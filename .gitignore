@@ -34,7 +34,6 @@ yarn-error.log*
 .env*
 
 # check .gitignore contains:
-.env
 .env.local
 .env*.local
 
