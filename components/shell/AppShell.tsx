@@ -34,7 +34,7 @@ export default function AppShell({ children, user }: AppShellProps) {
           userName={user.name}
           userRole={user.role}
         />
-        <main className="flex-1 overflow-auto bg-slate-50 p-6">
+        <main className="flex-1 overflow-auto bg-background p-4">
           {children}
         </main>
       </div>

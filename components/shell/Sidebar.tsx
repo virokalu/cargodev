@@ -133,7 +133,7 @@ export default function Sidebar({
       {/* Desktop sidebar — fixed left */}
       <aside
         className={cn(
-          "hidden md:flex flex-col flex-shrink-0 bg-[#0f1117] transition-all duration-200",
+          "hidden md:flex flex-col flex-shrink-0 bg-sidebar transition-all duration-200",
           collapsed ? "w-16" : "w-64"
         )}
       >
@@ -150,7 +150,7 @@ export default function Sidebar({
             aria-hidden="true"
           />
           {/* Slide-in panel */}
-          <aside className="relative w-64 flex flex-col bg-[#0f1117]">
+          <aside className="relative w-64 flex flex-col bg-sidebar">
             {/* Close button for mobile */}
             <button
               onClick={onClose}
