@@ -45,23 +45,27 @@ async function main() {
   console.log("Serial counters: FC=0, FL=0 (update before real entry starts)");
 
   // ── Default admin account ─────────────────────────────────────────────────
-  const hashed = await bcrypt.hash("admin123", 12);
+  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@globalmotors.lk";
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) throw new Error("ADMIN_PASSWORD is not set in .env — cannot seed admin account.");
+
+  const hashed = await bcrypt.hash(adminPassword, 12);
 
   const admin = await prisma.user.upsert({
-    where: { org_id_email: { org_id: org.id, email: "admin@globalmotors.lk" } },
+    where: { org_id_email: { org_id: org.id, email: adminEmail } },
     update: {},
     create: {
       org_id: org.id,
       userType: "STAFF",
       name: "Administrator",
-      email: "admin@globalmotors.lk",
+      email: adminEmail,
       password: hashed,
       loginEnabled: true,
       role: "ADMINISTRATOR",
     },
   });
 
-  console.log(`Admin user: ${admin.email} (password: admin123 — change on first login)`);
+  console.log(`Admin user: ${admin.email} (change password on first login)`);
 
   // ── Default row colour statuses ───────────────────────────────────────────
   // These match the spec §1. Admins can adjust colours in Settings later.
