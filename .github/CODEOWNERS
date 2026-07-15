@@ -1,0 +1,20 @@
+# CODEOWNERS — require review from the repo owner for security-sensitive paths.
+# Any PR touching these files will request a review from @virokalu automatically.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Auth, session, and guard logic
+/lib/auth.ts                    @virokalu
+/lib/env.ts                     @virokalu
+/lib/services/auth-guard.ts     @virokalu
+/types/next-auth.d.ts           @virokalu
+
+# Database schema and migrations (any change touches live data)
+/prisma/schema.prisma           @virokalu
+/prisma/migrations/             @virokalu
+/prisma/seed.ts                 @virokalu
+
+# CI/CD pipeline
+/.github/workflows/             @virokalu
+
+# NextAuth API route
+/app/api/auth/                  @virokalu
