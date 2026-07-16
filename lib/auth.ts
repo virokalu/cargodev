@@ -4,6 +4,7 @@
 
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { decode as jwtDecode, encode as jwtEncode } from "next-auth/jwt";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
@@ -16,10 +17,15 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "text" },
       },
 
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        const rememberMe =
+          credentials.rememberMe === "true" ||
+          credentials.rememberMe === "on";
 
         // Look up staff user only — customers cannot log in in Phase 1.
         const user = await prisma.user.findFirst({
@@ -67,6 +73,7 @@ export const authOptions: NextAuthOptions = {
           // role is confirmed non-null above
           role: user.role,
           orgId: user.org_id,
+          rememberMe,
         };
       },
     }),
@@ -78,6 +85,16 @@ export const authOptions: NextAuthOptions = {
     maxAge: 8 * 60 * 60,
   },
 
+  jwt: {
+    encode: async ({ token, secret }) => {
+      const maxAge = token?.rememberMe ? 30 * 24 * 60 * 60 : 8 * 60 * 60;
+      return await jwtEncode({ token, maxAge, secret });
+    },
+    decode: async ({ token, secret }) => {
+      return await jwtDecode({ token, secret });
+    },
+  },
+
   callbacks: {
     // Encode extra fields into the JWT token when the user first signs in.
     jwt({ token, user }) {
@@ -86,6 +103,7 @@ export const authOptions: NextAuthOptions = {
         // Cast: our authorize() return includes these but NextAuth's User type doesn't.
         token.role = (user as { role: StaffRole }).role;
         token.orgId = (user as { orgId: string }).orgId;
+        token.rememberMe = (user as { rememberMe: boolean }).rememberMe;
       }
       return token;
     },
@@ -96,6 +114,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as StaffRole;
         session.user.orgId = token.orgId as string;
+        session.user.rememberMe = token.rememberMe as boolean | undefined;
       }
       return session;
     },
