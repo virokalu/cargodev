@@ -6,10 +6,6 @@ import Link from "next/link";
 import {
   Search,
   Plus,
-  MoreHorizontal,
-  Eye,
-  Pencil,
-  Trash2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -31,13 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { vehicles, SHIPMENT_STATUSES, type VehicleStatus } from "@/lib/mock-data";
 
 const PAGE_SIZE = 10;
