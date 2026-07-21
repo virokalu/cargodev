@@ -149,6 +149,34 @@ export async function renameVehicleLocationAction(id: string, name: string) {
   return renamed;
 }
 
+// ── Freight Agent ─────────────────────────────────────────────────────────
+
+export async function searchFreightAgentsAction(query: string, method?: "RORO" | "CONTAINER") {
+  const user = await requireUser();
+  return lookupService.searchFreightAgents(user.orgId, query, method);
+}
+
+export async function createFreightAgentAction(
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.createFreightAgent(user.orgId, name, offersRoro, offersContainer);
+}
+
+export async function updateFreightAgentAction(
+  id: string,
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const updated = await lookupService.updateFreightAgent(user.orgId, id, name, offersRoro, offersContainer);
+  revalidatePath("/vehicles");
+  return updated;
+}
+
 // ── Customer ──────────────────────────────────────────────────────────────
 
 export async function searchCustomersAction(query: string) {

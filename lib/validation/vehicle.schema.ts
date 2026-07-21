@@ -54,6 +54,9 @@ export const vehicleCreateSchema = z
     track: z.enum(["FC", "FL"]),
     isLegacyEntry: z.boolean(),
     legacySerialNumber: z.number().int().positive().nullable().optional(),
+    // Only honoured by the service when isLegacyEntry && track === "FC" —
+    // otherwise status stays derived from ETD (Tech Doc §1).
+    shipmentStatus: z.enum(["PENDING", "BOOKING_RECEIVED", "SHIPPED"]).nullable().optional(),
 
     auctionItemNo: optionalText(100),
     chassisNo: z

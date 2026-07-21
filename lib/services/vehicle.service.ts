@@ -76,12 +76,18 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
       ? await assignLegacySerial(tx, user.orgId, input.track, legacySerialNumber!)
       : await assignNextSerial(tx, user.orgId, input.track);
 
-    // Shipment status is derived, never set manually (Tech Doc §1). A new FC
-    // vehicle created with an ETD already filled in must start at Booking
-    // Received, not Pending — the rest of the automation (revert on clear,
-    // daily cron to Shipped, computed-guard-on-read) belongs to the separate
-    // shipment-status service that runs on *edits*, not creation.
+    // Shipment status is derived, never set manually (Tech Doc §1) — with one
+    // documented exception: a legacy-serial FC record wasn't tracked through
+    // the real ETD flow, so staff pick the status it actually reached instead
+    // of every backfilled vehicle starting at a wrong "Pending". Everything
+    // else still starts derived: a new FC vehicle created with an ETD already
+    // filled in starts at Booking Received, not Pending — the rest of the
+    // automation (revert on clear, daily cron to Shipped, computed-guard-on-
+    // read) belongs to the separate shipment-status service that runs on
+    // *edits*, not creation.
     const startsBookingReceived = isFC && etd !== null;
+    const legacyStatus = input.isLegacyEntry && isFC ? input.shipmentStatus : null;
+    const initialStatus = legacyStatus ?? (startsBookingReceived ? "BOOKING_RECEIVED" : "PENDING");
 
     const created = await tx.vehicle.create({
       data: {
@@ -89,7 +95,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         serialPrefix: input.track,
         serialNumber,
         serial,
-        shipmentStatus: startsBookingReceived ? "BOOKING_RECEIVED" : "PENDING",
+        shipmentStatus: initialStatus,
 
         auctionItemNo: input.auctionItemNo,
         chassisNo: input.chassisNo,
@@ -128,7 +134,17 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
       },
     });
 
-    if (startsBookingReceived) {
+    if (legacyStatus && legacyStatus !== "PENDING") {
+      await tx.statusHistory.create({
+        data: {
+          vehicleId: created.id,
+          fromStatus: null,
+          toStatus: legacyStatus,
+          trigger: "LEGACY_ENTRY",
+          triggeredBy: user.id,
+        },
+      });
+    } else if (!legacyStatus && startsBookingReceived) {
       await tx.statusHistory.create({
         data: {
           vehicleId: created.id,

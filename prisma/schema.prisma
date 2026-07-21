@@ -382,7 +382,11 @@ model StatusHistory {
   vehicleId   String
   fromStatus  ShipmentStatus?
   toStatus    ShipmentStatus
-  // What caused the transition: "ETD_SAVED" | "ETD_CLEARED" | "CRON_JOB" | "COMPUTED_GUARD"
+  // What caused the transition: "ETD_SAVED" | "ETD_CLEARED" | "CRON_JOB" | "COMPUTED_GUARD" | "LEGACY_ENTRY"
+  // LEGACY_ENTRY = staff picked the starting status by hand on a legacy-serial
+  // record (Tech Doc §3) because the vehicle wasn't tracked through the real
+  // ETD flow. It's the one documented exception to "derived, never manually
+  // set" — normal (non-legacy) vehicles never get this trigger.
   trigger     String
   // null when triggered by cron/system; set when a staff action caused it
   triggeredBy String?
