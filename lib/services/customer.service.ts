@@ -7,6 +7,7 @@
 // uniqueness constraint on name, since people can legitimately share names.
 
 import { prisma } from "@/lib/prisma";
+import { ServiceError } from "@/lib/errors";
 
 export interface CustomerOption {
   id: string;
@@ -34,6 +35,26 @@ export async function createCustomer(orgId: string, name: string): Promise<Custo
       name: name.trim(),
       loginEnabled: false,
     },
+    select: { id: true, name: true },
+  });
+}
+
+/** Rename only — unlike the lookup services, this never checks for a
+ * duplicate name (customers can legitimately share a name, see above). */
+export async function renameCustomer(
+  orgId: string,
+  id: string,
+  newName: string
+): Promise<CustomerOption> {
+  const trimmed = newName.trim();
+  const current = await prisma.user.findUnique({ where: { id } });
+  if (!current || current.org_id !== orgId || current.userType !== "CUSTOMER") {
+    throw new ServiceError("NOT_FOUND", "Customer not found.");
+  }
+
+  return prisma.user.update({
+    where: { id },
+    data: { name: trimmed },
     select: { id: true, name: true },
   });
 }

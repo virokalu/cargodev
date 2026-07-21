@@ -76,8 +76,10 @@ async function main() {
     { name: "Resold in Auction",       colour: "#a855f7", transportCellOnly: false },
     { name: "Shaken Fax from Auc OK",  colour: "#06b6d4", transportCellOnly: false },
     { name: "Unit Canceled",           colour: "#ef4444", transportCellOnly: false },
-    // Special: colours only the Transport By cell, not the whole row.
-    { name: "Transport Complete",      colour: "#22c55e", transportCellOnly: true  },
+    // Special: colours only the Transport By cell, not the whole row. A
+    // distinct shade from "Sold" (both green, but Sold colours the whole
+    // row) so the two are never visually confused with each other.
+    { name: "Transport Complete",      colour: "#15803d", transportCellOnly: true  },
   ];
 
   for (const status of rowStatuses) {

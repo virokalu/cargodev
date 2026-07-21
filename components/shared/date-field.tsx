@@ -18,6 +18,10 @@ interface DateFieldProps {
   error?: string;
   hint?: string;
   disabled?: boolean;
+  /** Native "YYYY-MM-DD" floor — most browsers grey out earlier dates in the
+   * picker, e.g. ETA can't be picked before ETD. Still just a UI nudge, not
+   * validation on its own — the field can still be typed/pasted around it. */
+  min?: string;
 }
 
 export function DateField({
@@ -29,6 +33,7 @@ export function DateField({
   error,
   hint,
   disabled,
+  min,
 }: DateFieldProps) {
   return (
     <div>
@@ -42,6 +47,7 @@ export function DateField({
           id={id}
           type="date"
           value={value ?? ""}
+          min={min}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
           className={cn("pl-8", error && "border-destructive")}

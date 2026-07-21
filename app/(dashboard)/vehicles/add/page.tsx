@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/services/auth-guard";
 import { previewNextSerial } from "@/lib/services/serial.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
 import { COUNTRIES } from "@/lib/constants/countries";
-import { AddVehicleForm } from "@/components/vehicles/add-vehicle-form";
+import { VehicleForm } from "@/components/vehicles/vehicle-form";
 
 export default async function AddVehiclePage() {
   const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
@@ -19,7 +19,8 @@ export default async function AddVehiclePage() {
   ]);
 
   return (
-    <AddVehicleForm
+    <VehicleForm
+      mode="create"
       nextFcSerial={nextFcSerial}
       nextFlSerial={nextFlSerial}
       rowColourStatuses={rowColourStatuses}
