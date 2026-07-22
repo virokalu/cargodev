@@ -11,6 +11,9 @@
 // turns that into a Date | null for Prisma.
 
 import { z } from "zod";
+import { flattenFieldErrors } from "@/lib/validation/shared";
+
+export { flattenFieldErrors };
 
 function emptyToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) return null;
