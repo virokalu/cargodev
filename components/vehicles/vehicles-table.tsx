@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cell";
-import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
@@ -158,23 +157,29 @@ const SCROLL_COLUMNS: {
   {
     key: "auctionBillPaid",
     header: "Auction Bill Paid",
-    render: (row, ctx) =>
-      ctx.canWrite ? (
-        <AuctionBillPaidCell vehicleId={row.id} value={row.auctionBillPaid} />
-      ) : (
-        <TriStateCell value={row.auctionBillPaid} />
-      ),
+    render: (row) => <TriStateCell value={row.auctionBillPaid} />,
   },
   { key: "logBook", header: "Log Book", render: (row) => <TriStateCell value={row.logBook} /> },
   { key: "extraKey", header: "Extra Key", render: (row) => <TriStateCell value={row.extraKey} /> },
-  { key: "docsArrivedDate", header: "Docs Arrived Date", render: (row) => formatDate(row.docsArrivedDate) },
-  { key: "nameChangeDeadline", header: "Name Change Deadline", render: (row) => formatDate(row.nameChangeDeadline) },
-  { key: "massoDate", header: "Masso Date", render: (row) => formatDate(row.massoDate) },
+  {
+    key: "docsArrivedDate",
+    header: "Docs Arrived Date",
+    sortKey: "docsArrivedDate",
+    render: (row) => formatDate(row.docsArrivedDate),
+  },
+  {
+    key: "nameChangeDeadline",
+    header: "Name Change Deadline",
+    sortKey: "nameChangeDeadline",
+    render: (row) => formatDate(row.nameChangeDeadline),
+  },
+  { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
   { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
   { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
   {
     key: "docSent",
     header: "Doc Sent to Client",
+    sortKey: "docSentDate",
     render: (row) => (
       <div>
         <div>{formatDate(row.docSentDate)}</div>
@@ -186,7 +191,7 @@ const SCROLL_COLUMNS: {
       </div>
     ),
   },
-  { key: "recycleDate", header: "Recycle Date", render: (row) => formatDate(row.recycleDate) },
+  { key: "recycleDate", header: "Recycle Date", sortKey: "recycleDate", render: (row) => formatDate(row.recycleDate) },
   {
     key: "jibaishake",
     header: "Jibaishake",

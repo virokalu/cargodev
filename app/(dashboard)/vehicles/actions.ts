@@ -73,12 +73,6 @@ export async function updateRowColourStatusAction(
   revalidatePath("/vehicles");
 }
 
-export async function updateAuctionBillPaidAction(id: string, value: boolean | null): Promise<void> {
-  const user = await requireUser([...STAFF_CAN_WRITE]);
-  await vehicleService.updateVehicleAuctionBillPaid(user.orgId, user.id, id, value);
-  revalidatePath("/vehicles");
-}
-
 export async function checkChassisDuplicateAction(
   chassisNo: string,
   excludeId?: string

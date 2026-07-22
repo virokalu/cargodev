@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import type { VehicleListParams } from "@/lib/services/vehicle.service";
+import { VehicleFiltersPanel, type VehicleFilterSelections } from "@/components/vehicles/vehicle-filters-panel";
+import { VehicleFilterChips } from "@/components/vehicles/vehicle-filter-chips";
 
 interface RowColourStatusOption {
   id: string;
@@ -31,6 +33,7 @@ interface VehicleFiltersBarProps {
   params: VehicleListParams;
   destinations: string[];
   rowColourStatuses: RowColourStatusOption[];
+  selected: VehicleFilterSelections;
 }
 
 const DEBOUNCE_MS = 300;
@@ -40,6 +43,7 @@ export function VehicleFiltersBar({
   params,
   destinations,
   rowColourStatuses,
+  selected,
 }: VehicleFiltersBarProps) {
   const router = useRouter();
   const [searchText, setSearchText] = useState(params.search);
@@ -177,6 +181,8 @@ export function VehicleFiltersBar({
             ))}
           </SelectContent>
         </Select>
+
+        <VehicleFiltersPanel params={params} selected={selected} />
       </div>
 
       <div className="inline-flex gap-1 rounded-md bg-muted p-1">
@@ -211,6 +217,8 @@ export function VehicleFiltersBar({
           );
         })}
       </div>
+
+      <VehicleFilterChips params={params} selected={selected} />
     </div>
   );
 }
