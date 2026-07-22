@@ -37,6 +37,15 @@ export async function searchCustomers(orgId: string, query: string): Promise<Cus
   });
 }
 
+/** Resolves a single customer's label for the vehicle filter panel. */
+export async function getCustomerById(orgId: string, id: string): Promise<CustomerOption | null> {
+  const customer = await prisma.user.findFirst({
+    where: { id, org_id: orgId, userType: "CUSTOMER" },
+    select: { id: true, name: true },
+  });
+  return customer ?? null;
+}
+
 export async function createCustomer(orgId: string, name: string): Promise<CustomerOption> {
   return prisma.user.create({
     data: {

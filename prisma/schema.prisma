@@ -329,6 +329,15 @@ model Vehicle {
   @@index([org_id, shipmentStatus])
   @@index([org_id, customerId])
   @@index([org_id, deletedAt])
+  // Supports the vehicle list filter panel (each is a direct equality filter).
+  @@index([org_id, auctionHallId])
+  @@index([org_id, freightAgentId])
+  @@index([org_id, vehicleLocationId])
+  @@index([org_id, modelId])
+  @@index([org_id, gradeId])
+  @@index([org_id, destination])
+  @@index([org_id, rowColourStatusId])
+  @@index([org_id, shippingMethod])
 }
 
 // ─────────────────────────────────────────────

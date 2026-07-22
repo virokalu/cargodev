@@ -42,6 +42,13 @@ export async function searchBrands(orgId: string, query: string): Promise<Lookup
   });
 }
 
+/** Resolves a single brand's label for the vehicle filter panel — only called
+ * when a Brand filter is actually active, never as part of listing brands. */
+export async function getBrandById(orgId: string, id: string): Promise<LookupOption | null> {
+  const brand = await prisma.brand.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return brand ?? null;
+}
+
 export async function findOrCreateBrand(orgId: string, name: string): Promise<LookupOption> {
   const trimmed = name.trim();
   const existing = await prisma.brand.findFirst({
@@ -92,6 +99,15 @@ export async function searchModels(
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
   });
+}
+
+/** Resolves a single model's label for the vehicle filter panel. */
+export async function getModelById(orgId: string, id: string): Promise<LookupOption | null> {
+  const model = await prisma.vehicleModelRef.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return model ?? null;
 }
 
 export async function findOrCreateModel(
@@ -151,6 +167,12 @@ export async function searchGrades(
   });
 }
 
+/** Resolves a single grade's label for the vehicle filter panel. */
+export async function getGradeById(orgId: string, id: string): Promise<LookupOption | null> {
+  const grade = await prisma.grade.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return grade ?? null;
+}
+
 export async function findOrCreateGrade(
   orgId: string,
   modelId: string,
@@ -202,6 +224,12 @@ export async function searchAuctionHalls(orgId: string, query: string): Promise<
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
   });
+}
+
+/** Resolves a single auction hall's label for the vehicle filter panel. */
+export async function getAuctionHallById(orgId: string, id: string): Promise<LookupOption | null> {
+  const hall = await prisma.auctionHall.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return hall ?? null;
 }
 
 export async function findOrCreateAuctionHall(orgId: string, name: string): Promise<LookupOption> {
@@ -299,6 +327,15 @@ export async function searchVehicleLocations(orgId: string, query: string): Prom
   });
 }
 
+/** Resolves a single vehicle location's label for the vehicle filter panel. */
+export async function getVehicleLocationById(orgId: string, id: string): Promise<LookupOption | null> {
+  const location = await prisma.vehicleLocation.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return location ?? null;
+}
+
 export async function findOrCreateVehicleLocation(
   orgId: string,
   name: string
@@ -356,6 +393,15 @@ export async function listFreightAgents(orgId: string): Promise<FreightAgentOpti
     select: FREIGHT_AGENT_SELECT,
     orderBy: { name: "asc" },
   });
+}
+
+/** Resolves a single freight agent's label for the vehicle filter panel. */
+export async function getFreightAgentById(orgId: string, id: string): Promise<LookupOption | null> {
+  const agent = await prisma.freightAgent.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return agent ?? null;
 }
 
 export async function searchFreightAgents(

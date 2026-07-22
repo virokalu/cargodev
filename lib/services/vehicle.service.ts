@@ -540,31 +540,6 @@ export async function updateVehicleRowColourStatus(
   });
 }
 
-/** Quick inline-edit from the vehicle table — tri-state, so `null` (not
- * entered) is a valid value here too, same as everywhere else this flag
- * appears (CLAUDE.md "Tri-state flags"). */
-export async function updateVehicleAuctionBillPaid(
-  orgId: string,
-  actorId: string,
-  id: string,
-  value: boolean | null
-): Promise<void> {
-  const existing = await assertVehicleInOrg(orgId, id);
-
-  await prisma.$transaction(async (tx) => {
-    await tx.vehicle.update({ where: { id }, data: { auctionBillPaid: value } });
-    await activityLog.record(tx, {
-      orgId,
-      actorId,
-      action: "UPDATE_VEHICLE_AUCTION_BILL_PAID",
-      entity: "Vehicle",
-      entityId: id,
-      before: { auctionBillPaid: existing.auctionBillPaid },
-      after: { auctionBillPaid: value },
-    });
-  });
-}
-
 // ─────────────────────────────────────────────────────────────────────────
 // Vehicle list query layer (Tech Doc §1/§2, US-06/07/08) — powers the main
 // vehicle table: FC/FL toggle, search, per-column filters, sort, pagination.
@@ -594,7 +569,18 @@ export type VehicleListSortKey =
   | "purchaseDate"
   | "etd"
   | "eta"
-  | "destination";
+  | "destination"
+  | "docsArrivedDate"
+  | "nameChangeDeadline"
+  | "massoDate"
+  | "docSentDate"
+  | "recycleDate";
+
+/** Tri-state filters need a 4th state beyond the field's own null/true/false —
+ * "not filtering on this at all" is different from "filtering for blank"
+ * (CLAUDE.md tri-state rule: null is a real, distinct value, never a stand-in
+ * for "no filter applied"). */
+export type TriStateFilterValue = "ALL" | "YES" | "NO" | "BLANK";
 
 export interface VehicleListParams {
   page: number;
@@ -604,6 +590,17 @@ export interface VehicleListParams {
   shipmentStatus: ShipmentStatus | "ALL";
   destination: string | "ALL";
   rowColourStatusId: string | "ALL";
+  brandId: string | "ALL";
+  modelId: string | "ALL";
+  gradeId: string | "ALL";
+  auctionHallId: string | "ALL";
+  freightAgentId: string | "ALL";
+  vehicleLocationId: string | "ALL";
+  customerId: string | "ALL";
+  shippingMethod: ShippingMethod | "ALL";
+  auctionBillPaid: TriStateFilterValue;
+  logBook: TriStateFilterValue;
+  extraKey: TriStateFilterValue;
   sortBy: VehicleListSortKey;
   sortDir: "asc" | "desc";
 }
@@ -656,6 +653,18 @@ export interface VehicleListResult {
   totalPages: number;
 }
 
+/** Same 3-branch mapping repeats for Auction Bill Paid/Log Book/Extra Key —
+ * pulled out once rather than copy-pasted three times. */
+function applyTriStateFilter(
+  where: Prisma.VehicleWhereInput,
+  field: "auctionBillPaid" | "logBook" | "extraKey",
+  value: TriStateFilterValue
+): void {
+  if (value === "YES") where[field] = true;
+  else if (value === "NO") where[field] = false;
+  else if (value === "BLANK") where[field] = null;
+}
+
 function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma.VehicleWhereInput {
   const where: Prisma.VehicleWhereInput = { org_id: orgId, deletedAt: null };
 
@@ -663,6 +672,19 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.shipmentStatus !== "ALL") where.shipmentStatus = params.shipmentStatus;
   if (params.destination !== "ALL") where.destination = params.destination;
   if (params.rowColourStatusId !== "ALL") where.rowColourStatusId = params.rowColourStatusId;
+  // Vehicle stores modelId/gradeId directly, but not brandId — brand is one
+  // level up via the model relation.
+  if (params.brandId !== "ALL") where.model = { brand_id: params.brandId };
+  if (params.modelId !== "ALL") where.modelId = params.modelId;
+  if (params.gradeId !== "ALL") where.gradeId = params.gradeId;
+  if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
+  if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
+  if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
+  if (params.customerId !== "ALL") where.customerId = params.customerId;
+  if (params.shippingMethod !== "ALL") where.shippingMethod = params.shippingMethod;
+  applyTriStateFilter(where, "auctionBillPaid", params.auctionBillPaid);
+  applyTriStateFilter(where, "logBook", params.logBook);
+  applyTriStateFilter(where, "extraKey", params.extraKey);
 
   // US-08: free-text search matches serial, chassis, and auction item/lot no
   // only — everything else is a dedicated per-column filter, not free text.
@@ -705,6 +727,16 @@ function buildVehicleListOrderBy(
       return [{ eta: sortDir }];
     case "destination":
       return [{ destination: sortDir }];
+    case "docsArrivedDate":
+      return [{ docsArrivedDate: sortDir }];
+    case "nameChangeDeadline":
+      return [{ nameChangeDeadline: sortDir }];
+    case "massoDate":
+      return [{ massoDate: sortDir }];
+    case "docSentDate":
+      return [{ docSentDate: sortDir }];
+    case "recycleDate":
+      return [{ recycleDate: sortDir }];
   }
 }
 
