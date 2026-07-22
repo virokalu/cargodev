@@ -11,6 +11,9 @@
 // turns that into a Date | null for Prisma.
 
 import { z } from "zod";
+import { flattenFieldErrors } from "@/lib/validation/shared";
+
+export { flattenFieldErrors };
 
 function emptyToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) return null;
@@ -124,17 +127,3 @@ export const vehicleCreateSchema = z
   });
 
 export type VehicleCreateInput = z.infer<typeof vehicleCreateSchema>;
-
-/** Flattens zod's nested error tree into one message per field, for form display. */
-export function flattenFieldErrors(
-  error: z.ZodError
-): Record<string, string> {
-  const fieldErrors: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const key = issue.path.join(".");
-    if (key && !fieldErrors[key]) {
-      fieldErrors[key] = issue.message;
-    }
-  }
-  return fieldErrors;
-}
