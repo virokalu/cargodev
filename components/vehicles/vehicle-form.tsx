@@ -19,17 +19,9 @@ import {
   Loader2,
   AlertTriangle,
   Save,
-  ChevronDown,
 } from "lucide-react";
 
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -42,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SectionCard } from "@/components/shared/section-card";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
 import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobox-create";
@@ -324,48 +317,6 @@ function NumberField({
       />
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
-  );
-}
-
-function SectionCard({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  // Each card minimizes independently — staff filling a long form can collapse
-  // sections they've already finished without losing what's in them (fields
-  // keep their values while hidden, they're just not rendered).
-  const [open, setOpen] = useState(true);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg font-bold">
-          <Icon className="size-5 text-primary" />
-          {title}
-        </CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-        <CardAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setOpen((previous) => !previous)}
-            aria-expanded={open}
-            aria-label={open ? `Minimize ${title}` : `Expand ${title}`}
-          >
-            <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
-          </Button>
-        </CardAction>
-      </CardHeader>
-      {open && <CardContent className="grid gap-4 sm:grid-cols-2">{children}</CardContent>}
-    </Card>
   );
 }
 
