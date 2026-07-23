@@ -184,14 +184,11 @@ model User {
 | ~~Vehicles by destination~~ | ~~Pie~~ | removed — superseded by the more granular distribution charts in §7.2 |
 | Export volume by destination | *(moved)* | now one of the selectable views in the Vehicles by Category widget, §7.2 |
 | Transport status by company | Grouped bar / table | grouped by Transport By, split by row-colour status incl. Transport Complete |
-| Auction bill payment due | List / KPI | `auction_bill_paid` is `null` **or** `false` (i.e. not confirmed paid) |
+| Auction bill payment due | KPI card | `auction_bill_paid` is `null` **or** `false` (i.e. not confirmed paid) |
 
-Auction bill payment due is the one widget staff can still act on before it
-becomes a problem at the auction house, so it renders directly under the KPI
-cards (above the pie/bar charts), colour-coded by state rather than a fixed
-tint — **red** with an "N unpaid" badge while bills are outstanding, **green**
-with an "All paid" badge once every bill is confirmed paid — so it's never a
-neutral, easy-to-skip card either way.
+Auction bill payment due is the 4th KPI card, not a separate list widget —
+see §7.3, which also covers why it and Pending Shipping open a popup instead
+of navigating away like Total Vehicles and Shipped do.
 
 ### 7.1 Trend charts *(added post-spec, during implementation — US-43)*
 
@@ -249,7 +246,32 @@ every screen it appears on.
 Served by `getDashboardStats()` in `lib/services/dashboard.service.ts`, same
 function as the original KPI/pie/bar widgets above.
 
-## 8. Notifications — re-mapped to the new flow *(proposal — confirm)*
+### 7.3 KPI cards are clickable *(added post-spec, during implementation — US-45)*
+
+All 4 KPI cards (Total Vehicles, Pending Shipping, Shipped, Unpaid Auction
+Bills) are clickable, but not all the same way:
+
+- **Total Vehicles** and **Shipped** link straight to the vehicles table —
+  Shipped links to `/vehicles?status=SHIPPED&track=FC`, the exact filter that
+  matches what the card counted.
+- **Pending Shipping** and **Unpaid Auction Bills** open a popup first,
+  listing every matching vehicle as a small box (serial + year, brand/model,
+  customer name) — a Manager usually wants to know *which* vehicles before
+  deciding whether it's worth leaving the dashboard. Picking one closes the
+  popup and opens the vehicles table pre-filtered to that vehicle's serial
+  (`/vehicles?q=<serial>`), which — since serial is unique per org — shows
+  exactly that one row.
+
+Both popups share one component (`VehicleSummaryDialog` in
+`dashboard-kpi-cards.tsx`) and one data shape (`VehicleSummary`, in
+`dashboard.service.ts`) — same three at-a-glance fields either way, just a
+different source list and title/description.
+
+Unpaid Auction Bills used to be its own always-visible list card (colour-
+coded red/green) below the KPI row; it's now the 4th KPI card instead, tone-
+coded the same red-while-outstanding/green-once-clear way via `StatCard`'s
+`tone` prop, so it keeps standing out without breaking the now-uniform
+4-card KPI row.
 
 The old Arrived/Delayed events no longer exist. Proposed Phase 1 events: **Booking Received** (auto, in-app), **Shipped** (auto, in-app + email), **Name-change deadline approaching** (7 and 1 days before, in-app + email — this is the highest-value alert in the new model), **Document/photo uploaded** (in-app). WhatsApp add-on channel attaches to Shipped + deadline alerts. Same fan-out core as v1.
 
