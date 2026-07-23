@@ -13,12 +13,13 @@ import * as lookupService from "@/lib/services/lookup.service";
 import * as customerService from "@/lib/services/customer.service";
 
 const STAFF_CAN_WRITE = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
+const STAFF_CAN_DELETE = ["ADMINISTRATOR", "MANAGER"] as const;
 
-export type CreateVehicleResult =
+export type VehicleMutationResult =
   | { ok: true; id: string; serial: string }
   | { ok: false; code: ServiceErrorCode; message: string; fieldErrors?: Record<string, string> };
 
-export async function createVehicleAction(input: unknown): Promise<CreateVehicleResult> {
+export async function createVehicleAction(input: unknown): Promise<VehicleMutationResult> {
   const user = await requireUser([...STAFF_CAN_WRITE]);
   try {
     const vehicle = await vehicleService.createVehicle(user, input);
@@ -32,9 +33,52 @@ export async function createVehicleAction(input: unknown): Promise<CreateVehicle
   }
 }
 
-export async function checkChassisDuplicateAction(chassisNo: string): Promise<boolean> {
+export async function updateVehicleAction(id: string, input: unknown): Promise<VehicleMutationResult> {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  try {
+    const vehicle = await vehicleService.updateVehicle(user, id, input);
+    revalidatePath("/vehicles");
+    revalidatePath(`/vehicles/${id}/edit`);
+    return { ok: true, id: vehicle.id, serial: vehicle.serial };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, code: error.code, message: error.message, fieldErrors: error.fieldErrors };
+    }
+    throw error;
+  }
+}
+
+export async function deleteVehicleAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_DELETE]);
+  try {
+    await vehicleService.deleteVehicle(user.orgId, user.id, id);
+    revalidatePath("/vehicles");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+export async function updateRowColourStatusAction(
+  id: string,
+  rowColourStatusId: string | null
+): Promise<void> {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  await vehicleService.updateVehicleRowColourStatus(user.orgId, user.id, id, rowColourStatusId);
+  revalidatePath("/vehicles");
+}
+
+export async function checkChassisDuplicateAction(
+  chassisNo: string,
+  excludeId?: string
+): Promise<boolean> {
   const user = await requireUser();
-  return vehicleService.hasDuplicateChassisNo(user.orgId, chassisNo);
+  return vehicleService.hasDuplicateChassisNo(user.orgId, chassisNo, excludeId);
 }
 
 export async function previewNextSerialAction(prefix: "FC" | "FL"): Promise<string> {
@@ -149,6 +193,34 @@ export async function renameVehicleLocationAction(id: string, name: string) {
   return renamed;
 }
 
+// ── Freight Agent ─────────────────────────────────────────────────────────
+
+export async function searchFreightAgentsAction(query: string, method?: "RORO" | "CONTAINER") {
+  const user = await requireUser();
+  return lookupService.searchFreightAgents(user.orgId, query, method);
+}
+
+export async function createFreightAgentAction(
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.createFreightAgent(user.orgId, name, offersRoro, offersContainer);
+}
+
+export async function updateFreightAgentAction(
+  id: string,
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const updated = await lookupService.updateFreightAgent(user.orgId, id, name, offersRoro, offersContainer);
+  revalidatePath("/vehicles");
+  return updated;
+}
+
 // ── Customer ──────────────────────────────────────────────────────────────
 
 export async function searchCustomersAction(query: string) {
@@ -159,4 +231,11 @@ export async function searchCustomersAction(query: string) {
 export async function createCustomerAction(name: string) {
   const user = await requireUser([...STAFF_CAN_WRITE]);
   return customerService.createCustomer(user.orgId, name);
+}
+
+export async function renameCustomerAction(id: string, name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const renamed = await customerService.renameCustomer(user.orgId, id, name);
+  revalidatePath("/vehicles");
+  return renamed;
 }

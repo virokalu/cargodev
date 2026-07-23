@@ -298,6 +298,11 @@ model Vehicle {
 
   rowColourStatusId String? // FK → RowColourStatus (nullable — no colour = no status set)
 
+  // Soft delete — null = active. Every read path (table, edit, chassis-dup
+  // check) filters this out; the row (and its serial, so the number is never
+  // reissued) stays in the database, just hidden from normal use.
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -323,6 +328,16 @@ model Vehicle {
   @@index([org_id, serialPrefix])
   @@index([org_id, shipmentStatus])
   @@index([org_id, customerId])
+  @@index([org_id, deletedAt])
+  // Supports the vehicle list filter panel (each is a direct equality filter).
+  @@index([org_id, auctionHallId])
+  @@index([org_id, freightAgentId])
+  @@index([org_id, vehicleLocationId])
+  @@index([org_id, modelId])
+  @@index([org_id, gradeId])
+  @@index([org_id, destination])
+  @@index([org_id, rowColourStatusId])
+  @@index([org_id, shippingMethod])
 }
 
 // ─────────────────────────────────────────────
@@ -337,7 +352,10 @@ model RemarkEntry {
   body      String
   createdAt DateTime @default(now())
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  // Deleting a vehicle removes its own remarks with it — the append-only
+  // rule (never edit/delete a remark while its vehicle exists) doesn't
+  // extend to "must outlive the vehicle it's about."
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id])
 
   @@index([vehicleId])
@@ -354,7 +372,7 @@ model VehiclePhoto {
   url       String   // Cloudflare R2 URL (presigned for uploads, standard for reads)
   createdAt DateTime @default(now())
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
 }
@@ -367,7 +385,7 @@ model VehicleDocument {
   name      String   // Original filename shown in the UI
   createdAt DateTime @default(now())
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
 }
@@ -382,13 +400,17 @@ model StatusHistory {
   vehicleId   String
   fromStatus  ShipmentStatus?
   toStatus    ShipmentStatus
-  // What caused the transition: "ETD_SAVED" | "ETD_CLEARED" | "CRON_JOB" | "COMPUTED_GUARD"
+  // What caused the transition: "ETD_SAVED" | "ETD_CLEARED" | "CRON_JOB" | "COMPUTED_GUARD" | "LEGACY_ENTRY"
+  // LEGACY_ENTRY = staff picked the starting status by hand on a legacy-serial
+  // record (Tech Doc §3) because the vehicle wasn't tracked through the real
+  // ETD flow. It's the one documented exception to "derived, never manually
+  // set" — normal (non-legacy) vehicles never get this trigger.
   trigger     String
   // null when triggered by cron/system; set when a staff action caused it
   triggeredBy String?
   createdAt   DateTime       @default(now())
 
-  vehicle     Vehicle        @relation(fields: [vehicleId], references: [id])
+  vehicle     Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
 }

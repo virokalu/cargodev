@@ -8,7 +8,8 @@
 import { cn } from "@/lib/utils";
 
 interface TriStateToggleProps {
-  label: string;
+  /** Omit for a compact, unlabelled control (e.g. inline in a table cell). */
+  label?: string;
   value: boolean | null;
   onChange: (value: boolean | null) => void;
   disabled?: boolean;
@@ -23,7 +24,7 @@ const SEGMENTS: { value: boolean | null; label: string }[] = [
 export function TriStateToggle({ label, value, onChange, disabled }: TriStateToggleProps) {
   return (
     <div>
-      <span className="mb-1.5 block text-sm font-semibold">{label}</span>
+      {label && <span className="mb-1.5 block text-sm font-semibold">{label}</span>}
       <div className="inline-flex gap-1 rounded-md bg-muted p-1">
         {SEGMENTS.map((segment) => {
           const isActive = segment.value === value;

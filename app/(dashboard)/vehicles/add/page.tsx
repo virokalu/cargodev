@@ -1,27 +1,28 @@
 import { requireUser } from "@/lib/services/auth-guard";
 import { previewNextSerial } from "@/lib/services/serial.service";
-import { listFreightAgents, listRowColourStatuses } from "@/lib/services/lookup.service";
+import { listRowColourStatuses } from "@/lib/services/lookup.service";
 import { COUNTRIES } from "@/lib/constants/countries";
-import { AddVehicleForm } from "@/components/vehicles/add-vehicle-form";
+import { VehicleForm } from "@/components/vehicles/vehicle-form";
 
 export default async function AddVehiclePage() {
   const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
 
   // Fetched here (not in the client component) so the serial preview and the
-  // Freight Agent / Row Colour Status selects render on first paint with no
-  // loading flash — they're plain page content, not popovers.
-  const [nextFcSerial, nextFlSerial, freightAgents, rowColourStatuses] = await Promise.all([
+  // Row Colour Status select render on first paint with no loading flash —
+  // it's plain page content, not a popover. Freight Agent is a popover
+  // (FreightAgentCombobox) that loads its own options on open, same as
+  // Brand/Model/etc., so it doesn't need an eager list here.
+  const [nextFcSerial, nextFlSerial, rowColourStatuses] = await Promise.all([
     previewNextSerial(user.orgId, "FC"),
     previewNextSerial(user.orgId, "FL"),
-    listFreightAgents(user.orgId),
     listRowColourStatuses(user.orgId),
   ]);
 
   return (
-    <AddVehicleForm
+    <VehicleForm
+      mode="create"
       nextFcSerial={nextFcSerial}
       nextFlSerial={nextFlSerial}
-      freightAgents={freightAgents}
       rowColourStatuses={rowColourStatuses}
       countries={COUNTRIES}
     />

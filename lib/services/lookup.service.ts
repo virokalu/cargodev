@@ -42,6 +42,13 @@ export async function searchBrands(orgId: string, query: string): Promise<Lookup
   });
 }
 
+/** Resolves a single brand's label for the vehicle filter panel — only called
+ * when a Brand filter is actually active, never as part of listing brands. */
+export async function getBrandById(orgId: string, id: string): Promise<LookupOption | null> {
+  const brand = await prisma.brand.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return brand ?? null;
+}
+
 export async function findOrCreateBrand(orgId: string, name: string): Promise<LookupOption> {
   const trimmed = name.trim();
   const existing = await prisma.brand.findFirst({
@@ -92,6 +99,15 @@ export async function searchModels(
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
   });
+}
+
+/** Resolves a single model's label for the vehicle filter panel. */
+export async function getModelById(orgId: string, id: string): Promise<LookupOption | null> {
+  const model = await prisma.vehicleModelRef.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return model ?? null;
 }
 
 export async function findOrCreateModel(
@@ -151,6 +167,12 @@ export async function searchGrades(
   });
 }
 
+/** Resolves a single grade's label for the vehicle filter panel. */
+export async function getGradeById(orgId: string, id: string): Promise<LookupOption | null> {
+  const grade = await prisma.grade.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return grade ?? null;
+}
+
 export async function findOrCreateGrade(
   orgId: string,
   modelId: string,
@@ -202,6 +224,12 @@ export async function searchAuctionHalls(orgId: string, query: string): Promise<
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
   });
+}
+
+/** Resolves a single auction hall's label for the vehicle filter panel. */
+export async function getAuctionHallById(orgId: string, id: string): Promise<LookupOption | null> {
+  const hall = await prisma.auctionHall.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return hall ?? null;
 }
 
 export async function findOrCreateAuctionHall(orgId: string, name: string): Promise<LookupOption> {
@@ -299,6 +327,15 @@ export async function searchVehicleLocations(orgId: string, query: string): Prom
   });
 }
 
+/** Resolves a single vehicle location's label for the vehicle filter panel. */
+export async function getVehicleLocationById(orgId: string, id: string): Promise<LookupOption | null> {
+  const location = await prisma.vehicleLocation.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return location ?? null;
+}
+
 export async function findOrCreateVehicleLocation(
   orgId: string,
   name: string
@@ -339,23 +376,112 @@ export async function renameVehicleLocation(
   });
 }
 
-// ── Read-only lists (Freight Agent, Row Colour Status — plain selects) ─────
-// These are NOT inline-create from the vehicle form: Freight Agent needs its
-// RORO/Container capability flags set correctly (no sane default if created
-// blind here), and Row Colour Status is admin-managed in Settings.
+// ── Freight Agent (inline-create, but RORO/Container capability is set
+// explicitly at creation time — never defaulted blind, since those flags
+// gate which shipping method can later be picked for that agent) ──────────
 
 export interface FreightAgentOption extends LookupOption {
   offersRoro: boolean;
   offersContainer: boolean;
 }
 
+const FREIGHT_AGENT_SELECT = { id: true, name: true, offersRoro: true, offersContainer: true } as const;
+
 export async function listFreightAgents(orgId: string): Promise<FreightAgentOption[]> {
   return prisma.freightAgent.findMany({
     where: { org_id: orgId },
-    select: { id: true, name: true, offersRoro: true, offersContainer: true },
+    select: FREIGHT_AGENT_SELECT,
     orderBy: { name: "asc" },
   });
 }
+
+/** Resolves a single freight agent's label for the vehicle filter panel. */
+export async function getFreightAgentById(orgId: string, id: string): Promise<LookupOption | null> {
+  const agent = await prisma.freightAgent.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return agent ?? null;
+}
+
+export async function searchFreightAgents(
+  orgId: string,
+  query: string,
+  method?: "RORO" | "CONTAINER"
+): Promise<FreightAgentOption[]> {
+  return prisma.freightAgent.findMany({
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(method === "RORO" && { offersRoro: true }),
+      ...(method === "CONTAINER" && { offersContainer: true }),
+    },
+    select: FREIGHT_AGENT_SELECT,
+    orderBy: { name: "asc" },
+    take: SEARCH_LIMIT,
+  });
+}
+
+function assertHasCapability(offersRoro: boolean, offersContainer: boolean) {
+  if (!offersRoro && !offersContainer) {
+    throw new ServiceError("VALIDATION", "Select RORO, Container, or both for this agent.");
+  }
+}
+
+export async function createFreightAgent(
+  orgId: string,
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+): Promise<FreightAgentOption> {
+  const trimmed = name.trim();
+  assertHasCapability(offersRoro, offersContainer);
+
+  // Same case-insensitive dedupe as the other lookups — if the name already
+  // exists, reuse that row rather than creating a duplicate. The capability
+  // flags picked in the create form are only used for a genuinely new agent.
+  const existing = await prisma.freightAgent.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" } },
+    select: FREIGHT_AGENT_SELECT,
+  });
+  if (existing) return existing;
+
+  return prisma.freightAgent.create({
+    data: { org_id: orgId, name: trimmed, offersRoro, offersContainer },
+    select: FREIGHT_AGENT_SELECT,
+  });
+}
+
+export async function updateFreightAgent(
+  orgId: string,
+  id: string,
+  name: string,
+  offersRoro: boolean,
+  offersContainer: boolean
+): Promise<FreightAgentOption> {
+  const trimmed = name.trim();
+  assertHasCapability(offersRoro, offersContainer);
+
+  const current = await prisma.freightAgent.findUnique({ where: { id } });
+  assertBelongsToOrg(orgId, current, "Freight agent not found.");
+
+  const duplicate = await prisma.freightAgent.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" }, id: { not: id } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new ServiceError("CONFLICT", `A freight agent named "${trimmed}" already exists.`);
+  }
+
+  return prisma.freightAgent.update({
+    where: { id },
+    data: { name: trimmed, offersRoro, offersContainer },
+    select: FREIGHT_AGENT_SELECT,
+  });
+}
+
+// ── Read-only lists (Row Colour Status — plain select, admin-managed in
+// Settings, not inline-create from the vehicle form) ───────────────────────
 
 export async function listRowColourStatuses(orgId: string): Promise<
   (LookupOption & { colour: string; transportCellOnly: boolean })[]

@@ -34,7 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -45,12 +45,15 @@ import {
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
 import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobox-create";
+import { FreightAgentCombobox } from "@/components/shared/freight-agent-combobox";
 import { CountrySelect } from "@/components/shared/country-select";
 import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
+import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import {
   createVehicleAction,
+  updateVehicleAction,
   checkChassisDuplicateAction,
   searchBrandsAction,
   createBrandAction,
@@ -70,24 +73,44 @@ import {
   searchVehicleLocationsAction,
   createVehicleLocationAction,
   renameVehicleLocationAction,
+  searchFreightAgentsAction,
+  createFreightAgentAction,
+  updateFreightAgentAction,
   searchCustomersAction,
   createCustomerAction,
+  renameCustomerAction,
 } from "@/app/(dashboard)/vehicles/actions";
 
 type RowColourStatusOption = LookupOption & { colour: string; transportCellOnly: boolean };
 
-interface AddVehicleFormProps {
-  nextFcSerial: string;
-  nextFlSerial: string;
-  freightAgents: FreightAgentOption[];
+interface VehicleFormProps {
+  mode: "create" | "edit";
+  /** Required when mode === "edit". */
+  vehicleId?: string;
+  /** Read-only display values for edit mode — serial/track/status are all
+   * fixed by the creation flow (Tech Doc §3) or derived server-side, so
+   * they're shown, never fed back into FormState. */
+  existingSerial?: string;
+  existingTrack?: "FC" | "FL";
+  existingShipmentStatus?: ShipmentStatus;
+  /** Prefills FormState in edit mode; ignored in create mode. */
+  initialValues?: Partial<FormState>;
+  /** Create mode only — the next-serial preview shown before a track/legacy
+   * choice is made. */
+  nextFcSerial?: string;
+  nextFlSerial?: string;
   rowColourStatuses: RowColourStatusOption[];
   countries: CountryOption[];
 }
 
-interface FormState {
+export interface FormState {
   track: "FC" | "FL";
   isLegacyEntry: boolean;
   legacySerialNumberText: string;
+  // Only used (and only shown) when isLegacyEntry && track === "FC" — a
+  // legacy record wasn't tracked through the real ETD flow, so staff pick
+  // the status it actually reached instead of everything starting Pending.
+  manualShipmentStatus: ShipmentStatus;
 
   auctionItemNo: string;
   chassisNo: string;
@@ -104,7 +127,7 @@ interface FormState {
   etd: string | null;
   eta: string | null;
   blNo: string;
-  freightAgentId: string;
+  freightAgent: FreightAgentOption | null;
   shippingMethod: "" | "RORO" | "CONTAINER";
   trackingNo: string;
 
@@ -130,6 +153,7 @@ const INITIAL_STATE: FormState = {
   track: "FC",
   isLegacyEntry: false,
   legacySerialNumberText: "",
+  manualShipmentStatus: "PENDING",
 
   auctionItemNo: "",
   chassisNo: "",
@@ -146,7 +170,7 @@ const INITIAL_STATE: FormState = {
   etd: null,
   eta: null,
   blNo: "",
-  freightAgentId: "",
+  freightAgent: null,
   shippingMethod: "",
   trackingNo: "",
 
@@ -176,10 +200,15 @@ function buildPayload(state: FormState) {
       ? null
       : Number.parseInt(state.legacySerialNumberText, 10);
 
+  const isFC = state.track === "FC";
+
   return {
     track: state.track,
     isLegacyEntry: state.isLegacyEntry,
     legacySerialNumber: Number.isNaN(legacySerialNumber) ? null : legacySerialNumber,
+    // Server ignores this unless isLegacyEntry && track === "FC" — sending it
+    // otherwise would be meaningless since status stays derived from ETD.
+    shipmentStatus: state.isLegacyEntry && isFC ? state.manualShipmentStatus : null,
 
     auctionItemNo: state.auctionItemNo,
     chassisNo: state.chassisNo,
@@ -196,7 +225,7 @@ function buildPayload(state: FormState) {
     etd: state.etd,
     eta: state.eta,
     blNo: state.blNo,
-    freightAgentId: state.freightAgentId || null,
+    freightAgentId: state.freightAgent?.id ?? null,
     shippingMethod: state.shippingMethod || null,
     trackingNo: state.trackingNo,
 
@@ -340,15 +369,24 @@ function SectionCard({
   );
 }
 
-export function AddVehicleForm({
+export function VehicleForm({
+  mode,
+  vehicleId,
+  existingSerial,
+  existingTrack,
+  existingShipmentStatus,
+  initialValues,
   nextFcSerial,
   nextFlSerial,
-  freightAgents,
   rowColourStatuses,
   countries,
-}: AddVehicleFormProps) {
+}: VehicleFormProps) {
   const router = useRouter();
-  const [state, setState] = useState<FormState>(INITIAL_STATE);
+  const [state, setState] = useState<FormState>(() => ({
+    ...INITIAL_STATE,
+    ...(mode === "edit" ? { track: existingTrack ?? INITIAL_STATE.track } : {}),
+    ...initialValues,
+  }));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [chassisDuplicate, setChassisDuplicate] = useState(false);
@@ -360,9 +398,24 @@ export function AddVehicleForm({
 
   const isFC = state.track === "FC";
   const nextSerialPreview = state.track === "FC" ? nextFcSerial : nextFlSerial;
-  const shipmentStatusLabel = isFC && state.etd ? "Booking Received" : "Pending";
 
-  const selectedAgent = freightAgents.find((agent) => agent.id === state.freightAgentId);
+  // Same "documented exception" as the server (vehicle.service.ts): a legacy
+  // FC record's real status is picked by hand instead of derived from ETD —
+  // and that exception only ever applies at creation, never on a later edit.
+  const canSetShipmentStatusManually = mode === "create" && isFC && state.isLegacyEntry;
+  const derivedShipmentStatus: ShipmentStatus = isFC && state.etd ? "BOOKING_RECEIVED" : "PENDING";
+  const shipmentStatus =
+    mode === "edit"
+      ? (existingShipmentStatus ?? derivedShipmentStatus)
+      : canSetShipmentStatusManually
+        ? state.manualShipmentStatus
+        : derivedShipmentStatus;
+
+  // "YYYY-MM-DD" strings compare correctly with <= (ISO date strings sort
+  // lexicographically), so no Date parsing needed here. Server re-checks the
+  // same rule (vehicle.schema.ts) — this is just immediate UI feedback.
+  const etaError =
+    state.etd && state.eta && state.eta <= state.etd ? "ETA must be after ETD" : undefined;
 
   async function handleChassisBlur() {
     const trimmed = state.chassisNo.trim();
@@ -370,26 +423,45 @@ export function AddVehicleForm({
       setChassisDuplicate(false);
       return;
     }
-    const isDuplicate = await checkChassisDuplicateAction(trimmed);
+    const isDuplicate = await checkChassisDuplicateAction(trimmed, vehicleId);
     setChassisDuplicate(isDuplicate);
   }
 
-  function handleFreightAgentChange(value: string | null) {
-    const agentId = value ?? "";
-    const agent = freightAgents.find((a) => a.id === agentId);
-    // A method the new agent doesn't support can't stay selected — server
-    // would reject it anyway, but resetting here avoids a confusing round trip.
-    const methodStillValid =
-      state.shippingMethod === "RORO"
-        ? agent?.offersRoro
-        : state.shippingMethod === "CONTAINER"
-          ? agent?.offersContainer
-          : true;
-    setState((previous) => ({
-      ...previous,
-      freightAgentId: agentId,
-      shippingMethod: methodStillValid ? previous.shippingMethod : "",
-    }));
+  // Freight Agent and RORO/Container can be filled in either order (staff
+  // sometimes know the shipping method before they've picked an agent).
+  // Whichever one changes, drop the other if it's no longer a valid
+  // combination — the server re-checks this regardless (CLAUDE.md rule 4),
+  // but resetting here avoids a confusing round trip through a field error.
+  function handleFreightAgentChange(agent: FreightAgentOption | null) {
+    setState((previous) => {
+      const methodStillValid =
+        !agent || previous.shippingMethod === ""
+          ? true
+          : previous.shippingMethod === "RORO"
+            ? agent.offersRoro
+            : agent.offersContainer;
+      return {
+        ...previous,
+        freightAgent: agent,
+        shippingMethod: methodStillValid ? previous.shippingMethod : "",
+      };
+    });
+  }
+
+  function handleShippingMethodChange(method: "" | "RORO" | "CONTAINER") {
+    setState((previous) => {
+      const agentStillValid =
+        !previous.freightAgent || method === ""
+          ? true
+          : method === "RORO"
+            ? previous.freightAgent.offersRoro
+            : previous.freightAgent.offersContainer;
+      return {
+        ...previous,
+        shippingMethod: method,
+        freightAgent: agentStillValid ? previous.freightAgent : null,
+      };
+    });
   }
 
   async function handleSubmit() {
@@ -397,7 +469,10 @@ export function AddVehicleForm({
     setBannerError(null);
     setFieldErrors({});
 
-    const result = await createVehicleAction(buildPayload(state));
+    const result =
+      mode === "edit"
+        ? await updateVehicleAction(vehicleId!, buildPayload(state))
+        : await createVehicleAction(buildPayload(state));
 
     if (!result.ok) {
       setFieldErrors(result.fieldErrors ?? {});
@@ -413,8 +488,14 @@ export function AddVehicleForm({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Add Vehicle</h1>
-          <p className="text-muted-foreground">Register a new vehicle record.</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {mode === "edit" ? "Edit Vehicle" : "Add Vehicle"}
+          </h1>
+          <p className="text-muted-foreground">
+            {mode === "edit"
+              ? `Update ${existingSerial}'s record.`
+              : "Register a new vehicle record."}
+          </p>
         </div>
       </div>
 
@@ -431,23 +512,29 @@ export function AddVehicleForm({
           <SectionCard icon={Fingerprint} title="Serial & Track">
             <div className="sm:col-span-2">
               <span className="mb-1.5 block text-sm font-semibold">Track</span>
-              <div className="inline-flex gap-1 rounded-md bg-muted p-1">
-                {(["FC", "FL"] as const).map((track) => (
-                  <button
-                    key={track}
-                    type="button"
-                    onClick={() => setField("track", track)}
-                    className={cn(
-                      "min-w-24 rounded-sm px-3 py-1.5 text-sm font-semibold transition-colors",
-                      state.track === track
-                        ? "bg-card text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {track === "FC" ? "FC — Export" : "FL — Local"}
-                  </button>
-                ))}
-              </div>
+              {mode === "edit" ? (
+                <Badge variant="outline" className="text-sm">
+                  {isFC ? "FC — Export" : "FL — Local"}
+                </Badge>
+              ) : (
+                <div className="inline-flex gap-1 rounded-md bg-muted p-1">
+                  {(["FC", "FL"] as const).map((track) => (
+                    <button
+                      key={track}
+                      type="button"
+                      onClick={() => setField("track", track)}
+                      className={cn(
+                        "min-w-24 rounded-sm px-3 py-1.5 text-sm font-semibold transition-colors",
+                        state.track === track
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {track === "FC" ? "FC — Export" : "FL — Local"}
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className="mt-2 text-xs text-muted-foreground">
                 {isFC
                   ? "Export vehicle — full shipping lifecycle tracked."
@@ -455,20 +542,29 @@ export function AddVehicleForm({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <input
-                id="isLegacyEntry"
-                type="checkbox"
-                checked={state.isLegacyEntry}
-                onChange={(event) => setField("isLegacyEntry", event.target.checked)}
-                className="size-4 rounded border-input accent-primary"
-              />
-              <Label htmlFor="isLegacyEntry" className="font-normal">
-                Enter a legacy serial number manually
-              </Label>
-            </div>
+            {mode === "create" && (
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <input
+                  id="isLegacyEntry"
+                  type="checkbox"
+                  checked={state.isLegacyEntry}
+                  onChange={(event) => setField("isLegacyEntry", event.target.checked)}
+                  className="size-4 rounded border-input accent-primary"
+                />
+                <Label htmlFor="isLegacyEntry" className="font-normal">
+                  Enter a legacy serial number manually
+                </Label>
+              </div>
+            )}
 
-            {state.isLegacyEntry ? (
+            {mode === "edit" ? (
+              <div>
+                <span className="mb-1.5 block text-sm font-semibold">Serial No</span>
+                <Badge variant="outline" className="font-mono text-sm">
+                  {existingSerial}
+                </Badge>
+              </div>
+            ) : state.isLegacyEntry ? (
               <NumberField
                 id="legacySerialNumber"
                 label={`Legacy Serial Number (after ${state.track})`}
@@ -486,11 +582,49 @@ export function AddVehicleForm({
               </div>
             )}
 
-            <div>
+            <div className="sm:col-span-2">
               <span className="mb-1.5 block text-sm font-semibold">Shipment Status</span>
-              <Badge variant={shipmentStatusLabel === "Pending" ? "secondary" : "info"}>
-                {shipmentStatusLabel}
-              </Badge>
+              {canSetShipmentStatusManually ? (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.keys(SHIPMENT_STATUS_META) as ShipmentStatus[]).map((status) => {
+                      const meta = SHIPMENT_STATUS_META[status];
+                      const active = state.manualShipmentStatus === status;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => setField("manualShipmentStatus", status)}
+                          className={cn(
+                            active
+                              ? badgeVariants({ variant: meta.badgeVariant })
+                              : badgeVariants({ variant: "outline" }),
+                            "cursor-pointer transition-colors",
+                            !active && "text-muted-foreground hover:text-foreground"
+                          )}
+                          aria-pressed={active}
+                        >
+                          {meta.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
+                    tracked through the normal ETD flow.
+                  </p>
+                </>
+              ) : (
+                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                  {SHIPMENT_STATUS_META[shipmentStatus].label}
+                </Badge>
+              )}
+              {mode === "edit" && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Updates automatically — set or clear ETD below to move this between Pending and
+                  Booking Received.
+                </p>
+              )}
             </div>
           </SectionCard>
 
@@ -605,6 +739,7 @@ export function AddVehicleForm({
               onChange={(value) => setField("customer", value)}
               search={searchCustomersAction}
               onCreate={createCustomerAction}
+              onRename={(option, name) => renameCustomerAction(option.id, name)}
               error={fieldErrors.customerId}
             />
             <CountrySelect
@@ -634,6 +769,8 @@ export function AddVehicleForm({
                 label="ETA"
                 value={state.eta}
                 onChange={(value) => setField("eta", value)}
+                min={state.etd ?? undefined}
+                error={fieldErrors.eta || etaError}
               />
               <TextField
                 id="blNo"
@@ -642,48 +779,46 @@ export function AddVehicleForm({
                 onChange={(value) => setField("blNo", value)}
                 maxLength={100}
               />
-              <div>
-                <Label htmlFor="freightAgentId" className="mb-1.5">
-                  Freight Agent
-                </Label>
-                <Select value={state.freightAgentId} onValueChange={handleFreightAgentChange}>
-                  <SelectTrigger id="freightAgentId" className="w-full">
-                    <SelectValue placeholder="Select agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {freightAgents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.freightAgentId && (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.freightAgentId}</p>
-                )}
-              </div>
+              <FreightAgentCombobox
+                id="freightAgentId"
+                label="Freight Agent"
+                value={state.freightAgent}
+                onChange={handleFreightAgentChange}
+                search={(query) => searchFreightAgentsAction(query, state.shippingMethod || undefined)}
+                onCreate={createFreightAgentAction}
+                onUpdate={(option, name, offersRoro, offersContainer) =>
+                  updateFreightAgentAction(option.id, name, offersRoro, offersContainer)
+                }
+                error={fieldErrors.freightAgentId}
+              />
               <div>
                 <Label htmlFor="shippingMethod" className="mb-1.5">
                   RORO / Container
                 </Label>
                 <Select
                   value={state.shippingMethod}
-                  onValueChange={(value) => setField("shippingMethod", value as "RORO" | "CONTAINER")}
-                  disabled={!selectedAgent}
+                  onValueChange={(value) => handleShippingMethodChange(value as "RORO" | "CONTAINER")}
                 >
                   <SelectTrigger id="shippingMethod" className="w-full">
-                    <SelectValue placeholder="Select method" />
+                    <SelectValue placeholder="Select method">
+                      {(itemValue: string) =>
+                        itemValue === "RORO" ? "RORO" : itemValue === "CONTAINER" ? "Container" : "Select method"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedAgent?.offersRoro && <SelectItem value="RORO">RORO</SelectItem>}
-                    {selectedAgent?.offersContainer && (
-                      <SelectItem value="CONTAINER">Container</SelectItem>
+                    {(!state.freightAgent || state.freightAgent.offersRoro) && (
+                      <SelectItem value="RORO" label="RORO">
+                        RORO
+                      </SelectItem>
+                    )}
+                    {(!state.freightAgent || state.freightAgent.offersContainer) && (
+                      <SelectItem value="CONTAINER" label="Container">
+                        Container
+                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
-                {!selectedAgent && (
-                  <p className="mt-1 text-xs text-muted-foreground">Select a freight agent first</p>
-                )}
                 {fieldErrors.shippingMethod && (
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.shippingMethod}</p>
                 )}
@@ -780,13 +915,32 @@ export function AddVehicleForm({
                 onValueChange={(value) => setField("rowColourStatusId", value ?? "")}
               >
                 <SelectTrigger id="rowColourStatusId" className="w-full">
-                  <SelectValue placeholder="No status" />
+                  {/* Select.Value doesn't read a SelectItem's rendered
+                   * children for the trigger label — without this render
+                   * function it just prints the raw value (the id). */}
+                  <SelectValue placeholder="No status">
+                    {(itemValue: string) =>
+                      rowColourStatuses.find((status) => status.id === itemValue)?.name ?? "No status"
+                    }
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-56">
                   {rowColourStatuses.map((status) => (
-                    <SelectItem key={status.id} value={status.id}>
+                    <SelectItem
+                      key={status.id}
+                      value={status.id}
+                      label={status.name}
+                      hideIndicator
+                      // Selection shows as a tint of the status's own colour
+                      // instead of a checkmark crowding the text.
+                      style={
+                        state.rowColourStatusId === status.id
+                          ? { backgroundColor: `color-mix(in oklch, ${status.colour} 20%, transparent)` }
+                          : undefined
+                      }
+                    >
                       <span
-                        className="mr-1.5 inline-block size-2.5 rounded-full"
+                        className="mr-1.5 inline-block size-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: status.colour }}
                       />
                       {status.name}
@@ -851,8 +1005,8 @@ export function AddVehicleForm({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <Badge variant={shipmentStatusLabel === "Pending" ? "secondary" : "info"}>
-                  {shipmentStatusLabel}
+                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                  {SHIPMENT_STATUS_META[shipmentStatus].label}
                 </Badge>
               </div>
               <p className="border-t pt-3 text-xs text-muted-foreground">
@@ -863,13 +1017,13 @@ export function AddVehicleForm({
           </Card>
 
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-            <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+            <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
               {submitting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Save className="size-4" />
               )}
-              Save Vehicle
+              {mode === "edit" ? "Update Vehicle" : "Save Vehicle"}
             </Button>
             <Button
               variant="outline"
