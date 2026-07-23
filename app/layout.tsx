@@ -16,7 +16,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${geist.variable} h-full`}>
-      <body className="h-full antialiased font-sans">
+      {/* suppressHydrationWarning: browser extensions (Grammarly, etc.) inject
+          their own data-* attributes onto <body> before React hydrates,
+          which otherwise logs a harmless but noisy hydration-mismatch
+          warning on every page load — unrelated to any app code. */}
+      <body className="h-full antialiased font-sans" suppressHydrationWarning>
         {children}
       </body>
     </html>

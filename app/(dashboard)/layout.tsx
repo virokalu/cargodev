@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/services/auth-guard";
 import AppShell from "@/components/shell/AppShell";
+import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 export default async function DashboardLayout({
   children,
@@ -10,8 +11,10 @@ export default async function DashboardLayout({
   const user = await requireUser();
 
   return (
-    <AppShell user={{ name: user.name ?? "User", role: user.role }}>
-      {children}
-    </AppShell>
+    <AuthSessionProvider>
+      <AppShell user={{ name: user.name ?? "User", role: user.role }}>
+        {children}
+      </AppShell>
+    </AuthSessionProvider>
   );
 }
