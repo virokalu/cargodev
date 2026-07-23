@@ -150,3 +150,18 @@
     font-size: 14px;
   }
 }
+
+/* Lets JS detect the exact moment a browser autofills a field — there's no
+   direct DOM event for it, but WebKit fires this animation when its autofill
+   styling applies, so an onAnimationStart listener can catch it. Used on
+   fields where a stale browser-saved credential must never be trusted (e.g.
+   "confirm your current password" on a change-password form) — see
+   components/settings/profile-form.tsx. */
+@keyframes onAutoFillStart {
+  from {}
+  to {}
+}
+
+.detect-autofill:-webkit-autofill {
+  animation-name: onAutoFillStart;
+}

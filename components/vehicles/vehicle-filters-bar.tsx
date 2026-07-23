@@ -69,7 +69,7 @@ export function VehicleFiltersBar({
         <div className="relative flex-1">
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by serial, chassis, or auction item/lot no…"
+            placeholder="Search by serial, chassis, auction item/lot no, brand/model/grade, or customer…"
             className="pl-9"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}

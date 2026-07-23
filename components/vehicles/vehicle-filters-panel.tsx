@@ -1,16 +1,18 @@
 "use client";
 
-// The 9 filters that don't fit in the inline toolbar row (Brand/Model/Grade,
-// Auction Hall, Freight Agent, RORO/Container, Vehicle Location, Customer,
-// and the 3 tri-state flags) live behind a "Filters" button in a side panel,
-// plus a row of removable chips under the toolbar for whatever's active.
+// The 8 filters that don't fit in the inline toolbar row (Brand/Model/Grade,
+// Auction Hall, Freight Agent, RORO/Container, Vehicle Location, and the 3
+// tri-state flags) live behind a "Filters" button in a side panel, plus a row
+// of removable chips under the toolbar for whatever's active. Customer isn't
+// here — that list can get large, so narrowing by customer goes through the
+// free-text search box instead of a dedicated filter dropdown.
 // Every control still does the same immediate-navigate-on-change as the rest
 // of the toolbar (lib/vehicle-list-url.ts buildVehiclesHref) — no separate
 // "Apply" step to keep behaviour consistent across every filter on the page.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, X } from "lucide-react";
+import { Car, ClipboardList, Filter, Truck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
+import { SectionCard } from "@/components/shared/section-card";
 import { FilterCombobox, type FilterOption } from "@/components/shared/filter-combobox";
 import { TriStateFilterSelect } from "@/components/vehicles/tri-state-filter-select";
 import { buildVehiclesHref, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
@@ -34,7 +37,6 @@ import {
   searchAuctionHallsAction,
   searchFreightAgentsAction,
   searchVehicleLocationsAction,
-  searchCustomersAction,
 } from "@/app/(dashboard)/vehicles/actions";
 
 /** The panel-owned filter keys — used to compute the active-count badge and
@@ -47,7 +49,6 @@ const PANEL_FILTER_KEYS = [
   "auctionHallId",
   "freightAgentId",
   "vehicleLocationId",
-  "customerId",
   "shippingMethod",
   "auctionBillPaid",
   "logBook",
@@ -61,7 +62,6 @@ export interface VehicleFilterSelections {
   auctionHall: FilterOption | null;
   freightAgent: FilterOption | null;
   vehicleLocation: FilterOption | null;
-  customer: FilterOption | null;
 }
 
 interface VehicleFiltersPanelProps {
@@ -98,9 +98,15 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
           <SheetTitle>Filters</SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 space-y-5 overflow-y-auto">
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-foreground">Vehicle Identity</legend>
+        {/* overflow-y-auto forces overflow-x to clip too (CSS spec: neither
+         * axis can stay "visible" once the other isn't) — that was cutting
+         * off each SectionCard's ring border on the left/right edges. The
+         * -m-1/p-1 pair gives the ring 4px of room to render in before
+         * hitting this div's own clip box, while netting out to zero visual
+         * shift (negative margin pulls the box out, padding pushes content
+         * back in by the same amount). */}
+        <div className="-m-1 flex-1 space-y-4 overflow-y-auto p-1">
+          <SectionCard icon={Car} title="Vehicle Identity" contentClassName="space-y-3">
             <div>
               <Label className="mb-1.5">Brand</Label>
               <FilterCombobox
@@ -139,10 +145,9 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 disabledHint="Pick a model first"
               />
             </div>
-          </fieldset>
+          </SectionCard>
 
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-foreground">Logistics</legend>
+          <SectionCard icon={Truck} title="Logistics" contentClassName="space-y-3">
             <div>
               <Label className="mb-1.5">Auction Hall</Label>
               <FilterCombobox
@@ -195,24 +200,9 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 allLabel="All vehicle locations"
               />
             </div>
-          </fieldset>
+          </SectionCard>
 
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-foreground">People</legend>
-            <div>
-              <Label className="mb-1.5">Customer</Label>
-              <FilterCombobox
-                value={selected.customer}
-                onChange={(option) => push({ customerId: option?.id ?? "ALL" })}
-                search={searchCustomersAction}
-                placeholder="All customers"
-                allLabel="All customers"
-              />
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-foreground">Status Flags</legend>
+          <SectionCard icon={ClipboardList} title="Status Flags" contentClassName="space-y-3">
             <TriStateFilterSelect
               label="Auction Bill Paid"
               value={params.auctionBillPaid}
@@ -228,7 +218,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               value={params.extraKey}
               onChange={(value) => push({ extraKey: value })}
             />
-          </fieldset>
+          </SectionCard>
         </div>
 
         <SheetFooter>

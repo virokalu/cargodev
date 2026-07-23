@@ -33,7 +33,6 @@ export function VehicleFilterChips({ params, selected }: VehicleFilterChipsProps
   if (selected.auctionHall) chips.push({ key: "hall", label: `Auction Hall: ${selected.auctionHall.name}`, clear: { auctionHallId: "ALL" } });
   if (selected.freightAgent) chips.push({ key: "agent", label: `Freight Agent: ${selected.freightAgent.name}`, clear: { freightAgentId: "ALL" } });
   if (selected.vehicleLocation) chips.push({ key: "location", label: `Vehicle Location: ${selected.vehicleLocation.name}`, clear: { vehicleLocationId: "ALL" } });
-  if (selected.customer) chips.push({ key: "customer", label: `Customer: ${selected.customer.name}`, clear: { customerId: "ALL" } });
   if (params.shippingMethod !== "ALL") {
     chips.push({
       key: "method",

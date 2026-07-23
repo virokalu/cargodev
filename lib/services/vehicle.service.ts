@@ -596,7 +596,6 @@ export interface VehicleListParams {
   auctionHallId: string | "ALL";
   freightAgentId: string | "ALL";
   vehicleLocationId: string | "ALL";
-  customerId: string | "ALL";
   shippingMethod: ShippingMethod | "ALL";
   auctionBillPaid: TriStateFilterValue;
   logBook: TriStateFilterValue;
@@ -680,14 +679,17 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
   if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
   if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
-  if (params.customerId !== "ALL") where.customerId = params.customerId;
   if (params.shippingMethod !== "ALL") where.shippingMethod = params.shippingMethod;
   applyTriStateFilter(where, "auctionBillPaid", params.auctionBillPaid);
   applyTriStateFilter(where, "logBook", params.logBook);
   applyTriStateFilter(where, "extraKey", params.extraKey);
 
-  // US-08: free-text search matches serial, chassis, and auction item/lot no
-  // only — everything else is a dedicated per-column filter, not free text.
+  // US-08: free-text search matches serial, chassis, auction item/lot no,
+  // brand/model/grade, and customer name — everything else is a dedicated
+  // per-column filter, not free text. Customer has no dedicated filter
+  // dropdown (the customer list can get large — a plain dropdown or combobox
+  // filter doesn't scale the way search-by-name does), so search is the only
+  // way to narrow by customer.
   const search = params.search.trim();
   if (search) {
     where.OR = [
@@ -695,6 +697,10 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
       { chassisNo: { contains: search, mode: "insensitive" } },
       { auctionItemNo: { contains: search, mode: "insensitive" } },
       { auctionLotNo: { contains: search, mode: "insensitive" } },
+      { model: { name: { contains: search, mode: "insensitive" } } },
+      { model: { brand: { name: { contains: search, mode: "insensitive" } } } },
+      { grade: { name: { contains: search, mode: "insensitive" } } },
+      { customer: { name: { contains: search, mode: "insensitive" } } },
     ];
   }
 
