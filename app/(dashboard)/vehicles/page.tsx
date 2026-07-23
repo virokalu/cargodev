@@ -11,7 +11,6 @@ import {
   getFreightAgentById,
   getVehicleLocationById,
 } from "@/lib/services/lookup.service";
-import { getCustomerById } from "@/lib/services/customer.service";
 import { parseVehicleListParams } from "@/lib/vehicle-list-url";
 import { Button } from "@/components/ui/button";
 import { VehicleFiltersBar } from "@/components/vehicles/vehicle-filters-bar";
@@ -36,7 +35,6 @@ export default async function VehiclesPage({
     auctionHall,
     freightAgent,
     vehicleLocation,
-    customer,
   ] = await Promise.all([
     listVehicles(user.orgId, params),
     listDistinctDestinations(user.orgId),
@@ -47,7 +45,6 @@ export default async function VehiclesPage({
     params.auctionHallId !== "ALL" ? getAuctionHallById(user.orgId, params.auctionHallId) : null,
     params.freightAgentId !== "ALL" ? getFreightAgentById(user.orgId, params.freightAgentId) : null,
     params.vehicleLocationId !== "ALL" ? getVehicleLocationById(user.orgId, params.vehicleLocationId) : null,
-    params.customerId !== "ALL" ? getCustomerById(user.orgId, params.customerId) : null,
   ]);
   const selected: VehicleFilterSelections = {
     brand,
@@ -56,7 +53,6 @@ export default async function VehiclesPage({
     auctionHall,
     freightAgent,
     vehicleLocation,
-    customer,
   };
 
   // US-02: Viewer is read-only everywhere — no inline editors, no Edit/Delete

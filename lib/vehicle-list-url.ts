@@ -26,7 +26,6 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   auctionHallId: "ALL",
   freightAgentId: "ALL",
   vehicleLocationId: "ALL",
-  customerId: "ALL",
   shippingMethod: "ALL",
   auctionBillPaid: "ALL",
   logBook: "ALL",
@@ -95,7 +94,6 @@ export function parseVehicleListParams(
     auctionHallId: firstValue(searchParams.hall) || "ALL",
     freightAgentId: firstValue(searchParams.agent) || "ALL",
     vehicleLocationId: firstValue(searchParams.location) || "ALL",
-    customerId: firstValue(searchParams.customer) || "ALL",
     shippingMethod: SHIPPING_METHODS.includes(method as ShippingMethod)
       ? (method as ShippingMethod)
       : "ALL",
@@ -130,7 +128,6 @@ export function buildVehiclesHref(
   if (merged.auctionHallId !== "ALL") query.set("hall", merged.auctionHallId);
   if (merged.freightAgentId !== "ALL") query.set("agent", merged.freightAgentId);
   if (merged.vehicleLocationId !== "ALL") query.set("location", merged.vehicleLocationId);
-  if (merged.customerId !== "ALL") query.set("customer", merged.customerId);
   if (merged.shippingMethod !== "ALL") query.set("method", merged.shippingMethod);
   if (merged.auctionBillPaid !== "ALL") query.set("billPaid", merged.auctionBillPaid);
   if (merged.logBook !== "ALL") query.set("logBook", merged.logBook);
