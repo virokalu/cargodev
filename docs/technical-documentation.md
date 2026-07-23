@@ -179,12 +179,75 @@ model User {
 | Total vehicles | KPI card | count |
 | Pending shipping | KPI card | `shipmentStatus = PENDING` |
 | Shipped | KPI card | `shipmentStatus = SHIPPED` |
-| Total vehicles tracked | Pie | FC vs FL split *(assumption A3 — still open; flag if a different split is wanted)* |
-| Shipment status distribution | Pie | Pending / Booking Received / Shipped |
-| Vehicles by destination | Pie | destination country + counts |
-| Export volume by destination | Column chart | FC vehicles grouped by destination |
+| Total vehicles tracked | Pie | FC vs FL split *(assumption A3 — still open; flag if a different split is wanted)* — 2 deliberately distinct colours (blue/green), not two shades of the same base blue |
+| Shipment status distribution | Pie | Pending / Booking Received / Shipped — coloured to match the same warning/info/success badges used for status elsewhere in the app |
+| ~~Vehicles by destination~~ | ~~Pie~~ | removed — superseded by the more granular distribution charts in §7.2 |
+| Export volume by destination | *(moved)* | now one of the selectable views in the Vehicles by Category widget, §7.2 |
 | Transport status by company | Grouped bar / table | grouped by Transport By, split by row-colour status incl. Transport Complete |
 | Auction bill payment due | List / KPI | `auction_bill_paid` is `null` **or** `false` (i.e. not confirmed paid) |
+
+Auction bill payment due is the one widget staff can still act on before it
+becomes a problem at the auction house, so it renders directly under the KPI
+cards (above the pie/bar charts), colour-coded by state rather than a fixed
+tint — **red** with an "N unpaid" badge while bills are outstanding, **green**
+with an "All paid" badge once every bill is confirmed paid — so it's never a
+neutral, easy-to-skip card either way.
+
+### 7.1 Trend charts *(added post-spec, during implementation — US-43)*
+
+Four monthly time series, not in the original widget table above. Rather
+than adding four more permanent chart cards to an already-busy dashboard,
+they live behind a single segmented selector at the bottom of the page —
+only the chosen chart renders at a time (same toggle pattern as the FC/FL/All
+track filter on the vehicles page).
+
+| Chart | Series | Source |
+|---|---|---|
+| Bookings vs Arrivals | Bookings, Arrivals | FC vehicles, counted by the month of `etd` (bookings) and `eta` (arrivals) |
+| Vehicles Entered | Vehicles Entered | all vehicles, counted by the month of `createdAt` |
+| Cumulative Growth | Total Fleet Size | running total of Vehicles Entered |
+| Docs Turnaround | Avg Days (Purchase → Docs Arrived) | average of `docsArrivedDate - purchaseDate` in days, only vehicles with both dates set, bucketed by the month docs arrived |
+
+All four are bucketed in JS (grouped by a `"YYYY-MM"` key derived from the
+relevant date field, not a raw-SQL `GROUP BY month(...)`), served by
+`getDashboardTrends()` in `lib/services/dashboard.service.ts`.
+
+### 7.2 Additional distribution charts *(added post-spec, during implementation)*
+
+More widgets, replacing the removed "Vehicles by destination" pie and
+rounding out the picture with the other lookup fields on Vehicle. Chart type
+is chosen per field by how many distinct categories it can realistically
+have — a pie only stays readable for a small, roughly-fixed category count
+(RORO/Container: 2). Vehicle Location, Transport Company, Freight Agent,
+Export Volume by Destination and Brand can each grow to many entries over
+time, so instead of five separate always-visible charts (which either turn
+into a wall of pie slivers or need rotated, cramped bar-chart axis labels)
+they share **one switchable widget, "Vehicles by Category"** — a horizontal
+bar chart behind a segmented selector (same pattern as the Trends selector
+in §7.1), one view at a time, bar height scaling with category count so it
+stays readable however many categories a given view has.
+
+Every chart with org-specific, not-a-fixed-enum categories (RORO/Container,
+every view inside Vehicles by Category) colours each item individually from
+a shared 5-colour rotating palette (`ROTATING_CHART_COLORS`,
+`lib/constants/chart-colors.ts`) instead of one flat colour per chart — a
+single-colour bar chart, or a 2-slice pie drawing its first two colours off
+a rotation whose first two entries both sit in the blue/cyan range, both
+read as far more blue than intended. The two 2-category pies (Vehicles
+Tracked FC vs FL, RORO/Container) each get an explicit 2-colour override
+instead of the rotation, picked to sit far apart on the colour wheel rather
+than adjacent. Shipment Status (FC) reuses the same warning/info/success
+semantic colours already used for status badges elsewhere in the app,
+rather than generic chart colours, so a status reads the same colour on
+every screen it appears on.
+
+| Chart | Type | Source |
+|---|---|---|
+| Vehicles by Category *(Location / Transport Company / Freight Agent / Export Volume by Destination / Brand, selectable)* | Horizontal bar | grouped by whichever is selected; Transport Company here is plain volume per company, independent of the existing Transport Status by Company completion split; Export Volume by Destination is FC only |
+| RORO / Container | Pie | grouped by Shipping Method (2 categories, explicit 2-colour override) |
+
+Served by `getDashboardStats()` in `lib/services/dashboard.service.ts`, same
+function as the original KPI/pie/bar widgets above.
 
 ## 8. Notifications — re-mapped to the new flow *(proposal — confirm)*
 
