@@ -78,7 +78,7 @@ export function CustomersTable({ customers, countries, canManage }: CustomersTab
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Customers</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
           <p className="text-muted-foreground">
             {customers.length} customer{customers.length === 1 ? "" : "s"}.
           </p>

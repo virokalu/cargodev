@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -15,9 +16,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full`}>
+    // suppressHydrationWarning is required by next-themes — it sets the
+    // .dark class via an inline script before React hydrates, which would
+    // otherwise trip a mismatch warning on this element.
+    <html lang="en" className={`${geist.variable} h-full`} suppressHydrationWarning>
       <body className="h-full antialiased font-sans">
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
