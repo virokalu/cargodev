@@ -1,6 +1,10 @@
 // The main vehicle table (US-06). No "use client" here — sorting and
 // pagination are plain links that navigate to a new URL, which the server
-// page re-reads to re-query; there's no client-side table state to manage.
+// page re-reads to re-query; there's no server-page-level client state to
+// manage. The one piece of genuine client interactivity — the status dot
+// that appears in Actions once the row's status badge scrolls out of view —
+// is scoped to VehicleTableScrollArea (status-scroll-context.tsx), not this
+// component itself.
 //
 // Serial No / Chassis No / Model & Grade stay pinned on the left via
 // `position: sticky` while everything else (the other ~28 fields) scrolls
@@ -12,7 +16,6 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Pencil } fr
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -21,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
+import { VehicleTableScrollArea, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -245,7 +249,7 @@ export function VehiclesTable({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border">
-        <Table>
+        <VehicleTableScrollArea>
           <TableHeader>
             <TableRow>
               <TableHead style={frozenStyle(FROZEN_LEFT.serial, FROZEN_WIDTH.serial, undefined)} className="bg-muted">
@@ -327,22 +331,25 @@ export function VehiclesTable({
                       style={frozenStyle(FROZEN_LEFT.actions, FROZEN_WIDTH.actions, rowBg)}
                       className={cn("border-r", !rowBg && "bg-card")}
                     >
-                      {canWrite || canDelete ? (
-                        <div className="flex items-center gap-1">
-                          {canWrite && (
-                            <Link
-                              href={`/vehicles/${row.id}/edit`}
-                              aria-label={`Edit ${row.serial}`}
-                              className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
-                            >
-                              <Pencil className="size-4" />
-                            </Link>
-                          )}
-                          {canDelete && <DeleteVehicleDialog vehicleId={row.id} serial={row.serial} />}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <StatusScrollDot status={row.effectiveShipmentStatus} />
+                        {canWrite || canDelete ? (
+                          <div className="flex items-center gap-1">
+                            {canWrite && (
+                              <Link
+                                href={`/vehicles/${row.id}/edit`}
+                                aria-label={`Edit ${row.serial}`}
+                                className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                              >
+                                <Pencil className="size-4" />
+                              </Link>
+                            )}
+                            {canDelete && <DeleteVehicleDialog vehicleId={row.id} serial={row.serial} />}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     {SCROLL_COLUMNS.map((column) => (
                       <TableCell key={column.key} className="border-r">
@@ -355,7 +362,7 @@ export function VehiclesTable({
               })
             )}
           </TableBody>
-        </Table>
+        </VehicleTableScrollArea>
       </div>
 
       <div className="flex items-center justify-between">
