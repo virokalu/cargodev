@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Menu, Search, Bell, LogOut, User } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { StaffRole } from "@prisma/client";
@@ -32,6 +33,7 @@ function roleBadgeLabel(role: StaffRole): string {
 export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Close the user menu when clicking outside
   useEffect(() => {
@@ -117,7 +119,10 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
               {/* Menu items */}
               <button
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors text-left"
-                onClick={() => setUserMenuOpen(false)}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  router.push("/settings");
+                }}
               >
                 <User className="w-4 h-4 text-muted-foreground" />
                 My Profile
