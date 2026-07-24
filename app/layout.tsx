@@ -16,14 +16,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // suppressHydrationWarning is required by next-themes — it sets the
-    // .dark class via an inline script before React hydrates, which would
-    // otherwise trip a mismatch warning on this element.
-    <html lang="en" className={`${geist.variable} h-full`} suppressHydrationWarning>
-      <body className="h-full antialiased font-sans">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-        </ThemeProvider>
+    <html lang="en" className={`${geist.variable} h-full`}>
+      {/* suppressHydrationWarning: browser extensions (Grammarly, etc.) inject
+          their own data-* attributes onto <body> before React hydrates,
+          which otherwise logs a harmless but noisy hydration-mismatch
+          warning on every page load — unrelated to any app code. */}
+      <body className="h-full antialiased font-sans" suppressHydrationWarning>
+        {children}
       </body>
     </html>
   );
