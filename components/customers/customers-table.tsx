@@ -25,6 +25,7 @@ import {
 } from "@/components/customers/customer-form-dialog";
 import type { CustomerListItem } from "@/lib/services/customer.service";
 import type { CountryOption } from "@/lib/constants/countries";
+import { cn } from "@/lib/utils";
 
 /** Derive up to 2 uppercase initials from a display name. */
 function getInitials(name: string): string {
@@ -101,14 +102,14 @@ export function CustomersTable({ customers, countries, canManage }: CustomersTab
         />
       </div>
 
-      <div className="rounded-xl border bg-card">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Country</TableHead>
-              <TableHead>Vehicles</TableHead>
+              <TableHead className="border-r">Customer</TableHead>
+              <TableHead className="border-r">Contact</TableHead>
+              <TableHead className="border-r">Country</TableHead>
+              <TableHead className={canManage ? "border-r" : undefined}>Vehicles</TableHead>
               {canManage && <TableHead className="w-16 text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
@@ -122,7 +123,7 @@ export function CustomersTable({ customers, countries, canManage }: CustomersTab
             ) : (
               filtered.map((customer) => (
                 <TableRow key={customer.id}>
-                  <TableCell>
+                  <TableCell className="border-r">
                     <div className="flex items-center gap-3 py-1">
                       <Avatar className="size-10">
                         <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
@@ -132,7 +133,7 @@ export function CustomersTable({ customers, countries, canManage }: CustomersTab
                       <p className="font-semibold text-foreground">{customer.name}</p>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r">
                     <div className="text-sm">
                       {customer.email && <p className="text-foreground">{customer.email}</p>}
                       {customer.phone && <p className="text-muted-foreground">{customer.phone}</p>}
@@ -141,10 +142,10 @@ export function CustomersTable({ customers, countries, canManage }: CustomersTab
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="border-r text-sm text-muted-foreground">
                     {customer.country ?? "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className={cn("text-sm text-muted-foreground", canManage && "border-r")}>
                     {customer.vehicleCount}
                   </TableCell>
                   {canManage && (
