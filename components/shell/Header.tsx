@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, Bell, LogOut, User } from "lucide-react";
+import { Menu, Search, Bell, LogOut, User, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { StaffRole } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -34,6 +34,7 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const [isNavigatingToProfile, startProfileNavigation] = useTransition();
 
   // Close the user menu when clicking outside
   useEffect(() => {
@@ -98,7 +99,11 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
             aria-expanded={userMenuOpen}
           >
             <div className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold select-none">
-              {initials}
+              {isNavigatingToProfile ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                initials
+              )}
             </div>
             <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">
               {userName}
@@ -121,7 +126,7 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors text-left"
                 onClick={() => {
                   setUserMenuOpen(false);
-                  router.push("/settings");
+                  startProfileNavigation(() => router.push("/settings"));
                 }}
               >
                 <User className="w-4 h-4 text-muted-foreground" />
