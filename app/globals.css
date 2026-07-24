@@ -138,6 +138,58 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Login screen's brand panel ("Midnight Depth"). Always dark regardless of
+ * app theme — same as the persistent sidebar — so it lives outside the
+ * light/dark --background family and isn't redefined under .dark. Kept as
+ * its own tokens rather than folded into the palette above since nothing
+ * else in the app consumes them, only app/(auth)/login/page.tsx does. */
+:root {
+  --login-bg-1: oklch(0.10 0.03 259);
+  --login-bg-2: oklch(0.155 0.06 253);
+  --login-bg-3: oklch(0.085 0.025 261);
+  --login-glow: oklch(0.55 0.19 254 / 0.32);
+  --login-glow-chip: oklch(0.55 0.19 254 / 0.55);
+  --login-glow-headline: oklch(0.55 0.19 254 / 0.35);
+  --login-glow-stat: oklch(0.55 0.19 254 / 0.4);
+  --login-seam: oklch(0.66 0.15 256 / 0.5);
+  --login-accent: oklch(0.78 0.12 254);
+  --login-body: oklch(0.75 0.025 257);
+  --login-label: oklch(0.58 0.03 257);
+  --login-footer: oklch(0.42 0.025 257);
+}
+
+.login-panel-bg {
+  background: linear-gradient(155deg, var(--login-bg-1) 0%, var(--login-bg-2) 50%, var(--login-bg-3) 100%);
+}
+.login-panel-glow {
+  background: radial-gradient(ellipse 90% 70% at 20% 40%, var(--login-glow) 0%, transparent 72%);
+}
+.login-panel-seam {
+  background: linear-gradient(90deg, transparent 0%, var(--login-seam) 100%);
+}
+.login-logo-chip {
+  background: var(--primary);
+  box-shadow: 0 0 16px var(--login-glow-chip);
+}
+.login-headline-glow {
+  text-shadow: 0 0 30px var(--login-glow-headline);
+}
+.login-stat-glow {
+  text-shadow: 0 0 18px var(--login-glow-stat);
+}
+.login-accent-text {
+  color: var(--login-accent);
+}
+.login-body-text {
+  color: var(--login-body);
+}
+.login-label-text {
+  color: var(--login-label);
+}
+.login-footer-text {
+  color: var(--login-footer);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
