@@ -49,39 +49,16 @@ function LoginForm() {
           the sign-in panel. Always dark regardless of app theme, same as
           the persistent sidebar — this isn't meant to flip with light/dark
           mode. */}
-      <div
-        className="hidden md:flex md:w-1/2 flex-col px-12 py-10 relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(155deg, oklch(0.10 0.03 259) 0%, oklch(0.155 0.06 253) 50%, oklch(0.085 0.025 261) 100%)",
-        }}
-      >
+      <div className="login-panel-bg hidden md:flex md:w-1/2 flex-col px-12 py-10 relative overflow-hidden">
         {/* Bloomed radial glow, on-brand hue */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 90% 70% at 20% 40%, oklch(0.55 0.19 254 / 0.32) 0%, transparent 72%)",
-          }}
-          aria-hidden="true"
-        />
+        <div className="login-panel-glow absolute inset-0" aria-hidden="true" />
         {/* Lit seam against the sign-in panel */}
-        <div
-          className="absolute inset-y-0 right-0 w-[2px]"
-          style={{ background: "linear-gradient(90deg, transparent 0%, oklch(0.66 0.15 256 / 0.5) 100%)" }}
-          aria-hidden="true"
-        />
+        <div className="login-panel-seam absolute inset-y-0 right-0 w-[2px]" aria-hidden="true" />
 
         <div className="relative z-10 flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 flex items-center justify-center rounded-xl"
-              style={{
-                background: "oklch(0.52 0.18 256)",
-                boxShadow: "0 0 16px oklch(0.55 0.19 254 / 0.55)",
-              }}
-            >
+            <div className="login-logo-chip w-10 h-10 flex items-center justify-center rounded-xl">
               <Truck className="w-5 h-5 text-white" />
             </div>
             <span className="text-white font-bold text-lg tracking-tight">
@@ -91,19 +68,13 @@ function LoginForm() {
 
           {/* Tagline */}
           <div className="mt-auto mb-12">
-            <h1
-              className="text-4xl font-bold text-white leading-tight mb-4"
-              style={{ textShadow: "0 0 30px oklch(0.55 0.19 254 / 0.35)" }}
-            >
+            <h1 className="login-headline-glow text-4xl font-bold text-white leading-tight mb-4">
               Vehicle Import
               <br />
               Management,{" "}
-              <span style={{ color: "oklch(0.78 0.12 254)" }}>simplified.</span>
+              <span className="login-accent-text">simplified.</span>
             </h1>
-            <p
-              className="text-base leading-relaxed max-w-sm"
-              style={{ color: "oklch(0.75 0.025 257)" }}
-            >
+            <p className="login-body-text text-base leading-relaxed max-w-sm">
               Track imported vehicles from overseas auction win to customer
               handover — all from one dashboard.
             </p>
@@ -111,43 +82,24 @@ function LoginForm() {
             {/* Stats row */}
             <div className="flex gap-10 mt-10">
               <div>
-                <p
-                  className="text-3xl font-bold text-white"
-                  style={{ textShadow: "0 0 18px oklch(0.55 0.19 254 / 0.4)" }}
-                >
+                <p className="login-stat-glow text-3xl font-bold text-white">
                   FC / FL
                 </p>
-                <p className="text-sm mt-0.5" style={{ color: "oklch(0.58 0.03 257)" }}>
-                  Vehicle tracks
-                </p>
+                <p className="login-label-text text-sm mt-0.5">Vehicle tracks</p>
               </div>
               <div>
-                <p
-                  className="text-3xl font-bold text-white"
-                  style={{ textShadow: "0 0 18px oklch(0.55 0.19 254 / 0.4)" }}
-                >
-                  35
-                </p>
-                <p className="text-sm mt-0.5" style={{ color: "oklch(0.58 0.03 257)" }}>
-                  Fields tracked
-                </p>
+                <p className="login-stat-glow text-3xl font-bold text-white">35</p>
+                <p className="login-label-text text-sm mt-0.5">Fields tracked</p>
               </div>
               <div>
-                <p
-                  className="text-3xl font-bold text-white"
-                  style={{ textShadow: "0 0 18px oklch(0.55 0.19 254 / 0.4)" }}
-                >
-                  6–8
-                </p>
-                <p className="text-sm mt-0.5" style={{ color: "oklch(0.58 0.03 257)" }}>
-                  Staff users
-                </p>
+                <p className="login-stat-glow text-3xl font-bold text-white">6–8</p>
+                <p className="login-label-text text-sm mt-0.5">Staff users</p>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <p className="text-xs" style={{ color: "oklch(0.42 0.025 257)" }}>
+          <p className="login-footer-text text-xs">
             © {new Date().getFullYear()} Global Motors (Pvt) Ltd. All rights
             reserved.
           </p>
