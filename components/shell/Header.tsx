@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, Bell, LogOut, User, Loader2 } from "lucide-react";
+import { Menu, Bell, LogOut, User, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { StaffRole } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -63,16 +63,6 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Search — desktop only */}
-        <div className="hidden md:flex items-center gap-2 bg-muted rounded-lg px-3 py-2 w-72">
-          <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search vehicles, customers…"
-            className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
-          />
-        </div>
       </div>
 
       {/* Right */}
