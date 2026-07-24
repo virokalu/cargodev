@@ -25,6 +25,9 @@ export const env = {
   // Database
   DATABASE_URL: requireEnv("DATABASE_URL"),
 
+  //SupaBase direct URL for migrations (migrations need a real session, not a pooled one)
+  DIRECT_URL: requireEnv("DIRECT_URL"),
+
   // NextAuth — must be a long random string (openssl rand -base64 32)
   NEXTAUTH_SECRET: requireEnv("NEXTAUTH_SECRET"),
   NEXTAUTH_URL: requireEnv("NEXTAUTH_URL"),
