@@ -27,16 +27,29 @@ function LoginForm() {
     const result = await signIn("credentials", {
       email,
       password,
+      rememberMe,
       redirect: false,
     });
 
-    setLoading(false);
-
     if (result?.error) {
+      setLoading(false);
       setError("Invalid email or password. Please try again.");
       return;
     }
 
+    try {
+      await fetch("/api/auth/remember-me", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rememberMe }),
+      });
+    } catch {
+      // The JWT expiry is still the authoritative ceiling, so this is best-effort.
+    }
+
+    setLoading(false);
     router.push(callbackUrl);
   }
 

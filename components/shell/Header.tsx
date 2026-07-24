@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Menu, Search, Bell, LogOut, User } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { broadcastAuthUpdate } from "@/lib/auth-channel";
 import type { StaffRole } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -30,6 +32,7 @@ function roleBadgeLabel(role: StaffRole): string {
 }
 
 export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) {
+  const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +127,11 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
               </button>
 
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={async () => {
+                  await signOut({ redirect: false, callbackUrl: "/login" });
+                  broadcastAuthUpdate();
+                  router.push("/login");
+                }}
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
               >
                 <LogOut className="w-4 h-4" />

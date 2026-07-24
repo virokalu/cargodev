@@ -10,12 +10,14 @@ declare module "next-auth" {
       id: string;
       role: StaffRole;
       orgId: string;
+      rememberMe?: boolean;
     } & DefaultSession["user"];
   }
 
   interface User {
     role: StaffRole;
     orgId: string;
+    rememberMe?: boolean;
   }
 }
 
@@ -24,5 +26,6 @@ declare module "next-auth/jwt" {
     id: string;
     role: StaffRole;
     orgId: string;
+    rememberMe?: boolean;
   }
 }
