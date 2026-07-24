@@ -276,6 +276,15 @@ export async function searchTransportCompanies(orgId: string, query: string): Pr
   });
 }
 
+/** Resolves a single transport company's label for the vehicle filter panel. */
+export async function getTransportCompanyById(orgId: string, id: string): Promise<LookupOption | null> {
+  const company = await prisma.transportCompany.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return company ?? null;
+}
+
 export async function findOrCreateTransportCompany(
   orgId: string,
   name: string

@@ -16,6 +16,10 @@ import {
   staffCreateSchema,
   staffUpdateSchema,
 } from "@/lib/validation/user.schema";
+import {
+  profileDetailsSchema,
+  changePasswordSchema,
+} from "@/lib/validation/profile.schema";
 import { flattenFieldErrors } from "@/lib/validation/shared";
 import * as activityLog from "@/lib/services/activity-log.service";
 
@@ -225,5 +229,132 @@ export async function setStaffActive(
     });
 
     return updated as StaffListItem;
+  });
+}
+
+// ─────────────────────────────────────────────
+// OWN PROFILE — every user (any role) edits their own name/phone/password.
+// Unlike the staff-management functions above, these never take a `staffId`
+// argument — they only ever act on `actor.id`, so there's no owned-record
+// lookup to bypass and no role gate to enforce (CD-D2-17, US-03).
+// ─────────────────────────────────────────────
+
+export interface OwnProfile {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: StaffRole;
+}
+
+const OWN_PROFILE_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  role: true,
+} satisfies Prisma.UserSelect;
+
+export async function getOwnProfile(orgId: string, userId: string): Promise<OwnProfile> {
+  const profile = await prisma.user.findFirst({
+    where: { id: userId, org_id: orgId },
+    select: OWN_PROFILE_SELECT,
+  });
+  if (!profile) {
+    throw new ServiceError("NOT_FOUND", "Profile not found.");
+  }
+  // role is non-null here — every STAFF row has one; only customers don't,
+  // and only STAFF users hold a session that can call this.
+  return profile as OwnProfile;
+}
+
+export async function updateOwnProfileDetails(
+  actor: SessionUser,
+  rawInput: unknown
+): Promise<OwnProfile> {
+  const parsed = profileDetailsSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Please fix the highlighted fields.",
+      flattenFieldErrors(parsed.error)
+    );
+  }
+  const input = parsed.data;
+  const existing = await getOwnProfile(actor.orgId, actor.id);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: actor.id },
+        data: { name: input.name, email: input.email, phone: input.phone },
+        select: OWN_PROFILE_SELECT,
+      });
+
+      await activityLog.record(tx, {
+        orgId: actor.orgId,
+        actorId: actor.id,
+        action: "UPDATE_PROFILE",
+        entity: "User",
+        entityId: actor.id,
+        before: { name: existing.name, email: existing.email, phone: existing.phone },
+        after: { name: updated.name, email: updated.email, phone: updated.phone },
+      });
+
+      return updated as OwnProfile;
+    });
+  } catch (error) {
+    // @@unique([org_id, email]) — surfaced as a field error rather than a 500.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ServiceError("CONFLICT", "An account with this email already exists.", {
+        email: "Email already in use",
+      });
+    }
+    throw error;
+  }
+}
+
+export async function changeOwnPassword(actor: SessionUser, rawInput: unknown): Promise<void> {
+  const parsed = changePasswordSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Please fix the highlighted fields.",
+      flattenFieldErrors(parsed.error)
+    );
+  }
+  const input = parsed.data;
+
+  // Never trust the JWT session for the password hash — fetch it fresh so a
+  // stale/forged session can't skip the current-password check.
+  const existing = await prisma.user.findFirst({
+    where: { id: actor.id, org_id: actor.orgId },
+    select: { password: true },
+  });
+  if (!existing?.password) {
+    throw new ServiceError("NOT_FOUND", "Account not found.");
+  }
+
+  const currentValid = await bcrypt.compare(input.currentPassword, existing.password);
+  if (!currentValid) {
+    throw new ServiceError("VALIDATION", "Current password is incorrect.", {
+      currentPassword: "Current password is incorrect",
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, PASSWORD_SALT_ROUNDS);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: actor.id }, data: { password: passwordHash } });
+
+    // No before/after snapshot here — a password hash has no business being
+    // written to the audit trail, even hashed.
+    await activityLog.record(tx, {
+      orgId: actor.orgId,
+      actorId: actor.id,
+      action: "CHANGE_PASSWORD",
+      entity: "User",
+      entityId: actor.id,
+    });
   });
 }

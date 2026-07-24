@@ -43,27 +43,22 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* ── Left panel — brand / marketing ───────────────────────── */}
-      <div
-        className="hidden md:flex md:w-1/2 flex-col px-12 py-10 relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(145deg, #0a1628 0%, #0f2444 40%, #0d1f3a 100%)",
-        }}
-      >
-        {/* Subtle radial glow */}
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 60% at 30% 50%, #1e4080 0%, transparent 70%)",
-          }}
-          aria-hidden="true"
-        />
+      {/* "Midnight Depth" palette — same brand hue as --primary (256°)
+          throughout, just deeper and lit rather than a flat gradient: a
+          bloomed glow behind the headline/stats and a lit 2px seam against
+          the sign-in panel. Always dark regardless of app theme, same as
+          the persistent sidebar — this isn't meant to flip with light/dark
+          mode. */}
+      <div className="login-panel-bg hidden md:flex md:w-1/2 flex-col px-12 py-10 relative overflow-hidden">
+        {/* Bloomed radial glow, on-brand hue */}
+        <div className="login-panel-glow absolute inset-0" aria-hidden="true" />
+        {/* Lit seam against the sign-in panel */}
+        <div className="login-panel-seam absolute inset-y-0 right-0 w-[2px]" aria-hidden="true" />
 
         <div className="relative z-10 flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center bg-blue-600 rounded-xl shadow-lg">
+            <div className="login-logo-chip w-10 h-10 flex items-center justify-center rounded-xl">
               <Truck className="w-5 h-5 text-white" />
             </div>
             <span className="text-white font-bold text-lg tracking-tight">
@@ -73,13 +68,13 @@ function LoginForm() {
 
           {/* Tagline */}
           <div className="mt-auto mb-12">
-            <h1 className="text-4xl font-bold text-white leading-tight mb-4">
+            <h1 className="login-headline-glow text-4xl font-bold text-white leading-tight mb-4">
               Vehicle Import
               <br />
               Management,{" "}
-              <span className="text-blue-400">simplified.</span>
+              <span className="login-accent-text">simplified.</span>
             </h1>
-            <p className="text-slate-400 text-base leading-relaxed max-w-sm">
+            <p className="login-body-text text-base leading-relaxed max-w-sm">
               Track imported vehicles from overseas auction win to customer
               handover — all from one dashboard.
             </p>
@@ -87,22 +82,24 @@ function LoginForm() {
             {/* Stats row */}
             <div className="flex gap-10 mt-10">
               <div>
-                <p className="text-3xl font-bold text-white">FC / FL</p>
-                <p className="text-slate-400 text-sm mt-0.5">Vehicle tracks</p>
+                <p className="login-stat-glow text-3xl font-bold text-white">
+                  FC / FL
+                </p>
+                <p className="login-label-text text-sm mt-0.5">Vehicle tracks</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">35</p>
-                <p className="text-slate-400 text-sm mt-0.5">Fields tracked</p>
+                <p className="login-stat-glow text-3xl font-bold text-white">35</p>
+                <p className="login-label-text text-sm mt-0.5">Fields tracked</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">6–8</p>
-                <p className="text-slate-400 text-sm mt-0.5">Staff users</p>
+                <p className="login-stat-glow text-3xl font-bold text-white">6–8</p>
+                <p className="login-label-text text-sm mt-0.5">Staff users</p>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <p className="text-slate-600 text-xs">
+          <p className="login-footer-text text-xs">
             © {new Date().getFullYear()} Global Motors (Pvt) Ltd. All rights
             reserved.
           </p>
@@ -110,28 +107,32 @@ function LoginForm() {
       </div>
 
       {/* ── Right panel — sign-in form ────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-white">
+      {/* Unlike the left brand panel (always dark, like the sidebar), this
+          side is the actual content area, so it follows the light/dark
+          theme like the rest of the app — semantic tokens, not literal
+          slate/blue/white/red classes. */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-background">
         {/* Mobile logo — shown only on small screens */}
         <div className="flex md:hidden items-center gap-2 mb-10">
-          <div className="w-9 h-9 flex items-center justify-center bg-blue-600 rounded-xl">
-            <Truck className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 flex items-center justify-center bg-primary rounded-xl">
+            <Truck className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-slate-900 font-bold text-lg">CargoDev</span>
+          <span className="text-foreground font-bold text-lg">CargoDev</span>
         </div>
 
         <div className="w-full max-w-[400px]">
           {/* Heading */}
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">
+          <h2 className="text-2xl font-bold text-foreground mb-1">
             Sign in to your account
           </h2>
-          <p className="text-sm text-slate-500 mb-8">
+          <p className="text-sm text-muted-foreground mb-8">
             Enter your credentials to access the dashboard.
           </p>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {/* Error alert */}
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -140,12 +141,12 @@ function LoginForm() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-slate-700 mb-1.5"
+                className="block text-sm font-medium text-foreground mb-1.5"
               >
                 Email address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="email"
                   type="email"
@@ -154,7 +155,7 @@ function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@globalmotors.lk"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                 />
               </div>
             </div>
@@ -163,12 +164,12 @@ function LoginForm() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-slate-700 mb-1.5"
+                className="block text-sm font-medium text-foreground mb-1.5"
               >
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -177,12 +178,12 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -201,13 +202,13 @@ function LoginForm() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                  className="w-4 h-4 rounded border-input accent-primary"
                 />
-                <span className="text-sm text-slate-600">Remember me</span>
+                <span className="text-sm text-muted-foreground">Remember me</span>
               </label>
               <button
                 type="button"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 Forgot password?
               </button>
@@ -217,11 +218,11 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-sm py-2.5 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground font-semibold text-sm py-2.5 rounded-lg transition-colors"
             >
               {loading ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   Signing in…
                 </>
               ) : (
@@ -231,7 +232,7 @@ function LoginForm() {
           </form>
 
           {/* Hint text */}
-          <p className="mt-6 text-xs text-center text-slate-400">
+          <p className="mt-6 text-xs text-center text-muted-foreground">
             Contact your Administrator if you need access.
           </p>
         </div>
@@ -244,7 +245,7 @@ function LoginForm() {
 // Required because LoginForm uses useSearchParams() which opts into CSR.
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <LoginForm />
     </Suspense>
   );

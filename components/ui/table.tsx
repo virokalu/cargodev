@@ -4,11 +4,21 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  onScroll,
+  ...props
+}: React.ComponentProps<"table"> & {
+  // The scrollable element is the wrapper div, not the <table> itself — this
+  // overrides the (wrongly-typed-for-a-table) inherited onScroll so callers
+  // that actually want to know about the horizontal scroll position get it.
+  onScroll?: React.UIEventHandler<HTMLDivElement>
+}) {
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      onScroll={onScroll}
     >
       <table
         data-slot="table"

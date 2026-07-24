@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Menu, Search, Bell, LogOut, User } from "lucide-react";
+import { useState, useRef, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, Bell, LogOut, User, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { StaffRole } from "@prisma/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface HeaderProps {
   onMenuOpen: () => void;
@@ -31,6 +33,8 @@ function roleBadgeLabel(role: StaffRole): string {
 export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [isNavigatingToProfile, startProfileNavigation] = useTransition();
 
   // Close the user menu when clicking outside
   useEffect(() => {
@@ -59,20 +63,12 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Search — desktop only */}
-        <div className="hidden md:flex items-center gap-2 bg-muted rounded-lg px-3 py-2 w-72">
-          <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search vehicles, customers…"
-            className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
-          />
-        </div>
       </div>
 
       {/* Right */}
       <div className="flex items-center gap-1">
+        <ThemeToggle />
+
         {/* Notification bell */}
         <button
           className="relative w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -93,7 +89,11 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
             aria-expanded={userMenuOpen}
           >
             <div className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold select-none">
-              {initials}
+              {isNavigatingToProfile ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                initials
+              )}
             </div>
             <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">
               {userName}
@@ -114,7 +114,10 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
               {/* Menu items */}
               <button
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors text-left"
-                onClick={() => setUserMenuOpen(false)}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  startProfileNavigation(() => router.push("/settings"));
+                }}
               >
                 <User className="w-4 h-4 text-muted-foreground" />
                 My Profile
