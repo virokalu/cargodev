@@ -4,32 +4,14 @@
 // user.service.ts, which has the Prisma client and the session user.
 
 import { z } from "zod";
-
-const name = z.string().trim().min(1, "Name is required").max(150, "Must be 150 characters or fewer");
-
-const email = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .min(1, "Email is required")
-  .email("Enter a valid email address")
-  .max(150, "Must be 150 characters or fewer");
-
-const phone = z
-  .string()
-  .nullable()
-  .optional()
-  .transform((v) => (v && v.trim() !== "" ? v.trim() : null))
-  .refine((v) => v === null || v.length <= 30, {
-    message: "Must be 30 characters or fewer",
-  });
+import {
+  nameSchema as name,
+  emailSchema as email,
+  phoneSchema as phone,
+  newPasswordSchema as newPassword,
+} from "@/lib/validation/shared";
 
 const role = z.enum(["ADMINISTRATOR", "MANAGER", "OPERATOR", "VIEWER"]);
-
-const newPassword = z
-  .string()
-  .min(8, "Must be at least 8 characters")
-  .max(100, "Must be 100 characters or fewer");
 
 // On update, a blank password means "leave it unchanged" — only validate
 // length when the admin actually typed something.
