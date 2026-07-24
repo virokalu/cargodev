@@ -6,6 +6,7 @@ import { Menu, Search, Bell, LogOut, User } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { broadcastAuthUpdate } from "@/lib/auth-channel";
 import type { StaffRole } from "@prisma/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface HeaderProps {
   onMenuOpen: () => void;
@@ -76,6 +77,8 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
 
       {/* Right */}
       <div className="flex items-center gap-1">
+        <ThemeToggle />
+
         {/* Notification bell */}
         <button
           className="relative w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

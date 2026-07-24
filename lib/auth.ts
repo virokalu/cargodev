@@ -97,13 +97,20 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     // Encode extra fields into the JWT token when the user first signs in.
-    jwt({ token, user }) {
+    // `trigger`/`session` are populated when a client calls useSession().update(...)
+    // (e.g. after Settings → Profile saves a new name) — without this branch the
+    // JWT would keep showing whatever name was true at login until the next
+    // sign-in, since a JWT session never re-reads the database on its own.
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         // Cast: our authorize() return includes these but NextAuth's User type doesn't.
         token.role = (user as { role: StaffRole }).role;
         token.orgId = (user as { orgId: string }).orgId;
         token.rememberMe = (user as { rememberMe: boolean }).rememberMe;
+      }
+      if (trigger === "update" && session?.name) {
+        token.name = session.name;
       }
       return token;
     },

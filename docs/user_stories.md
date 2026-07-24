@@ -156,21 +156,37 @@ Tasks: CD-D2-16, CD-D2-17
 AC: counts correct and org-scoped; Pending/Shipped count FC vehicles only; cards update on load.
 Tasks: CD-D1-10, CD-D1-12
 
-**US-32 · Distribution pies** — *As a Manager, I want pie charts for vehicles tracked (FC vs FL), shipment status, and destination so that I can see the shape of the business, not just totals.*
-AC: three pies with legends and counts; destination pie groups by country; empty categories omitted.
+**US-32 · Distribution pies** — *As a Manager, I want pie charts for vehicles tracked (FC vs FL) and shipment status so that I can see the shape of the business, not just totals.*
+AC: pies with legends and counts; empty categories omitted; the 2-slice FC vs FL pie uses two deliberately distinct colours (not two shades of the same blue); the shipment-status pie reuses the same warning/info/success colours already used for status badges elsewhere in the app. The original third pie (destination) was retired — destination is still covered by Export Volume by Destination (US-33, now folded into the US-44 selectable widget); the more granular set added in US-44 covers location/transport/agent/RORO-Container/brand instead.
 Tasks: CD-D1-10, CD-D1-11, CD-D1-12
 
-**US-33 · Export volume by destination** — *As a Manager, I want a column chart of export volume per destination so that I can compare markets.*
-AC: FC vehicles grouped by destination country; sorted by volume; readable at 10+ destinations.
+**US-33 · Export volume by destination** — *As a Manager, I want to see export volume per destination so that I can compare markets.*
+AC: FC vehicles grouped by destination country; sorted by volume; readable at 10+ destinations. Originally its own column chart — folded into the US-44 selectable widget during implementation so it scales the same way as the other lookup breakdowns.
 Tasks: CD-D1-11, CD-D1-13
 
 **US-34 · Transport status by company** — *As a Manager, I want vehicle transport status grouped by transport company so that I can see each company's load and completion at a glance.*
 AC: grouped by Transport By value; shows Transport Complete vs in-progress per company; companies with no vehicles omitted.
 Tasks: CD-D1-11, CD-D1-13
 
-**US-35 · Auction bills needing payment** — *As a Manager, I want a list of vehicles whose auction bill is not confirmed paid so that nothing is missed at the auction house.*
-AC: includes vehicles where Auction Bill Paid is blank **or** No (blank is not treated as paid); links straight to each vehicle.
+**US-35 · Auction bills needing payment** — *As a Manager, I want to see vehicles whose auction bill is not confirmed paid so that nothing is missed at the auction house.*
+AC: includes vehicles where Auction Bill Paid is blank **or** No (blank is not treated as paid); links straight to each vehicle. Originally its own always-visible, colour-highlighted list card below the KPI row — folded into the KPI row itself as the 4th card during implementation (US-45), keeping the red/green colour-coding via the card's own tone instead of the whole card's background.
 Tasks: CD-D1-11, CD-D1-13
+
+**US-43 · Dashboard trend charts** *(added post-spec, during implementation)* — *As a Manager, I want to switch between a few trend charts (Bookings vs Arrivals, Vehicles Entered, Cumulative Growth, Docs Turnaround) so that I can see how things are moving over time without cluttering the dashboard with every chart at once.*
+AC: one segmented selector, only the chosen chart renders; Bookings vs Arrivals counts FC vehicles by ETD/ETA month; Vehicles Entered and Cumulative Growth count all vehicles by `createdAt` month; Docs Turnaround averages `docsArrivedDate - purchaseDate` in days per month; each chart shows an empty state instead of a blank card when there's not enough data yet.
+Tasks: none (added directly, no task breakdown entry)
+
+**US-44 · Additional distribution charts** *(added post-spec, during implementation)* — *As a Manager, I want to see vehicle counts by Location, Transport Company, Freight Agent, Export Volume by Destination and Brand so that I can see the shape of the business across every lookup field, not just shipment status and track — without the dashboard growing a new permanent card for each one.*
+AC: Vehicle Location, Transport Company, Freight Agent, Export Volume by Destination and Brand share one switchable "Vehicles by Category" widget (segmented selector, one horizontal bar chart rendered at a time) since each can grow to many categories over time and a pie or a vertical bar with rotated labels stops being readable past a handful; bar-chart height scales with category count so it stays readable at any size; RORO/Container stays its own pie (only 2 categories, doesn't need the selector); every chart colours each category individually from a shared rotating palette instead of one flat colour per chart, and the 2-category charts (FC vs FL, RORO/Container) get an explicit 2-colour override picked to sit far apart on the wheel rather than drawing two similar blues off the rotation; each empty category omitted; each chart shows an empty state instead of a blank card when there's no data yet. Replaces the retired "vehicles by destination" pie from US-32.
+Tasks: none (added directly, no task breakdown entry)
+
+**US-45 · Clickable KPI cards** *(added post-spec, during implementation)* — *As a Manager, I want to click a KPI card and land on exactly those vehicles so that a headline number is a starting point, not a dead end.*
+AC: Total Vehicles and Shipped link straight to the vehicles table, pre-filtered to match what the card counted (Shipped: `status=SHIPPED&track=FC`); Pending Shipping and Unpaid Auction Bills each open a popup first, listing every matching vehicle as a small box (serial + year, brand/model, customer name), since a Manager usually wants to know *which* vehicles before leaving the dashboard; picking one from either popup closes it and opens the vehicles table filtered to that vehicle's unique serial; all 4 cards get a hover lift/shadow so they read as clickable.
+Tasks: none (added directly, no task breakdown entry)
+
+**US-46 · Clickable dashboard charts** *(added post-spec, during implementation)* — *As a Manager, I want to click a specific slice or bar on any dashboard chart and land on exactly those vehicles so that a chart is a starting point, not a dead end — the same idea as the clickable KPI cards (US-45), just per data point instead of per card.*
+AC: Vehicles Tracked (FC vs FL), Shipment Status (FC), RORO/Container, every category in the "Vehicles by Category" selector (Location, Transport Company, Freight Agent, Export Volume by Destination, Brand), and Transport Status by Company are all clickable — clicking a slice/bar navigates to the vehicles table pre-filtered to that exact value (e.g. clicking the "Shipped" slice goes to `status=SHIPPED&track=FC`; clicking a Location bar goes to `location=<id>`; clicking the "Complete" segment of a company's Transport Status bar goes to `transport=<id>&rowColour=<Transport Complete status id>`). Hovering a slice/bar dims its siblings and shows a pointer cursor so it reads as clickable before the click. Trend charts (US-43) are unchanged — a month isn't a filterable dimension on the vehicles table, so they stay non-interactive rather than implying a click that goes nowhere useful. Required adding a Transport Company filter to the vehicles table (mirroring the existing Auction Hall/Freight Agent/Vehicle Location filters), since no filter existed for it before this story.
+Tasks: none (added directly, no task breakdown entry)
 
 ---
 

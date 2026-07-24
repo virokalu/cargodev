@@ -13,7 +13,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { env } from "@/lib/env";
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
+  const adapter = new PrismaPg({
+  connectionString: env.DATABASE_URL,
+  connectionTimeoutMillis: 10000,
+});
 
   return new PrismaClient({
     adapter,
@@ -21,6 +24,10 @@ function createPrismaClient() {
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
         : ["error"],
+        transactionOptions: {
+    maxWait: 5000,   // time to acquire a connection & open the tx (default 2000ms)
+    timeout: 15000,  // time the callback has to run before commit (default 5000ms)
+  },
   });
 }
 

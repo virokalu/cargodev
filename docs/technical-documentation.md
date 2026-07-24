@@ -179,14 +179,143 @@ model User {
 | Total vehicles | KPI card | count |
 | Pending shipping | KPI card | `shipmentStatus = PENDING` |
 | Shipped | KPI card | `shipmentStatus = SHIPPED` |
-| Total vehicles tracked | Pie | FC vs FL split *(assumption A3 — still open; flag if a different split is wanted)* |
-| Shipment status distribution | Pie | Pending / Booking Received / Shipped |
-| Vehicles by destination | Pie | destination country + counts |
-| Export volume by destination | Column chart | FC vehicles grouped by destination |
+| Total vehicles tracked | Pie | FC vs FL split *(assumption A3 — still open; flag if a different split is wanted)* — 2 deliberately distinct colours (blue/green), not two shades of the same base blue |
+| Shipment status distribution | Pie | Pending / Booking Received / Shipped — coloured to match the same warning/info/success badges used for status elsewhere in the app |
+| ~~Vehicles by destination~~ | ~~Pie~~ | removed — superseded by the more granular distribution charts in §7.2 |
+| Export volume by destination | *(moved)* | now one of the selectable views in the Vehicles by Category widget, §7.2 |
 | Transport status by company | Grouped bar / table | grouped by Transport By, split by row-colour status incl. Transport Complete |
-| Auction bill payment due | List / KPI | `auction_bill_paid` is `null` **or** `false` (i.e. not confirmed paid) |
+| Auction bill payment due | KPI card | `auction_bill_paid` is `null` **or** `false` (i.e. not confirmed paid) |
 
-## 8. Notifications — re-mapped to the new flow *(proposal — confirm)*
+Auction bill payment due is the 4th KPI card, not a separate list widget —
+see §7.3, which also covers why it and Pending Shipping open a popup instead
+of navigating away like Total Vehicles and Shipped do.
+
+### 7.1 Trend charts *(added post-spec, during implementation — US-43)*
+
+Four monthly time series, not in the original widget table above. Rather
+than adding four more permanent chart cards to an already-busy dashboard,
+they live behind a single segmented selector at the bottom of the page —
+only the chosen chart renders at a time (same toggle pattern as the FC/FL/All
+track filter on the vehicles page).
+
+| Chart | Series | Source |
+|---|---|---|
+| Bookings vs Arrivals | Bookings, Arrivals | FC vehicles, counted by the month of `etd` (bookings) and `eta` (arrivals) |
+| Vehicles Entered | Vehicles Entered | all vehicles, counted by the month of `createdAt` |
+| Cumulative Growth | Total Fleet Size | running total of Vehicles Entered |
+| Docs Turnaround | Avg Days (Purchase → Docs Arrived) | average of `docsArrivedDate - purchaseDate` in days, only vehicles with both dates set, bucketed by the month docs arrived |
+
+All four are bucketed in JS (grouped by a `"YYYY-MM"` key derived from the
+relevant date field, not a raw-SQL `GROUP BY month(...)`), served by
+`getDashboardTrends()` in `lib/services/dashboard.service.ts`.
+
+### 7.2 Additional distribution charts *(added post-spec, during implementation)*
+
+More widgets, replacing the removed "Vehicles by destination" pie and
+rounding out the picture with the other lookup fields on Vehicle. Chart type
+is chosen per field by how many distinct categories it can realistically
+have — a pie only stays readable for a small, roughly-fixed category count
+(RORO/Container: 2). Vehicle Location, Transport Company, Freight Agent,
+Export Volume by Destination and Brand can each grow to many entries over
+time, so instead of five separate always-visible charts (which either turn
+into a wall of pie slivers or need rotated, cramped bar-chart axis labels)
+they share **one switchable widget, "Vehicles by Category"** — a horizontal
+bar chart behind a segmented selector (same pattern as the Trends selector
+in §7.1), one view at a time, bar height scaling with category count so it
+stays readable however many categories a given view has.
+
+Every chart with org-specific, not-a-fixed-enum categories (RORO/Container,
+every view inside Vehicles by Category) colours each item individually from
+a shared 5-colour rotating palette (`ROTATING_CHART_COLORS`,
+`lib/constants/chart-colors.ts`) instead of one flat colour per chart — a
+single-colour bar chart, or a 2-slice pie drawing its first two colours off
+a rotation whose first two entries both sit in the blue/cyan range, both
+read as far more blue than intended. The two 2-category pies (Vehicles
+Tracked FC vs FL, RORO/Container) each get an explicit 2-colour override
+instead of the rotation, picked to sit far apart on the colour wheel rather
+than adjacent. Shipment Status (FC) reuses the same warning/info/success
+semantic colours already used for status badges elsewhere in the app,
+rather than generic chart colours, so a status reads the same colour on
+every screen it appears on.
+
+| Chart | Type | Source |
+|---|---|---|
+| Vehicles by Category *(Location / Transport Company / Freight Agent / Export Volume by Destination / Brand, selectable)* | Horizontal bar | grouped by whichever is selected; Transport Company here is plain volume per company, independent of the existing Transport Status by Company completion split; Export Volume by Destination is FC only |
+| RORO / Container | Pie | grouped by Shipping Method (2 categories, explicit 2-colour override) |
+
+Served by `getDashboardStats()` in `lib/services/dashboard.service.ts`, same
+function as the original KPI/pie/bar widgets above.
+
+### 7.3 KPI cards are clickable *(added post-spec, during implementation — US-45)*
+
+All 4 KPI cards (Total Vehicles, Pending Shipping, Shipped, Unpaid Auction
+Bills) are clickable, but not all the same way:
+
+- **Total Vehicles** and **Shipped** link straight to the vehicles table —
+  Shipped links to `/vehicles?status=SHIPPED&track=FC`, the exact filter that
+  matches what the card counted.
+- **Pending Shipping** and **Unpaid Auction Bills** open a popup first,
+  listing every matching vehicle as a small box (serial + year, brand/model,
+  customer name) — a Manager usually wants to know *which* vehicles before
+  deciding whether it's worth leaving the dashboard. Picking one closes the
+  popup and opens the vehicles table pre-filtered to that vehicle's serial
+  (`/vehicles?q=<serial>`), which — since serial is unique per org — shows
+  exactly that one row.
+
+Both popups share one component (`VehicleSummaryDialog` in
+`dashboard-kpi-cards.tsx`) and one data shape (`VehicleSummary`, in
+`dashboard.service.ts`) — same three at-a-glance fields either way, just a
+different source list and title/description.
+
+Unpaid Auction Bills used to be its own always-visible list card (colour-
+coded red/green) below the KPI row; it's now the 4th KPI card instead, tone-
+coded the same red-while-outstanding/green-once-clear way via `StatCard`'s
+`tone` prop, so it keeps standing out without breaking the now-uniform
+4-card KPI row.
+
+### 7.4 Charts are clickable *(added post-spec, during implementation — US-46)*
+
+Every chart from §7 and §7.2 (Vehicles Tracked, Shipment Status, RORO/
+Container, every view in "Vehicles by Category", Transport Status by
+Company) extends the same "a number is a starting point, not a dead end"
+idea from §7.3 down to individual chart segments — clicking a specific
+slice or bar goes straight to the vehicles table filtered to exactly that
+value, and hovering dims the other slices/bars in that chart so a segment
+reads as clickable before it's clicked (`fillOpacity` + pointer cursor on
+the `Cell` under the cursor, via a small shared `useHoveredIndex` hook in
+`components/dashboard/use-hovered-index.ts`). Trend charts (§7.1) are
+excluded — a month isn't a filterable dimension on the vehicles table, so
+they stay static rather than implying a click that would go nowhere.
+
+Fixed-enum charts (track, shipment status, RORO/Container) already know
+their filter value at build time (`FC`/`FL`, the `ShipmentStatus` enum, the
+`ShippingMethod` enum) and link directly. The lookup-based charts (Vehicle
+Location, Transport Company, Freight Agent, Brand) needed real ids to link
+precisely, which `getDashboardStats()` didn't carry before this story — its
+tally helper (`tallyByIdName`, formerly `tallyNames`) and the underlying
+Prisma `select`s were extended to keep each row's `id` alongside its name,
+and the shared `NameCount` type became `IdNameCount` (`{id, name, count}`)
+everywhere it's used. Export Volume by Destination is the one exception —
+`destination` is a plain string column with no lookup table, so its `id` is
+just the destination string itself, letting the dashboard treat all five
+"Vehicles by Category" views uniformly instead of branching per category.
+
+Transport Status by Company's "Complete" bar segment links with both the
+company id and the org's Transport-Complete `RowColourStatus` id attached
+(`?transport=<id>&rowColour=<id>`) — that status id is captured once, off
+whichever row first has `rowColourStatus.transportCellOnly === true`, while
+tallying the same query already used for the completion split. The
+"In Progress" segment can only scope by company (`?transport=<id>`) — there's
+no "not equal" filter on the vehicles table to isolate in-progress
+precisely, which is an accepted, honest limit rather than a new filter
+being built just for this one segment.
+
+This story is also why the vehicles table gained a **Transport Company**
+filter (`transportById` — new URL param, `VehicleListParams` field, and
+`FilterCombobox` in the filters panel, identical to the existing Auction
+Hall/Freight Agent/Vehicle Location filters) — neither the Transport
+Company bar nor the whole Transport Status by Company chart could link
+anywhere without one.
 
 The old Arrived/Delayed events no longer exist. Proposed Phase 1 events: **Booking Received** (auto, in-app), **Shipped** (auto, in-app + email), **Name-change deadline approaching** (7 and 1 days before, in-app + email — this is the highest-value alert in the new model), **Document/photo uploaded** (in-app). WhatsApp add-on channel attaches to Shipped + deadline alerts. Same fan-out core as v1.
 

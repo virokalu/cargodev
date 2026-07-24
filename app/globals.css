@@ -27,6 +27,13 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -49,30 +56,37 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  --background: oklch(0.985 0.005 247);
+  --foreground: oklch(0.21 0.04 257);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.04 257);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.04 257);
+  --primary: oklch(0.52 0.18 256);
+  --primary-foreground: oklch(0.99 0.003 247);
+  --secondary: oklch(0.96 0.01 247);
+  --secondary-foreground: oklch(0.3 0.04 257);
+  --muted: oklch(0.965 0.008 247);
+  --muted-foreground: oklch(0.55 0.03 257);
+  --accent: oklch(0.94 0.03 250);
+  --accent-foreground: oklch(0.35 0.1 256);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.003 247);
+  --success: oklch(0.62 0.16 152);
+  --success-foreground: oklch(0.99 0.003 247);
+  --warning: oklch(0.75 0.16 70);
+  --warning-foreground: oklch(0.27 0.05 70);
+  --info: oklch(0.6 0.13 230);
+  --info-foreground: oklch(0.99 0.003 247);
+  --border: oklch(0.92 0.012 255);
+  --input: oklch(0.92 0.012 255);
+  --ring: oklch(0.52 0.18 256);
+  --chart-1: oklch(0.52 0.18 256);
+  --chart-2: oklch(0.6 0.13 230);
+  --chart-3: oklch(0.62 0.16 152);
+  --chart-4: oklch(0.75 0.16 70);
+  --chart-5: oklch(0.58 0.22 27);
   --sidebar: oklch(0.18 0.07 258);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -84,29 +98,36 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --background: oklch(0.18 0.025 257);
+  --foreground: oklch(0.95 0.01 247);
+  --card: oklch(0.23 0.03 257);
+  --card-foreground: oklch(0.95 0.01 247);
+  --popover: oklch(0.23 0.03 257);
+  --popover-foreground: oklch(0.95 0.01 247);
+  --primary: oklch(0.62 0.16 256);
+  --primary-foreground: oklch(0.15 0.02 257);
+  --secondary: oklch(0.28 0.03 257);
+  --secondary-foreground: oklch(0.95 0.01 247);
+  --muted: oklch(0.28 0.03 257);
+  --muted-foreground: oklch(0.68 0.02 257);
+  --accent: oklch(0.32 0.05 256);
+  --accent-foreground: oklch(0.95 0.01 247);
+  --destructive: oklch(0.62 0.2 27);
+  --destructive-foreground: oklch(0.98 0.003 247);
+  --success: oklch(0.65 0.15 152);
+  --success-foreground: oklch(0.15 0.02 257);
+  --warning: oklch(0.78 0.15 70);
+  --warning-foreground: oklch(0.2 0.03 70);
+  --info: oklch(0.65 0.13 230);
+  --info-foreground: oklch(0.15 0.02 257);
+  --border: oklch(0.32 0.03 257);
+  --input: oklch(0.34 0.03 257);
+  --ring: oklch(0.62 0.16 256);
+  --chart-1: oklch(0.65 0.16 256);
+  --chart-2: oklch(0.68 0.13 230);
+  --chart-3: oklch(0.68 0.15 152);
+  --chart-4: oklch(0.78 0.15 70);
+  --chart-5: oklch(0.65 0.2 27);
   --sidebar: oklch(0.14 0.07 258);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -128,4 +149,44 @@
     @apply font-sans;
     font-size: 14px;
   }
+
+  /* Clicking a bar/slice in a dashboard chart makes Recharts programmatically
+   * focus() one of its internal SVG groups (e.g. a `recharts-zIndex-layer_*`
+   * group), even with each chart's `accessibilityLayer` disabled — the
+   * browser then draws its default focus box around the whole chart. These
+   * internal groups are tabindex="-1" (never keyboard-reachable), so there's
+   * no keyboard user relying on that ring — safe to always hide it. */
+  [class*="recharts"]:focus {
+    outline: none;
+  }
+}
+
+/* Lets JS detect the exact moment a browser autofills a field — there's no
+   direct DOM event for it, but WebKit fires this animation when its autofill
+   styling applies, so an onAnimationStart listener can catch it. Used on
+   fields where a stale browser-saved credential must never be trusted (e.g.
+   "confirm your current password" on a change-password form) — see
+   components/settings/profile-form.tsx. */
+@keyframes onAutoFillStart {
+  from {}
+  to {}
+}
+
+.detect-autofill:-webkit-autofill {
+  animation-name: onAutoFillStart;
+}
+
+/* Lets JS detect the exact moment a browser autofills a field — there's no
+   direct DOM event for it, but WebKit fires this animation when its autofill
+   styling applies, so an onAnimationStart listener can catch it. Used on
+   fields where a stale browser-saved credential must never be trusted (e.g.
+   "confirm your current password" on a change-password form) — see
+   components/settings/profile-form.tsx. */
+@keyframes onAutoFillStart {
+  from {}
+  to {}
+}
+
+.detect-autofill:-webkit-autofill {
+  animation-name: onAutoFillStart;
 }
