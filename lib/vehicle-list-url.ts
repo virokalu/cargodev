@@ -20,6 +20,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   shipmentStatus: "ALL",
   destination: "ALL",
   rowColourStatusId: "ALL",
+  rowColourStatusIdNot: "ALL",
   brandId: "ALL",
   modelId: "ALL",
   gradeId: "ALL",
@@ -89,6 +90,7 @@ export function parseVehicleListParams(
       : "ALL",
     destination: firstValue(searchParams.destination) || "ALL",
     rowColourStatusId: firstValue(searchParams.rowColour) || "ALL",
+    rowColourStatusIdNot: firstValue(searchParams.rowColourNot) || "ALL",
     brandId: firstValue(searchParams.brand) || "ALL",
     modelId: firstValue(searchParams.model) || "ALL",
     gradeId: firstValue(searchParams.grade) || "ALL",
@@ -124,6 +126,7 @@ export function buildVehiclesHref(
   if (merged.shipmentStatus !== "ALL") query.set("status", merged.shipmentStatus);
   if (merged.destination !== "ALL") query.set("destination", merged.destination);
   if (merged.rowColourStatusId !== "ALL") query.set("rowColour", merged.rowColourStatusId);
+  if (merged.rowColourStatusIdNot !== "ALL") query.set("rowColourNot", merged.rowColourStatusIdNot);
   if (merged.brandId !== "ALL") query.set("brand", merged.brandId);
   if (merged.modelId !== "ALL") query.set("model", merged.modelId);
   if (merged.gradeId !== "ALL") query.set("grade", merged.gradeId);

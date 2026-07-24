@@ -590,6 +590,13 @@ export interface VehicleListParams {
   shipmentStatus: ShipmentStatus | "ALL";
   destination: string | "ALL";
   rowColourStatusId: string | "ALL";
+  /** Excludes one specific row colour status rather than filtering to it —
+   * used by the dashboard's "In Progress" transport bar, which means
+   * "everything except Transport Complete" (any other status, or none),
+   * not "no colour set". Mutually exclusive with rowColourStatusId in
+   * practice (nothing sets both), so if both were ever set, the equality
+   * filter below takes precedence. */
+  rowColourStatusIdNot: string | "ALL";
   brandId: string | "ALL";
   modelId: string | "ALL";
   gradeId: string | "ALL";
@@ -671,7 +678,11 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.track !== "ALL") where.serialPrefix = params.track;
   if (params.shipmentStatus !== "ALL") where.shipmentStatus = params.shipmentStatus;
   if (params.destination !== "ALL") where.destination = params.destination;
-  if (params.rowColourStatusId !== "ALL") where.rowColourStatusId = params.rowColourStatusId;
+  if (params.rowColourStatusId !== "ALL") {
+    where.rowColourStatusId = params.rowColourStatusId;
+  } else if (params.rowColourStatusIdNot !== "ALL") {
+    where.rowColourStatusId = { not: params.rowColourStatusIdNot };
+  }
   // Vehicle stores modelId/gradeId directly, but not brandId — brand is one
   // level up via the model relation.
   if (params.brandId !== "ALL") where.model = { brand_id: params.brandId };

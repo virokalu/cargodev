@@ -24,19 +24,23 @@ import {
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import { ROTATING_CHART_COLORS } from "@/lib/constants/chart-colors";
 import type { DashboardStats, IdNameCount } from "@/lib/services/dashboard.service";
-import { useHoveredIndex, renderActivePieSlice, makeGrowingBarShape } from "@/components/dashboard/use-hovered-index";
+import { useHoveredIndex, renderActivePieSlice, makeGrowingBarShape, makeClickableAxisTick } from "@/components/dashboard/use-hovered-index";
 
 interface DashboardChartsProps {
   stats: DashboardStats;
 }
 
 // FC/FL only has 2 slices, so it gets 2 deliberately far-apart colours
-// (blue + green) instead of drawing the first two entries off the rotating
-// palette, which put chart-1 and chart-2 next to each other — both sit in
-// the blue/cyan family and read as near-identical in a 2-slice pie.
+// instead of drawing the first two entries off the rotating palette (which
+// put chart-1 and chart-2 next to each other, both in the blue/cyan family,
+// reading as near-identical in a 2-slice pie). Uses a violet/purple pair
+// (--chart-track-*) instead of blue/green/yellow so this neutral FC-vs-FL
+// split doesn't read as a status colour — and deliberately a different
+// colour *family* than RORO/Container below (violet/purple vs red/orange),
+// so the two pies don't look like the same palette reused twice.
 const trackConfig = {
-  fc: { label: "FC — Export", color: "var(--chart-1)" },
-  fl: { label: "FL — Local", color: "var(--chart-3)" },
+  fc: { label: "FC — Export", color: "var(--chart-track-fc)" },
+  fl: { label: "FL — Local", color: "var(--chart-track-fl)" },
 } satisfies ChartConfig;
 
 // Reuses the same semantic colours already used for the shipment-status
@@ -61,8 +65,12 @@ const transportConfig = {
 } satisfies ChartConfig;
 
 // RORO/Container is also only 2 slices — same reasoning as FC/FL, pick two
-// colours far apart on the wheel instead of the rotating palette's first two.
-const SHIPPING_METHOD_COLORS = ["var(--chart-2)", "var(--chart-4)"];
+// colours far apart on the wheel instead of the rotating palette's first
+// two, off blue/green/yellow for the same reason as trackConfig above — and
+// a red/orange family rather than trackConfig's violet/purple, so the two
+// pies read as clearly different palettes, not just different shades of
+// the same one.
+const SHIPPING_METHOD_COLORS = ["var(--chart-roro)", "var(--chart-container)"];
 
 
 function EmptyState({ label }: { label: string }) {
@@ -255,7 +263,17 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
             <ChartContainer config={transportConfig} className="h-[280px] w-full">
               <BarChart data={stats.transportByCompany} margin={{ left: -16, right: 8 }} accessibilityLayer={false}>
                 <CartesianGrid vertical={false} />
-                <XAxis dataKey="company" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+                <XAxis
+                  dataKey="company"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  fontSize={11}
+                  tick={makeClickableAxisTick(
+                    stats.transportByCompany.map((c) => ({ id: c.id, label: c.company })),
+                    (id) => router.push(`/vehicles?transport=${id}`)
+                  )}
+                />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <ChartLegend content={<ChartLegendContent />} />
@@ -280,7 +298,12 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
                   shape={makeGrowingBarShape(transportHover.hoveredIndex, "vertical")}
                   onMouseEnter={(_, i) => transportHover.onEnter(i)}
                   onMouseLeave={transportHover.onLeave}
-                  onClick={(_, i) => router.push(`/vehicles?transport=${stats.transportByCompany[i].id}`)}
+                  onClick={(_, i) => {
+                    const entry = stats.transportByCompany[i];
+                    router.push(
+                      `/vehicles?transport=${entry.id}${stats.transportCompleteStatusId ? `&rowColourNot=${stats.transportCompleteStatusId}` : ""}`
+                    );
+                  }}
                 />
               </BarChart>
             </ChartContainer>
