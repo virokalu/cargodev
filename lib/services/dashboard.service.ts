@@ -6,7 +6,11 @@ import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeEffectiveShipmentStatus } from "@/lib/services/vehicle.service";
 
-export interface NameCount {
+/** Every lookup-based distribution below carries an id alongside the display
+ * name — the dashboard charts link each slice/bar straight to that exact
+ * value on the vehicles table, which needs the id, not just the label. */
+export interface IdNameCount {
+  id: string;
   name: string;
   count: number;
 }
@@ -31,29 +35,30 @@ export interface DashboardStats {
   trackSplit: { fc: number; fl: number };
   shipmentStatusDistribution: { status: ShipmentStatus; count: number }[];
   exportVolumeByDestination: { destination: string; count: number }[];
-  transportByCompany: { company: string; complete: number; inProgress: number }[];
-  vehicleLocationDistribution: NameCount[];
-  transportByDistribution: NameCount[];
-  freightAgentDistribution: NameCount[];
+  transportByCompany: { id: string; company: string; complete: number; inProgress: number }[];
+  transportCompleteStatusId: string | null;
+  vehicleLocationDistribution: IdNameCount[];
+  transportByDistribution: IdNameCount[];
+  freightAgentDistribution: IdNameCount[];
   shippingMethodDistribution: { method: ShippingMethod; count: number }[];
-  brandDistribution: NameCount[];
+  brandDistribution: IdNameCount[];
   unpaidAuctionBills: VehicleSummary[];
 }
 
 const STATUS_ORDER: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
 
-/** Shared by every "count vehicles grouped by a related lookup's name"
- * widget (Vehicle Location, Transport By, Freight Agent, Brand) — same
- * tally-then-sort shape each time, just fed a different relation's names. */
-function tallyNames(names: (string | null | undefined)[]): NameCount[] {
-  const tally = new Map<string, number>();
-  for (const name of names) {
-    if (!name) continue;
-    tally.set(name, (tally.get(name) ?? 0) + 1);
+/** Shared by every "count vehicles grouped by a related lookup" widget
+ * (Vehicle Location, Transport By, Freight Agent, Brand) — same
+ * tally-then-sort shape each time, just fed a different relation's rows. */
+function tallyByIdName(items: ({ id: string; name: string } | null | undefined)[]): IdNameCount[] {
+  const tally = new Map<string, IdNameCount>();
+  for (const item of items) {
+    if (!item) continue;
+    const entry = tally.get(item.id) ?? { id: item.id, name: item.name, count: 0 };
+    entry.count += 1;
+    tally.set(item.id, entry);
   }
-  return Array.from(tally.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+  return Array.from(tally.values()).sort((a, b) => b.count - a.count);
 }
 
 export async function getDashboardStats(orgId: string): Promise<DashboardStats> {
@@ -93,17 +98,17 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     prisma.vehicle.findMany({
       where: { ...baseWhere, transportById: { not: null } },
       select: {
-        transportBy: { select: { name: true } },
-        rowColourStatus: { select: { transportCellOnly: true } },
+        transportBy: { select: { id: true, name: true } },
+        rowColourStatus: { select: { id: true, transportCellOnly: true } },
       },
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, vehicleLocationId: { not: null } },
-      select: { vehicleLocation: { select: { name: true } } },
+      select: { vehicleLocation: { select: { id: true, name: true } } },
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, freightAgentId: { not: null } },
-      select: { freightAgent: { select: { name: true } } },
+      select: { freightAgent: { select: { id: true, name: true } } },
     }),
     prisma.vehicle.groupBy({
       by: ["shippingMethod"],
@@ -112,7 +117,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, modelId: { not: null } },
-      select: { model: { select: { brand: { select: { name: true } } } } },
+      select: { model: { select: { brand: { select: { id: true, name: true } } } } },
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }] },
@@ -169,24 +174,31 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     .map((group) => ({ destination: group.destination as string, count: group._count }))
     .sort((a, b) => b.count - a.count);
 
-  const transportTally = new Map<string, { complete: number; inProgress: number }>();
+  // Complete/In-Progress split by company, plus the id of the org's
+  // Transport-Complete row colour status (captured off whichever row hits
+  // it first) — the dashboard's "Complete" bar segment links to
+  // ?transport=<id>&rowColour=<transportCompleteStatusId>, so both ids need
+  // to survive the tally, not just the display names.
+  const transportTally = new Map<string, { id: string; company: string; complete: number; inProgress: number }>();
+  let transportCompleteStatusId: string | null = null;
   for (const row of transportRows) {
-    const company = row.transportBy?.name;
+    const company = row.transportBy;
     if (!company) continue;
-    const entry = transportTally.get(company) ?? { complete: 0, inProgress: 0 };
-    if (row.rowColourStatus?.transportCellOnly) entry.complete++;
-    else entry.inProgress++;
-    transportTally.set(company, entry);
+    const entry = transportTally.get(company.id) ?? { id: company.id, company: company.name, complete: 0, inProgress: 0 };
+    if (row.rowColourStatus?.transportCellOnly) {
+      entry.complete++;
+      transportCompleteStatusId ??= row.rowColourStatus.id;
+    } else {
+      entry.inProgress++;
+    }
+    transportTally.set(company.id, entry);
   }
-  const transportByCompany = Array.from(transportTally.entries()).map(([company, counts]) => ({
-    company,
-    ...counts,
-  }));
+  const transportByCompany = Array.from(transportTally.values());
 
-  const vehicleLocationDistribution = tallyNames(vehicleLocationRows.map((v) => v.vehicleLocation?.name));
-  const transportByDistribution = tallyNames(transportRows.map((v) => v.transportBy?.name));
-  const freightAgentDistribution = tallyNames(freightAgentRows.map((v) => v.freightAgent?.name));
-  const brandDistribution = tallyNames(brandRows.map((v) => v.model?.brand?.name));
+  const vehicleLocationDistribution = tallyByIdName(vehicleLocationRows.map((v) => v.vehicleLocation));
+  const transportByDistribution = tallyByIdName(transportRows.map((v) => v.transportBy));
+  const freightAgentDistribution = tallyByIdName(freightAgentRows.map((v) => v.freightAgent));
+  const brandDistribution = tallyByIdName(brandRows.map((v) => v.model?.brand));
 
   const shippingMethodDistribution = shippingMethodGroups
     .map((group) => ({ method: group.shippingMethod as ShippingMethod, count: group._count }))
@@ -201,6 +213,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     shipmentStatusDistribution,
     exportVolumeByDestination,
     transportByCompany,
+    transportCompleteStatusId,
     vehicleLocationDistribution,
     transportByDistribution,
     freightAgentDistribution,

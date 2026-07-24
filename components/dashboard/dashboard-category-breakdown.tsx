@@ -9,19 +9,21 @@
 // vertical bar would need rotated, cramped axis labels.
 
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
+import { useRouter } from "next/navigation";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { ROTATING_CHART_COLORS } from "@/lib/constants/chart-colors";
-import type { NameCount } from "@/lib/services/dashboard.service";
+import type { IdNameCount } from "@/lib/services/dashboard.service";
+import { useHoveredIndex, makeGrowingBarShape } from "@/components/dashboard/use-hovered-index";
 
 interface DashboardCategoryBreakdownProps {
-  vehicleLocationDistribution: NameCount[];
-  transportByDistribution: NameCount[];
-  freightAgentDistribution: NameCount[];
-  exportVolumeByDestination: NameCount[];
-  brandDistribution: NameCount[];
+  vehicleLocationDistribution: IdNameCount[];
+  transportByDistribution: IdNameCount[];
+  freightAgentDistribution: IdNameCount[];
+  exportVolumeByDestination: IdNameCount[];
+  brandDistribution: IdNameCount[];
 }
 
 type CategoryKey = "location" | "transportBy" | "freightAgent" | "exportVolume" | "brand";
@@ -33,6 +35,25 @@ const CATEGORY_OPTIONS: { key: CategoryKey; label: string; emptyLabel: string }[
   { key: "exportVolume", label: "Export Volume by Destination", emptyLabel: "No FC export destinations yet." },
   { key: "brand", label: "Brand", emptyLabel: "No brands entered yet." },
 ];
+
+// Each category's bar links to the vehicles table filtered by its own id —
+// exportVolume is the one exception (destination has no lookup table, so
+// page.tsx hands it a synthetic id equal to the destination name itself),
+// which is why it needs the extra track=FC to scope it the same way the
+// dashboard's own export-volume numbers are scoped (FC only).
+const CATEGORY_LINK: Record<CategoryKey, { param: string; extraQuery?: Record<string, string> }> = {
+  location: { param: "location" },
+  transportBy: { param: "transport" },
+  freightAgent: { param: "agent" },
+  exportVolume: { param: "destination", extraQuery: { track: "FC" } },
+  brand: { param: "brand" },
+};
+
+function buildCategoryHref(key: CategoryKey, id: string): string {
+  const { param, extraQuery } = CATEGORY_LINK[key];
+  const query = new URLSearchParams({ [param]: id, ...extraQuery });
+  return `/vehicles?${query.toString()}`;
+}
 
 const config = { count: { label: "Vehicles", color: "var(--chart-2)" } } satisfies ChartConfig;
 
@@ -49,9 +70,11 @@ export function DashboardCategoryBreakdown({
   exportVolumeByDestination,
   brandDistribution,
 }: DashboardCategoryBreakdownProps) {
+  const router = useRouter();
+  const hover = useHoveredIndex();
   const [selected, setSelected] = useState<CategoryKey>("location");
 
-  const dataByCategory: Record<CategoryKey, NameCount[]> = {
+  const dataByCategory: Record<CategoryKey, IdNameCount[]> = {
     location: vehicleLocationDistribution,
     transportBy: transportByDistribution,
     freightAgent: freightAgentDistribution,
@@ -76,7 +99,10 @@ export function DashboardCategoryBreakdown({
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => setSelected(option.key)}
+                  onClick={() => {
+                    setSelected(option.key);
+                    hover.onLeave();
+                  }}
                   className={cn(
                     "rounded-sm px-3 py-1.5 text-sm font-semibold transition-colors",
                     active ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
@@ -95,7 +121,7 @@ export function DashboardCategoryBreakdown({
           <EmptyState label={activeOption.emptyLabel} />
         ) : (
           <ChartContainer config={config} className="w-full" style={{ height: chartHeight }}>
-            <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16 }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16 }} accessibilityLayer={false}>
               <CartesianGrid horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
               <YAxis
@@ -107,11 +133,18 @@ export function DashboardCategoryBreakdown({
                 fontSize={11}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                {data.map((entry, i) => (
-                  <Cell key={entry.name} fill={ROTATING_CHART_COLORS[i % ROTATING_CHART_COLORS.length]} />
-                ))}
-              </Bar>
+              <Bar
+                dataKey="count"
+                radius={[0, 6, 6, 0]}
+                shape={makeGrowingBarShape(
+                  hover.hoveredIndex,
+                  "horizontal",
+                  (i) => ROTATING_CHART_COLORS[i % ROTATING_CHART_COLORS.length]
+                )}
+                onMouseEnter={(_, i) => hover.onEnter(i)}
+                onMouseLeave={hover.onLeave}
+                onClick={(_, i) => router.push(buildCategoryHref(selected, data[i].id))}
+              />
             </BarChart>
           </ChartContainer>
         )}

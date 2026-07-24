@@ -149,4 +149,14 @@
     @apply font-sans;
     font-size: 14px;
   }
+
+  /* Clicking a bar/slice in a dashboard chart makes Recharts programmatically
+   * focus() one of its internal SVG groups (e.g. a `recharts-zIndex-layer_*`
+   * group), even with each chart's `accessibilityLayer` disabled — the
+   * browser then draws its default focus box around the whole chart. These
+   * internal groups are tabindex="-1" (never keyboard-reachable), so there's
+   * no keyboard user relying on that ring — safe to always hide it. */
+  [class*="recharts"]:focus {
+    outline: none;
+  }
 }

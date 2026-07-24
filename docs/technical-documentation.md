@@ -273,6 +273,50 @@ coded the same red-while-outstanding/green-once-clear way via `StatCard`'s
 `tone` prop, so it keeps standing out without breaking the now-uniform
 4-card KPI row.
 
+### 7.4 Charts are clickable *(added post-spec, during implementation — US-46)*
+
+Every chart from §7 and §7.2 (Vehicles Tracked, Shipment Status, RORO/
+Container, every view in "Vehicles by Category", Transport Status by
+Company) extends the same "a number is a starting point, not a dead end"
+idea from §7.3 down to individual chart segments — clicking a specific
+slice or bar goes straight to the vehicles table filtered to exactly that
+value, and hovering dims the other slices/bars in that chart so a segment
+reads as clickable before it's clicked (`fillOpacity` + pointer cursor on
+the `Cell` under the cursor, via a small shared `useHoveredIndex` hook in
+`components/dashboard/use-hovered-index.ts`). Trend charts (§7.1) are
+excluded — a month isn't a filterable dimension on the vehicles table, so
+they stay static rather than implying a click that would go nowhere.
+
+Fixed-enum charts (track, shipment status, RORO/Container) already know
+their filter value at build time (`FC`/`FL`, the `ShipmentStatus` enum, the
+`ShippingMethod` enum) and link directly. The lookup-based charts (Vehicle
+Location, Transport Company, Freight Agent, Brand) needed real ids to link
+precisely, which `getDashboardStats()` didn't carry before this story — its
+tally helper (`tallyByIdName`, formerly `tallyNames`) and the underlying
+Prisma `select`s were extended to keep each row's `id` alongside its name,
+and the shared `NameCount` type became `IdNameCount` (`{id, name, count}`)
+everywhere it's used. Export Volume by Destination is the one exception —
+`destination` is a plain string column with no lookup table, so its `id` is
+just the destination string itself, letting the dashboard treat all five
+"Vehicles by Category" views uniformly instead of branching per category.
+
+Transport Status by Company's "Complete" bar segment links with both the
+company id and the org's Transport-Complete `RowColourStatus` id attached
+(`?transport=<id>&rowColour=<id>`) — that status id is captured once, off
+whichever row first has `rowColourStatus.transportCellOnly === true`, while
+tallying the same query already used for the completion split. The
+"In Progress" segment can only scope by company (`?transport=<id>`) — there's
+no "not equal" filter on the vehicles table to isolate in-progress
+precisely, which is an accepted, honest limit rather than a new filter
+being built just for this one segment.
+
+This story is also why the vehicles table gained a **Transport Company**
+filter (`transportById` — new URL param, `VehicleListParams` field, and
+`FilterCombobox` in the filters panel, identical to the existing Auction
+Hall/Freight Agent/Vehicle Location filters) — neither the Transport
+Company bar nor the whole Transport Status by Company chart could link
+anywhere without one.
+
 The old Arrived/Delayed events no longer exist. Proposed Phase 1 events: **Booking Received** (auto, in-app), **Shipped** (auto, in-app + email), **Name-change deadline approaching** (7 and 1 days before, in-app + email — this is the highest-value alert in the new model), **Document/photo uploaded** (in-app). WhatsApp add-on channel attaches to Shipped + deadline alerts. Same fan-out core as v1.
 
 ## 9. Commercial & scope notes

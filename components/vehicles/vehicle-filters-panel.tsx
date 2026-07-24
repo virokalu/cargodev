@@ -1,8 +1,9 @@
 "use client";
 
-// The 8 filters that don't fit in the inline toolbar row (Brand/Model/Grade,
-// Auction Hall, Freight Agent, RORO/Container, Vehicle Location, and the 3
-// tri-state flags) live behind a "Filters" button in a side panel, plus a row
+// The filters that don't fit in the inline toolbar row (Brand/Model/Grade,
+// Auction Hall, Freight Agent, RORO/Container, Vehicle Location, Transport
+// Company, and the 3 tri-state flags) live behind a "Filters" button in a
+// side panel, plus a row
 // of removable chips under the toolbar for whatever's active. Customer isn't
 // here — that list can get large, so narrowing by customer goes through the
 // free-text search box instead of a dedicated filter dropdown.
@@ -37,6 +38,7 @@ import {
   searchAuctionHallsAction,
   searchFreightAgentsAction,
   searchVehicleLocationsAction,
+  searchTransportCompaniesAction,
 } from "@/app/(dashboard)/vehicles/actions";
 
 /** The panel-owned filter keys — used to compute the active-count badge and
@@ -49,6 +51,7 @@ const PANEL_FILTER_KEYS = [
   "auctionHallId",
   "freightAgentId",
   "vehicleLocationId",
+  "transportById",
   "shippingMethod",
   "auctionBillPaid",
   "logBook",
@@ -62,6 +65,7 @@ export interface VehicleFilterSelections {
   auctionHall: FilterOption | null;
   freightAgent: FilterOption | null;
   vehicleLocation: FilterOption | null;
+  transportCompany: FilterOption | null;
 }
 
 interface VehicleFiltersPanelProps {
@@ -198,6 +202,16 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 search={searchVehicleLocationsAction}
                 placeholder="All vehicle locations"
                 allLabel="All vehicle locations"
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5">Transport Company</Label>
+              <FilterCombobox
+                value={selected.transportCompany}
+                onChange={(option) => push({ transportById: option?.id ?? "ALL" })}
+                search={searchTransportCompaniesAction}
+                placeholder="All transport companies"
+                allLabel="All transport companies"
               />
             </div>
           </SectionCard>
