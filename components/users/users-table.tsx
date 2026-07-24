@@ -102,12 +102,12 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
         />
       </div>
 
-      <div className="rounded-xl border bg-card">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
+              <TableHead className="border-r">User</TableHead>
+              <TableHead className="border-r">Role</TableHead>
               <TableHead className="w-24 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -121,7 +121,7 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
             ) : (
               filtered.map((member) => (
                 <TableRow key={member.id} className={!member.loginEnabled ? "opacity-60" : undefined}>
-                  <TableCell>
+                  <TableCell className="border-r">
                     <div className="flex items-center gap-3 py-1">
                       <Avatar className="size-10">
                         <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
@@ -139,7 +139,7 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r">
                     <RoleBadge role={member.role} />
                   </TableCell>
                   <TableCell className="text-right">
@@ -167,9 +167,9 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
                         onClick={() => handleToggleActive(member)}
                       >
                         {member.loginEnabled ? (
-                          <Power className="size-4" />
+                          <Power className="size-4 text-success" />
                         ) : (
-                          <PowerOff className="size-4 text-muted-foreground" />
+                          <PowerOff className="size-4 text-destructive" />
                         )}
                       </Button>
                     </div>
