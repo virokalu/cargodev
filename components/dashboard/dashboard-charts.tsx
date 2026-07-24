@@ -10,7 +10,8 @@
 // plain server-rendered JSX — only these need a client boundary, since
 // Recharts itself is client-only.
 
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { useRouter } from "next/navigation";
+import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -22,7 +23,8 @@ import {
 } from "@/components/ui/chart";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import { ROTATING_CHART_COLORS } from "@/lib/constants/chart-colors";
-import type { DashboardStats, NameCount } from "@/lib/services/dashboard.service";
+import type { DashboardStats, IdNameCount } from "@/lib/services/dashboard.service";
+import { useHoveredIndex, renderActivePieSlice, makeGrowingBarShape } from "@/components/dashboard/use-hovered-index";
 
 interface DashboardChartsProps {
   stats: DashboardStats;
@@ -88,21 +90,28 @@ function PieLegend({ items }: { items: { name: string; value: number; fill: stri
 // breakdown needs a pie later. `colors` defaults to the rotating palette but
 // can be overridden — a 2-slice pie reads much better with two deliberately
 // distinct colours than the first two entries off a 5-colour rotation.
+// `getHref`, if given, makes every slice clickable — it navigates to the
+// vehicles table filtered to that slice; the hovered slice pops outward to
+// signal it's the one that'll respond to a click.
 function DistributionPie({
   title,
   data,
   emptyLabel,
   colors = ROTATING_CHART_COLORS,
+  getHref,
 }: {
   title: string;
-  data: NameCount[];
+  data: IdNameCount[];
   emptyLabel: string;
   colors?: string[];
+  getHref?: (item: IdNameCount) => string;
 }) {
+  const router = useRouter();
   const chartData = data.map((d, i) => ({
     name: d.name,
     value: d.count,
     fill: colors[i % colors.length],
+    href: getHref?.(d),
   }));
 
   return (
@@ -116,13 +125,21 @@ function DistributionPie({
         ) : (
           <>
             <ChartContainer config={{}} className="mx-auto aspect-square max-h-[220px]">
-              <PieChart>
+              <PieChart accessibilityLayer={false}>
                 <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} strokeWidth={2}>
-                  {chartData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Pie>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={50}
+                  outerRadius={85}
+                  strokeWidth={2}
+                  activeShape={renderActivePieSlice}
+                  onClick={(_, i) => {
+                    const href = chartData[i]?.href;
+                    if (href) router.push(href);
+                  }}
+                />
               </PieChart>
             </ChartContainer>
             <PieLegend items={chartData} />
@@ -134,18 +151,23 @@ function DistributionPie({
 }
 
 export function DashboardCharts({ stats }: DashboardChartsProps) {
+  const router = useRouter();
+  const transportHover = useHoveredIndex();
+
   const trackData = [
-    { name: trackConfig.fc.label, value: stats.trackSplit.fc, fill: trackConfig.fc.color },
-    { name: trackConfig.fl.label, value: stats.trackSplit.fl, fill: trackConfig.fl.color },
+    { name: trackConfig.fc.label, value: stats.trackSplit.fc, fill: trackConfig.fc.color, href: "/vehicles?track=FC" },
+    { name: trackConfig.fl.label, value: stats.trackSplit.fl, fill: trackConfig.fl.color, href: "/vehicles?track=FL" },
   ].filter((d) => d.value > 0);
 
   const statusData = stats.shipmentStatusDistribution.map((s) => ({
     name: SHIPMENT_STATUS_META[s.status].label,
     value: s.count,
     fill: STATUS_COLOR[s.status],
+    href: `/vehicles?status=${s.status}&track=FC`,
   }));
 
-  const shippingMethodData: NameCount[] = stats.shippingMethodDistribution.map((s) => ({
+  const shippingMethodData: IdNameCount[] = stats.shippingMethodDistribution.map((s) => ({
+    id: s.method,
     name: s.method === "RORO" ? "RORO" : "Container",
     count: s.count,
   }));
@@ -163,13 +185,18 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
             ) : (
               <>
                 <ChartContainer config={trackConfig} className="mx-auto aspect-square max-h-[220px]">
-                  <PieChart>
+                  <PieChart accessibilityLayer={false}>
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie data={trackData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} strokeWidth={2}>
-                      {trackData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.fill} />
-                      ))}
-                    </Pie>
+                    <Pie
+                      data={trackData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={85}
+                      strokeWidth={2}
+                      activeShape={renderActivePieSlice}
+                      onClick={(_, i) => router.push(trackData[i].href)}
+                    />
                   </PieChart>
                 </ChartContainer>
                 <PieLegend items={trackData} />
@@ -188,13 +215,18 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
             ) : (
               <>
                 <ChartContainer config={statusConfig} className="mx-auto aspect-square max-h-[220px]">
-                  <PieChart>
+                  <PieChart accessibilityLayer={false}>
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} strokeWidth={2}>
-                      {statusData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.fill} />
-                      ))}
-                    </Pie>
+                    <Pie
+                      data={statusData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={85}
+                      strokeWidth={2}
+                      activeShape={renderActivePieSlice}
+                      onClick={(_, i) => router.push(statusData[i].href)}
+                    />
                   </PieChart>
                 </ChartContainer>
                 <PieLegend items={statusData} />
@@ -208,6 +240,7 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
           data={shippingMethodData}
           emptyLabel="No shipping method set yet."
           colors={SHIPPING_METHOD_COLORS}
+          getHref={(item) => `/vehicles?method=${item.id}`}
         />
       </div>
 
@@ -220,14 +253,35 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
             <EmptyState label="No vehicles assigned to a transport company yet." />
           ) : (
             <ChartContainer config={transportConfig} className="h-[280px] w-full">
-              <BarChart data={stats.transportByCompany} margin={{ left: -16, right: 8 }}>
+              <BarChart data={stats.transportByCompany} margin={{ left: -16, right: 8 }} accessibilityLayer={false}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="company" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="complete" fill="var(--color-complete)" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="inProgress" fill="var(--color-inProgress)" radius={[6, 6, 0, 0]} />
+                <Bar
+                  dataKey="complete"
+                  fill="var(--color-complete)"
+                  radius={[6, 6, 0, 0]}
+                  shape={makeGrowingBarShape(transportHover.hoveredIndex, "vertical")}
+                  onMouseEnter={(_, i) => transportHover.onEnter(i)}
+                  onMouseLeave={transportHover.onLeave}
+                  onClick={(_, i) => {
+                    const entry = stats.transportByCompany[i];
+                    router.push(
+                      `/vehicles?transport=${entry.id}${stats.transportCompleteStatusId ? `&rowColour=${stats.transportCompleteStatusId}` : ""}`
+                    );
+                  }}
+                />
+                <Bar
+                  dataKey="inProgress"
+                  fill="var(--color-inProgress)"
+                  radius={[6, 6, 0, 0]}
+                  shape={makeGrowingBarShape(transportHover.hoveredIndex, "vertical")}
+                  onMouseEnter={(_, i) => transportHover.onEnter(i)}
+                  onMouseLeave={transportHover.onLeave}
+                  onClick={(_, i) => router.push(`/vehicles?transport=${stats.transportByCompany[i].id}`)}
+                />
               </BarChart>
             </ChartContainer>
           )}

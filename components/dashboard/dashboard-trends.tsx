@@ -65,7 +65,7 @@ function MonthlyLineChart<T extends { month: string }>({
 
   return (
     <ChartContainer config={config} className="h-[280px] w-full">
-      <LineChart data={data} margin={{ left: -16, right: 8 }}>
+      <LineChart data={data} margin={{ left: -16, right: 8 }} accessibilityLayer={false}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
         <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />

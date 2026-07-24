@@ -596,6 +596,7 @@ export interface VehicleListParams {
   auctionHallId: string | "ALL";
   freightAgentId: string | "ALL";
   vehicleLocationId: string | "ALL";
+  transportById: string | "ALL";
   shippingMethod: ShippingMethod | "ALL";
   auctionBillPaid: TriStateFilterValue;
   logBook: TriStateFilterValue;
@@ -679,6 +680,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
   if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
   if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
+  if (params.transportById !== "ALL") where.transportById = params.transportById;
   if (params.shippingMethod !== "ALL") where.shippingMethod = params.shippingMethod;
   applyTriStateFilter(where, "auctionBillPaid", params.auctionBillPaid);
   applyTriStateFilter(where, "logBook", params.logBook);

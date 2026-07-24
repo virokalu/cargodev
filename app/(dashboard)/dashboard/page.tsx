@@ -42,6 +42,7 @@ export default async function DashboardPage() {
         transportByDistribution={stats.transportByDistribution}
         freightAgentDistribution={stats.freightAgentDistribution}
         exportVolumeByDestination={stats.exportVolumeByDestination.map((d) => ({
+          id: d.destination,
           name: d.destination,
           count: d.count,
         }))}
