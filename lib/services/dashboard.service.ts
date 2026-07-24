@@ -11,10 +11,23 @@ export interface NameCount {
   count: number;
 }
 
+// Shared by both KPI popups (Pending Shipping, Unpaid Auction Bills) — same
+// three at-a-glance details either way: what the vehicle is, how old, and
+// whose it is.
+export interface VehicleSummary {
+  id: string;
+  serial: string;
+  brand: string | null;
+  model: string | null;
+  yom: number | null;
+  customerName: string | null;
+}
+
 export interface DashboardStats {
   totalVehicles: number;
   pendingFc: number;
   shippedFc: number;
+  pendingVehicles: VehicleSummary[];
   trackSplit: { fc: number; fl: number };
   shipmentStatusDistribution: { status: ShipmentStatus; count: number }[];
   exportVolumeByDestination: { destination: string; count: number }[];
@@ -24,7 +37,7 @@ export interface DashboardStats {
   freightAgentDistribution: NameCount[];
   shippingMethodDistribution: { method: ShippingMethod; count: number }[];
   brandDistribution: NameCount[];
-  unpaidAuctionBills: { id: string; serial: string; customerName: string | null }[];
+  unpaidAuctionBills: VehicleSummary[];
 }
 
 const STATUS_ORDER: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
@@ -62,7 +75,15 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     prisma.vehicle.groupBy({ by: ["serialPrefix"], where: baseWhere, _count: true }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, serialPrefix: "FC" },
-      select: { shipmentStatus: true, etd: true },
+      select: {
+        id: true,
+        serial: true,
+        shipmentStatus: true,
+        etd: true,
+        yom: true,
+        model: { select: { name: true, brand: { select: { name: true } } } },
+        customer: { select: { name: true } },
+      },
     }),
     prisma.vehicle.groupBy({
       by: ["destination"],
@@ -95,7 +116,13 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }] },
-      select: { id: true, serial: true, customer: { select: { name: true } } },
+      select: {
+        id: true,
+        serial: true,
+        yom: true,
+        model: { select: { name: true, brand: { select: { name: true } } } },
+        customer: { select: { name: true } },
+      },
       orderBy: { serial: "asc" },
       take: 15,
     }),
@@ -117,10 +144,22 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     BOOKING_RECEIVED: 0,
     SHIPPED: 0,
   };
+  const pendingVehicles: VehicleSummary[] = [];
   for (const row of fcStatusRows) {
     const effective = computeEffectiveShipmentStatus(row.shipmentStatus, row.etd);
     statusTally[effective]++;
+    if (effective === "PENDING") {
+      pendingVehicles.push({
+        id: row.id,
+        serial: row.serial,
+        brand: row.model?.brand?.name ?? null,
+        model: row.model?.name ?? null,
+        yom: row.yom,
+        customerName: row.customer?.name ?? null,
+      });
+    }
   }
+  pendingVehicles.sort((a, b) => a.serial.localeCompare(b.serial));
   const shipmentStatusDistribution = STATUS_ORDER.map((status) => ({
     status,
     count: statusTally[status],
@@ -157,6 +196,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     totalVehicles,
     pendingFc: statusTally.PENDING,
     shippedFc: statusTally.SHIPPED,
+    pendingVehicles,
     trackSplit,
     shipmentStatusDistribution,
     exportVolumeByDestination,
@@ -169,6 +209,9 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     unpaidAuctionBills: unpaidBills.map((v) => ({
       id: v.id,
       serial: v.serial,
+      brand: v.model?.brand?.name ?? null,
+      model: v.model?.name ?? null,
+      yom: v.yom,
       customerName: v.customer?.name ?? null,
     })),
   };
