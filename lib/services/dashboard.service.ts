@@ -4,7 +4,7 @@
 
 import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { computeEffectiveShipmentStatus } from "@/lib/services/vehicle.service";
+import { computeEffectiveShipmentStatus } from "@/lib/shipment-status";
 
 /** Every lookup-based distribution below carries an id alongside the display
  * name — the dashboard charts link each slice/bar straight to that exact

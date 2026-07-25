@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cell";
+import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { VehicleTableScrollArea, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
 import { cn, formatDate } from "@/lib/utils";
@@ -110,14 +111,37 @@ interface ColumnContext {
   rowColourStatuses: RowColourStatusOption[];
 }
 
-// The ~28 non-frozen columns, in field-spec order. A config array instead of
-// one-off JSX per column keeps the header row and body row in lockstep (add
-// a field here once and both render it) instead of two lists that can drift.
+// Transport By is a normal (non-frozen) column, but it's the one field that
+// gets coloured on its own even when the rest of the row isn't (US-09:
+// "Transport Complete" colours only this cell, never the whole row) — the
+// one column below that needs a per-cell background, via `cellStyle`.
+function transportByStyle(row: VehicleListRow): React.CSSProperties | undefined {
+  if (row.rowColourStatus?.transportCellOnly) {
+    return { backgroundColor: row.rowColourStatus.colour };
+  }
+  return undefined;
+}
+
+// The non-frozen columns, in the order requested (2026-07-25) — matches
+// FTJ MAIN.pdf's physical sheet order, with Shipment Status (not on that
+// sheet) kept right after Model/Grade, Row Colour Status at the very end,
+// "SHIPMENT DATE" mapped to ETD (ETA dropped — not on the sheet either),
+// and "REMARKS" split out of what was one Doc Sent to Client cell into its
+// own column next to it, rather than the unbuilt RemarkEntry feature.
+//
+// Auction Item No is NOT a column here — turned out to be a duplicate of
+// Auction Lot No (Tech Doc §2), added by mistake. Hidden rather than
+// dropped from the schema: no DB change, it's just not queried into
+// VehicleListRow or rendered anywhere.
 const SCROLL_COLUMNS: {
   key: string;
   header: string;
   sortKey?: VehicleListSortKey;
   render: (row: VehicleListRow, ctx: ColumnContext) => React.ReactNode;
+  cellStyle?: (row: VehicleListRow) => React.CSSProperties | undefined;
+  /** Centers both the header label and the cell content — used for the
+   * tri-state columns, whose Yes/No/— values read oddly left-aligned. */
+  center?: boolean;
 }[] = [
   {
     key: "shipmentStatus",
@@ -129,16 +153,14 @@ const SCROLL_COLUMNS: {
       </Badge>
     ),
   },
-  { key: "yom", header: "YOM", sortKey: "yom", render: (row) => row.yom ?? "—" },
-  { key: "auctionItemNo", header: "Auction Item No", render: (row) => row.auctionItemNo ?? "—" },
   { key: "auctionHall", header: "Auction Hall", render: (row) => row.auctionHallName ?? "—" },
-  { key: "auctionLotNo", header: "Auction Lot No", render: (row) => row.auctionLotNo ?? "—" },
   {
     key: "purchaseDate",
     header: "Purchase Date",
     sortKey: "purchaseDate",
     render: (row) => formatDate(row.purchaseDate),
   },
+  { key: "auctionLotNo", header: "Auction Lot No", render: (row) => row.auctionLotNo ?? "—" },
   { key: "customer", header: "Customer", render: (row) => row.customerName ?? "—" },
   {
     key: "destination",
@@ -146,25 +168,17 @@ const SCROLL_COLUMNS: {
     sortKey: "destination",
     render: (row) => row.destination ?? "—",
   },
-  { key: "etd", header: "ETD", sortKey: "etd", render: (row) => formatDate(row.etd) },
-  { key: "eta", header: "ETA", sortKey: "eta", render: (row) => formatDate(row.eta) },
-  { key: "blNo", header: "BL No", render: (row) => row.blNo ?? "—" },
-  { key: "freightAgent", header: "Freight Agent", render: (row) => row.freightAgentName ?? "—" },
-  {
-    key: "shippingMethod",
-    header: "RORO / Container",
-    render: (row) =>
-      row.shippingMethod === "RORO" ? "RORO" : row.shippingMethod === "CONTAINER" ? "Container" : "—",
-  },
-  { key: "trackingNo", header: "Tracking No", render: (row) => row.trackingNo ?? "—" },
-  { key: "vehicleLocation", header: "Vehicle Location", render: (row) => row.vehicleLocationName ?? "—" },
   {
     key: "auctionBillPaid",
     header: "Auction Bill Paid",
-    render: (row) => <TriStateCell value={row.auctionBillPaid} />,
+    center: true,
+    render: (row, ctx) =>
+      ctx.canWrite ? (
+        <AuctionBillPaidCell vehicleId={row.id} value={row.auctionBillPaid} />
+      ) : (
+        <TriStateCell value={row.auctionBillPaid} />
+      ),
   },
-  { key: "logBook", header: "Log Book", render: (row) => <TriStateCell value={row.logBook} /> },
-  { key: "extraKey", header: "Extra Key", render: (row) => <TriStateCell value={row.extraKey} /> },
   {
     key: "docsArrivedDate",
     header: "Docs Arrived Date",
@@ -172,28 +186,59 @@ const SCROLL_COLUMNS: {
     render: (row) => formatDate(row.docsArrivedDate),
   },
   {
+    key: "logBook",
+    header: "Log Book",
+    center: true,
+    render: (row) => <TriStateCell value={row.logBook} />,
+  },
+  {
+    key: "extraKey",
+    header: "Extra Key",
+    center: true,
+    render: (row) => <TriStateCell value={row.extraKey} />,
+  },
+  {
     key: "nameChangeDeadline",
     header: "Name Change Deadline",
     sortKey: "nameChangeDeadline",
     render: (row) => formatDate(row.nameChangeDeadline),
   },
-  { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
-  { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
-  { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
   {
-    key: "docSent",
+    key: "transportBy",
+    header: "Transport By",
+    render: (row) => row.transportByName ?? "—",
+    cellStyle: transportByStyle,
+  },
+  { key: "vehicleLocation", header: "Vehicle Location", render: (row) => row.vehicleLocationName ?? "—" },
+  { key: "freightAgent", header: "Freight Agent", render: (row) => row.freightAgentName ?? "—" },
+  {
+    key: "shippingMethod",
+    header: "RORO / Container",
+    render: (row) =>
+      row.shippingMethod === "RORO" ? "RORO" : row.shippingMethod === "CONTAINER" ? "Container" : "—",
+  },
+  { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
+  { key: "etd", header: "ETD", sortKey: "etd", render: (row) => formatDate(row.etd) },
+  { key: "blNo", header: "BL No", render: (row) => row.blNo ?? "—" },
+  { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
+  { key: "trackingNo", header: "Tracking No", render: (row) => row.trackingNo ?? "—" },
+  {
+    key: "remarks",
+    header: "Remarks",
+    render: (row) =>
+      row.docSentComment ? (
+        <span className="block max-w-40 truncate" title={row.docSentComment}>
+          {row.docSentComment}
+        </span>
+      ) : (
+        "—"
+      ),
+  },
+  {
+    key: "docSentDate",
     header: "Doc Sent to Client",
     sortKey: "docSentDate",
-    render: (row) => (
-      <div>
-        <div>{formatDate(row.docSentDate)}</div>
-        {row.docSentComment && (
-          <div className="max-w-40 truncate text-xs text-muted-foreground" title={row.docSentComment}>
-            {row.docSentComment}
-          </div>
-        )}
-      </div>
-    ),
+    render: (row) => formatDate(row.docSentDate),
   },
   { key: "recycleDate", header: "Recycle Date", sortKey: "recycleDate", render: (row) => formatDate(row.recycleDate) },
   {
@@ -208,6 +253,7 @@ const SCROLL_COLUMNS: {
         "—"
       ),
   },
+  { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
   {
     key: "rowColourStatus",
     header: "Row Colour Status",
@@ -224,16 +270,6 @@ const SCROLL_COLUMNS: {
   },
 ];
 
-// Transport By is a normal (non-frozen) column, but it's the one field that
-// gets coloured on its own even when the rest of the row isn't (US-09:
-// "Transport Complete" colours only this cell, never the whole row).
-function transportByStyle(row: VehicleListRow): React.CSSProperties | undefined {
-  if (row.rowColourStatus?.transportCellOnly) {
-    return { backgroundColor: row.rowColourStatus.colour };
-  }
-  return undefined;
-}
-
 export function VehiclesTable({
   rows,
   total,
@@ -243,7 +279,7 @@ export function VehiclesTable({
   canDelete,
 }: VehiclesTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / params.pageSize));
-  const totalCols = 4 + SCROLL_COLUMNS.length + 1; // frozen (incl. Actions) + Transport By
+  const totalCols = 4 + SCROLL_COLUMNS.length; // frozen (incl. Actions) + scrolling
   const columnContext: ColumnContext = { canWrite, rowColourStatuses };
 
   return (
@@ -251,27 +287,40 @@ export function VehiclesTable({
       <div className="rounded-lg border">
         <VehicleTableScrollArea>
           <TableHeader>
-            <TableRow>
-              <TableHead style={frozenStyle(FROZEN_LEFT.serial, FROZEN_WIDTH.serial, undefined)} className="bg-muted">
+            <TableRow className="bg-muted hover:bg-muted">
+              <TableHead
+                style={frozenStyle(FROZEN_LEFT.serial, FROZEN_WIDTH.serial, undefined)}
+                className="bg-muted font-semibold"
+              >
                 <SortableHeader label="Serial No" sortKey="serial" params={params} />
               </TableHead>
-              <TableHead style={frozenStyle(FROZEN_LEFT.chassis, FROZEN_WIDTH.chassis, undefined)} className="bg-muted">
+              <TableHead
+                style={frozenStyle(FROZEN_LEFT.chassis, FROZEN_WIDTH.chassis, undefined)}
+                className="bg-muted font-semibold"
+              >
                 <SortableHeader label="Chassis No" sortKey="chassisNo" params={params} />
               </TableHead>
               <TableHead
                 style={frozenStyle(FROZEN_LEFT.model, FROZEN_WIDTH.model, undefined)}
-                className="bg-muted"
+                className="bg-muted font-semibold"
               >
                 <SortableHeader label="Model / Grade" sortKey="model" params={params} />
               </TableHead>
               <TableHead
                 style={frozenStyle(FROZEN_LEFT.actions, FROZEN_WIDTH.actions, undefined)}
-                className="border-r bg-muted"
+                className="border-r bg-muted font-semibold"
               >
                 Actions
               </TableHead>
-              {SCROLL_COLUMNS.map((column) => (
-                <TableHead key={column.key} className="border-r">
+              {SCROLL_COLUMNS.map((column, i) => (
+                <TableHead
+                  key={column.key}
+                  className={cn(
+                    "font-semibold",
+                    column.center && "text-center",
+                    i < SCROLL_COLUMNS.length - 1 && "border-r"
+                  )}
+                >
                   {column.sortKey ? (
                     <SortableHeader label={column.header} sortKey={column.sortKey} params={params} />
                   ) : (
@@ -279,7 +328,6 @@ export function VehiclesTable({
                   )}
                 </TableHead>
               ))}
-              <TableHead>Transport By</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -319,8 +367,10 @@ export function VehiclesTable({
                           <div className="font-medium">
                             {[row.brandName, row.modelName].filter(Boolean).join(" ")}
                           </div>
-                          {row.gradeName && (
-                            <div className="text-xs text-muted-foreground">{row.gradeName}</div>
+                          {(row.gradeName || row.yom) && (
+                            <div className="text-xs text-muted-foreground">
+                              {[row.gradeName, row.yom].filter(Boolean).join(" - ")}
+                            </div>
                           )}
                         </>
                       ) : (
@@ -351,12 +401,15 @@ export function VehiclesTable({
                         )}
                       </div>
                     </TableCell>
-                    {SCROLL_COLUMNS.map((column) => (
-                      <TableCell key={column.key} className="border-r">
+                    {SCROLL_COLUMNS.map((column, i) => (
+                      <TableCell
+                        key={column.key}
+                        className={cn(column.center && "text-center", i < SCROLL_COLUMNS.length - 1 && "border-r")}
+                        style={column.cellStyle?.(row)}
+                      >
                         {column.render(row, columnContext)}
                       </TableCell>
                     ))}
-                    <TableCell style={transportByStyle(row)}>{row.transportByName ?? "—"}</TableCell>
                   </TableRow>
                 );
               })
