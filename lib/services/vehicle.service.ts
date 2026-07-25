@@ -13,6 +13,11 @@ import {
 } from "@/lib/validation/vehicle.schema";
 import { assignNextSerial, assignLegacySerial } from "@/lib/services/serial.service";
 import * as activityLog from "@/lib/services/activity-log.service";
+import {
+  computeEffectiveShipmentStatus,
+  computeShipmentStatusAfterEtdChange,
+  todayAtMidnight,
+} from "@/lib/shipment-status";
 
 export async function createVehicle(user: SessionUser, rawInput: unknown): Promise<Vehicle> {
   const parsed = vehicleCreateSchema.safeParse(rawInput);
@@ -303,7 +308,13 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     id: vehicle.id,
     serial: vehicle.serial,
     track: vehicle.serialPrefix,
-    shipmentStatus: vehicle.shipmentStatus,
+    // Same "computed guard on read" the vehicles table uses (see
+    // computeEffectiveShipmentStatus above) — without it, this page shows
+    // the raw stored status, which reads BOOKING_RECEIVED until the daily
+    // cron catches up, even right after saving an ETD that's already in
+    // the past (which should read as SHIPPED immediately, same as the
+    // table already shows).
+    shipmentStatus: computeEffectiveShipmentStatus(vehicle.shipmentStatus, vehicle.etd),
     auctionItemNo: vehicle.auctionItemNo,
     chassisNo: vehicle.chassisNo,
     brand: vehicle.model?.brand ?? null,
@@ -408,12 +419,13 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   if (isFC) {
     const hadEtd = existing.etd !== null;
     const hasEtd = etd !== null;
-    if (!hadEtd && hasEtd && existing.shipmentStatus === "PENDING") {
-      nextStatus = "BOOKING_RECEIVED";
-      statusTransition = { from: "PENDING", to: "BOOKING_RECEIVED", trigger: "ETD_SAVED" };
-    } else if (hadEtd && !hasEtd) {
-      nextStatus = "PENDING";
-      statusTransition = { from: existing.shipmentStatus, to: "PENDING", trigger: "ETD_CLEARED" };
+    nextStatus = computeShipmentStatusAfterEtdChange(existing.shipmentStatus, hadEtd, hasEtd);
+    if (nextStatus !== existing.shipmentStatus) {
+      statusTransition = {
+        from: existing.shipmentStatus,
+        to: nextStatus,
+        trigger: nextStatus === "PENDING" ? "ETD_CLEARED" : "ETD_SAVED",
+      };
     }
   }
 
@@ -545,19 +557,39 @@ export async function updateVehicleRowColourStatus(
 // vehicle table: FC/FL toggle, search, per-column filters, sort, pagination.
 // ─────────────────────────────────────────────────────────────────────────
 
-/** "Computed guard on read" (Tech Doc §1): the daily cron flips
- * BOOKING_RECEIVED -> SHIPPED once today is after the ETD date, but if the
- * cron hasn't run yet today the table would show a stale status. This never
- * writes to the DB — it's purely what gets displayed until the cron (or an
- * edit that changes ETD) catches up for real. */
-export function computeEffectiveShipmentStatus(
-  status: ShipmentStatus,
-  etd: Date | null
-): ShipmentStatus {
-  if (status !== "BOOKING_RECEIVED" || !etd) return status;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return etd.getTime() < today.getTime() ? "SHIPPED" : status;
+/** Same effective-status guard as computeEffectiveShipmentStatus, expressed
+ * as a Prisma where-clause instead of a post-fetch check — filtering by
+ * status has to agree with what's actually displayed, or a vehicle whose
+ * ETD has passed but the daily cron hasn't run yet would show as "Shipped"
+ * everywhere while still matching a "Booking Received" filter (and being
+ * excluded from a "Shipped" one). Each branch is self-contained (its own
+ * OR, not the top-level one) so it composes safely inside an AND array
+ * alongside the free-text search's own top-level OR in buildVehicleListWhere. */
+function buildEffectiveShipmentStatusWhere(status: ShipmentStatus): Prisma.VehicleWhereInput {
+  if (status === "PENDING") {
+    // The guard only ever promotes BOOKING_RECEIVED -> SHIPPED; it never
+    // touches PENDING, so the raw column is already correct here.
+    return { shipmentStatus: "PENDING" };
+  }
+
+  const today = todayAtMidnight();
+
+  if (status === "SHIPPED") {
+    return {
+      OR: [
+        { shipmentStatus: "SHIPPED" },
+        { shipmentStatus: "BOOKING_RECEIVED", etd: { lt: today } },
+      ],
+    };
+  }
+
+  // BOOKING_RECEIVED: genuinely still booking-received — not past its ETD
+  // yet, otherwise the guard would show it as Shipped and this filter would
+  // disagree with that.
+  return {
+    shipmentStatus: "BOOKING_RECEIVED",
+    OR: [{ etd: null }, { etd: { gte: today } }],
+  };
 }
 
 export type VehicleListSortKey =
@@ -676,7 +708,12 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   const where: Prisma.VehicleWhereInput = { org_id: orgId, deletedAt: null };
 
   if (params.track !== "ALL") where.serialPrefix = params.track;
-  if (params.shipmentStatus !== "ALL") where.shipmentStatus = params.shipmentStatus;
+  if (params.shipmentStatus !== "ALL") {
+    // Its own AND-array entry (not a direct where.shipmentStatus= equality)
+    // so its internal OR doesn't collide with the free-text search's own
+    // top-level where.OR below.
+    where.AND = [buildEffectiveShipmentStatusWhere(params.shipmentStatus)];
+  }
   if (params.destination !== "ALL") where.destination = params.destination;
   if (params.rowColourStatusId !== "ALL") {
     where.rowColourStatusId = params.rowColourStatusId;

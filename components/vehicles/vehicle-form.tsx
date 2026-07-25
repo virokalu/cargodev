@@ -45,6 +45,10 @@ import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import {
+  computeEffectiveShipmentStatus,
+  computeShipmentStatusAfterEtdChange,
+} from "@/lib/shipment-status";
+import {
   createVehicleAction,
   updateVehicleAction,
   checkChassisDuplicateAction,
@@ -354,10 +358,32 @@ export function VehicleForm({
   // FC record's real status is picked by hand instead of derived from ETD —
   // and that exception only ever applies at creation, never on a later edit.
   const canSetShipmentStatusManually = mode === "create" && isFC && state.isLegacyEntry;
-  const derivedShipmentStatus: ShipmentStatus = isFC && state.etd ? "BOOKING_RECEIVED" : "PENDING";
+
+  // Live preview — mirrors lib/shipment-status.ts's ETD-driven transition
+  // (the exact logic vehicle.service.ts#updateVehicle applies on save) so
+  // the badge reflects what saving *right now* would actually produce,
+  // instead of only updating after the round trip. In edit mode that means
+  // comparing against the ETD as it was when the page loaded (hadEtd);
+  // computeEffectiveShipmentStatus on top handles picking an ETD that's
+  // already in the past showing as Shipped immediately, same as the table.
+  const liveEtd = state.etd ? new Date(state.etd) : null;
+  const derivedShipmentStatus: ShipmentStatus = isFC
+    ? computeEffectiveShipmentStatus(state.etd ? "BOOKING_RECEIVED" : "PENDING", liveEtd)
+    : "PENDING";
+  const liveEditShipmentStatus: ShipmentStatus | null =
+    mode === "edit" && isFC && existingShipmentStatus
+      ? computeEffectiveShipmentStatus(
+          computeShipmentStatusAfterEtdChange(
+            existingShipmentStatus,
+            (initialValues?.etd ?? null) !== null,
+            state.etd !== null
+          ),
+          liveEtd
+        )
+      : null;
   const shipmentStatus =
     mode === "edit"
-      ? (existingShipmentStatus ?? derivedShipmentStatus)
+      ? (liveEditShipmentStatus ?? existingShipmentStatus ?? derivedShipmentStatus)
       : canSetShipmentStatusManually
         ? state.manualShipmentStatus
         : derivedShipmentStatus;
