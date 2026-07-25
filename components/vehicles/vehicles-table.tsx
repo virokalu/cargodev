@@ -47,8 +47,12 @@ interface VehiclesTableProps {
   params: VehicleListParams;
   rowColourStatuses: RowColourStatusOption[];
   /** RBAC (US-02): Viewer gets read-only everywhere — no inline editors, no
-   * Edit/Delete controls rendered, not just hidden behind a disabled state. */
+   * Edit/Delete controls rendered, not just hidden behind a disabled state.
+   * `canWrite` covers the inline Row Colour Status editor (Admin/Manager/
+   * Operator — "table level" access); `canEditVehicle` covers the full
+   * edit-form link (Admin/Manager only — Operator doesn't get this one). */
   canWrite: boolean;
+  canEditVehicle: boolean;
   canDelete: boolean;
 }
 
@@ -276,6 +280,7 @@ export function VehiclesTable({
   params,
   rowColourStatuses,
   canWrite,
+  canEditVehicle,
   canDelete,
 }: VehiclesTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / params.pageSize));
@@ -383,9 +388,9 @@ export function VehiclesTable({
                     >
                       <div className="flex items-center gap-1.5">
                         <StatusScrollDot status={row.effectiveShipmentStatus} />
-                        {canWrite || canDelete ? (
+                        {canEditVehicle || canDelete ? (
                           <div className="flex items-center gap-1">
-                            {canWrite && (
+                            {canEditVehicle && (
                               <Link
                                 href={`/vehicles/${row.id}/edit`}
                                 aria-label={`Edit ${row.serial}`}

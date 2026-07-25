@@ -1,9 +1,9 @@
 "use server";
 
 // Thin Server Actions for the Customers slice (docs/implementation.md §2).
-// Per user_stories.md US-02, Manager and above manage customers — Viewer and
-// Operator can view the list (requireUser() with no role list) but writes
-// are gated to Manager+.
+// Every staff role can view the customer list (requireUser() with no role
+// list) but only Administrator and Manager can add/edit — Operator is
+// view-only here.
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/services/auth-guard";

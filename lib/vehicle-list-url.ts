@@ -15,7 +15,9 @@ import type { ShippingMethod } from "@prisma/client";
 export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   page: 1,
   pageSize: 25,
-  track: "ALL",
+  // FC (export) is the default view — there's no "All tracks" option in the
+  // UI toggle anymore, just FC/FL.
+  track: "FC",
   search: "",
   shipmentStatus: "ALL",
   destination: "ALL",
@@ -53,7 +55,7 @@ const SORT_KEYS: VehicleListSortKey[] = [
   "recycleDate",
 ];
 
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
+const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
 const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
 
@@ -83,7 +85,7 @@ export function parseVehicleListParams(
   return {
     page: Number.isFinite(page) && page > 0 ? page : VEHICLE_LIST_DEFAULTS.page,
     pageSize: VEHICLE_LIST_DEFAULTS.pageSize,
-    track: track === "FC" || track === "FL" ? track : "ALL",
+    track: track === "FC" || track === "FL" ? track : VEHICLE_LIST_DEFAULTS.track,
     search: firstValue(searchParams.q)?.trim() ?? "",
     shipmentStatus: SHIPMENT_STATUSES.includes(status as ShipmentStatus)
       ? (status as ShipmentStatus)
@@ -122,7 +124,7 @@ export function buildVehiclesHref(
   const query = new URLSearchParams();
 
   if (merged.search) query.set("q", merged.search);
-  if (merged.track !== "ALL") query.set("track", merged.track);
+  if (merged.track !== VEHICLE_LIST_DEFAULTS.track) query.set("track", merged.track);
   if (merged.shipmentStatus !== "ALL") query.set("status", merged.shipmentStatus);
   if (merged.destination !== "ALL") query.set("destination", merged.destination);
   if (merged.rowColourStatusId !== "ALL") query.set("rowColour", merged.rowColourStatusId);

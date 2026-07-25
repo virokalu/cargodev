@@ -37,7 +37,7 @@ interface VehicleFiltersBarProps {
 }
 
 const DEBOUNCE_MS = 300;
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
+const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 
 export function VehicleFiltersBar({
   params,
@@ -188,7 +188,6 @@ export function VehicleFiltersBar({
       <div className="inline-flex gap-1 rounded-md bg-muted p-1">
         {(
           [
-            { value: "ALL", label: "All" },
             { value: "FC", label: "FC — Export" },
             { value: "FL", label: "FL — Local" },
           ] as const

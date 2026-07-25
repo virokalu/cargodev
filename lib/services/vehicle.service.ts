@@ -3,6 +3,11 @@
 // call this; nothing here is UI-specific (CLAUDE.md rule 2).
 
 import type { Prisma, SerialPrefix, ShipmentStatus, ShippingMethod, Vehicle } from "@prisma/client";
+// The raw Vehicle.shipmentStatus column only ever holds the 3 Prisma-enum
+// values above. CANCELLED is a computed, FC-only, display-only status (see
+// lib/shipment-status.ts) — fields that hold an *effective* status use this
+// wider app-level type instead.
+import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/services/auth-guard";
@@ -16,6 +21,7 @@ import * as activityLog from "@/lib/services/activity-log.service";
 import {
   computeEffectiveShipmentStatus,
   computeShipmentStatusAfterEtdChange,
+  isCancelShipmentRowColour,
   todayAtMidnight,
 } from "@/lib/shipment-status";
 
@@ -216,7 +222,7 @@ export interface VehicleEditData {
   id: string;
   serial: string;
   track: SerialPrefix;
-  shipmentStatus: ShipmentStatus;
+  shipmentStatus: EffectiveShipmentStatus;
 
   auctionItemNo: string | null;
   chassisNo: string | null;
@@ -299,6 +305,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       freightAgent: { select: { id: true, name: true, offersRoro: true, offersContainer: true } },
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
+      rowColourStatus: { select: { name: true } },
     },
   });
 
@@ -313,8 +320,12 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     // the raw stored status, which reads BOOKING_RECEIVED until the daily
     // cron catches up, even right after saving an ETD that's already in
     // the past (which should read as SHIPPED immediately, same as the
-    // table already shows).
-    shipmentStatus: computeEffectiveShipmentStatus(vehicle.shipmentStatus, vehicle.etd),
+    // table already shows). Same treatment for Cancelled — FC only.
+    shipmentStatus: computeEffectiveShipmentStatus(
+      vehicle.shipmentStatus,
+      vehicle.etd,
+      vehicle.serialPrefix === "FC" && isCancelShipmentRowColour(vehicle.rowColourStatus?.name)
+    ),
     auctionItemNo: vehicle.auctionItemNo,
     chassisNo: vehicle.chassisNo,
     brand: vehicle.model?.brand ?? null,
@@ -583,25 +594,43 @@ export async function updateVehicleAuctionBillPaid(
 // vehicle table: FC/FL toggle, search, per-column filters, sort, pagination.
 // ─────────────────────────────────────────────────────────────────────────
 
+// FC vehicle whose row colour is the one that overrides shipment status to
+// Cancelled — same condition computeEffectiveShipmentStatus checks, just
+// expressed as a where-clause fragment so it can be reused as both the
+// CANCELLED branch below and an exclusion on the other three branches.
+const CANCELLED_WHERE: Prisma.VehicleWhereInput = {
+  serialPrefix: "FC",
+  rowColourStatus: { name: "Unit Canceled" },
+};
+
 /** Same effective-status guard as computeEffectiveShipmentStatus, expressed
  * as a Prisma where-clause instead of a post-fetch check — filtering by
  * status has to agree with what's actually displayed, or a vehicle whose
  * ETD has passed but the daily cron hasn't run yet would show as "Shipped"
  * everywhere while still matching a "Booking Received" filter (and being
- * excluded from a "Shipped" one). Each branch is self-contained (its own
- * OR, not the top-level one) so it composes safely inside an AND array
- * alongside the free-text search's own top-level OR in buildVehicleListWhere. */
-function buildEffectiveShipmentStatusWhere(status: ShipmentStatus): Prisma.VehicleWhereInput {
+ * excluded from a "Shipped" one). Cancelled works the same way: a vehicle
+ * whose row colour marks it Cancelled must never also match Pending/Booking
+ * Received/Shipped, even though its raw stored column still says one of
+ * those. Each branch is self-contained (its own OR, not the top-level one)
+ * so it composes safely inside an AND array alongside the free-text
+ * search's own top-level OR in buildVehicleListWhere. */
+function buildEffectiveShipmentStatusWhere(status: EffectiveShipmentStatus): Prisma.VehicleWhereInput {
+  if (status === "CANCELLED") {
+    return CANCELLED_WHERE;
+  }
+
   if (status === "PENDING") {
     // The guard only ever promotes BOOKING_RECEIVED -> SHIPPED; it never
-    // touches PENDING, so the raw column is already correct here.
-    return { shipmentStatus: "PENDING" };
+    // touches PENDING, so the raw column is already correct here — aside
+    // from the Cancelled override, which still needs excluding.
+    return { shipmentStatus: "PENDING", NOT: CANCELLED_WHERE };
   }
 
   const today = todayAtMidnight();
 
   if (status === "SHIPPED") {
     return {
+      NOT: CANCELLED_WHERE,
       OR: [
         { shipmentStatus: "SHIPPED" },
         { shipmentStatus: "BOOKING_RECEIVED", etd: { lt: today } },
@@ -611,9 +640,10 @@ function buildEffectiveShipmentStatusWhere(status: ShipmentStatus): Prisma.Vehic
 
   // BOOKING_RECEIVED: genuinely still booking-received — not past its ETD
   // yet, otherwise the guard would show it as Shipped and this filter would
-  // disagree with that.
+  // disagree with that. Also excludes Cancelled, same reasoning as above.
   return {
     shipmentStatus: "BOOKING_RECEIVED",
+    NOT: CANCELLED_WHERE,
     OR: [{ etd: null }, { etd: { gte: today } }],
   };
 }
@@ -645,7 +675,7 @@ export interface VehicleListParams {
   pageSize: number;
   track: SerialPrefix | "ALL";
   search: string;
-  shipmentStatus: ShipmentStatus | "ALL";
+  shipmentStatus: EffectiveShipmentStatus | "ALL";
   destination: string | "ALL";
   rowColourStatusId: string | "ALL";
   /** Excludes one specific row colour status rather than filtering to it —
@@ -706,7 +736,7 @@ export interface VehicleListRow {
   recycleDate: Date | null;
   jibaishake: string | null;
   shipmentStatus: ShipmentStatus;
-  effectiveShipmentStatus: ShipmentStatus;
+  effectiveShipmentStatus: EffectiveShipmentStatus;
   rowColourStatus: { id: string; name: string; colour: string; transportCellOnly: boolean } | null;
 }
 
@@ -913,7 +943,11 @@ export async function listVehicles(
     recycleDate: v.recycleDate,
     jibaishake: v.jibaishake,
     shipmentStatus: v.shipmentStatus,
-    effectiveShipmentStatus: computeEffectiveShipmentStatus(v.shipmentStatus, v.etd),
+    effectiveShipmentStatus: computeEffectiveShipmentStatus(
+      v.shipmentStatus,
+      v.etd,
+      v.serialPrefix === "FC" && isCancelShipmentRowColour(v.rowColourStatus?.name)
+    ),
     rowColourStatus: v.rowColourStatus,
   }));
 

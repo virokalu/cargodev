@@ -12,7 +12,13 @@ import * as vehicleService from "@/lib/services/vehicle.service";
 import * as lookupService from "@/lib/services/lookup.service";
 import * as customerService from "@/lib/services/customer.service";
 
-const STAFF_CAN_WRITE = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
+// Operator's entire vehicle write access is "table level" only — the row
+// colour dropdown inline in the table. They can't add new vehicles, open the
+// full edit form, or touch the lookup/customer create-create actions those
+// forms depend on. Admin/Manager keep all of it.
+const STAFF_CAN_WRITE = ["ADMINISTRATOR", "MANAGER"] as const;
+const STAFF_CAN_EDIT_VEHICLE = ["ADMINISTRATOR", "MANAGER"] as const;
+const STAFF_CAN_UPDATE_ROW_COLOUR = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
 const STAFF_CAN_DELETE = ["ADMINISTRATOR", "MANAGER"] as const;
 
 export type VehicleMutationResult =
@@ -34,7 +40,7 @@ export async function createVehicleAction(input: unknown): Promise<VehicleMutati
 }
 
 export async function updateVehicleAction(id: string, input: unknown): Promise<VehicleMutationResult> {
-  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
     const vehicle = await vehicleService.updateVehicle(user, id, input);
     revalidatePath("/vehicles");
@@ -68,7 +74,7 @@ export async function updateRowColourStatusAction(
   id: string,
   rowColourStatusId: string | null
 ): Promise<void> {
-  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const user = await requireUser([...STAFF_CAN_UPDATE_ROW_COLOUR]);
   await vehicleService.updateVehicleRowColourStatus(user.orgId, user.id, id, rowColourStatusId);
   revalidatePath("/vehicles");
 }

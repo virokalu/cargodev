@@ -17,21 +17,38 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { StaffRole } from "@prisma/client";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  /** Omitted = every role can see this item. */
+  roles?: StaffRole[];
 }
 
+// RBAC (US-02 + this app's role rules): a role only sees links to things it
+// can actually do something with — a dead-end link that just redirects away
+// is worse than no link. Server-side guards (requireUser in each page/action)
+// are still the real enforcement; this list just keeps the nav honest.
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Vehicles", href: "/vehicles", icon: Car },
-  { label: "Add Vehicle", href: "/vehicles/add", icon: CirclePlus },
+  {
+    label: "Add Vehicle",
+    href: "/vehicles/add",
+    icon: CirclePlus,
+    roles: ["ADMINISTRATOR", "MANAGER"],
+  },
   { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Users", href: "/users", icon: Users },
-  { label: "Customers", href: "/customers", icon: UserRound },
+  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMINISTRATOR", "MANAGER"] },
+  { label: "Users", href: "/users", icon: Users, roles: ["ADMINISTRATOR", "MANAGER"] },
+  {
+    label: "Customers",
+    href: "/customers",
+    icon: UserRound,
+    roles: ["ADMINISTRATOR", "MANAGER", "OPERATOR"],
+  },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -44,6 +61,8 @@ interface SidebarProps {
   collapsed: boolean;
   /** Desktop: toggle collapsed state */
   onToggleCollapse: () => void;
+  /** Current user's role — filters which nav items render. */
+  role: StaffRole;
 }
 
 export default function Sidebar({
@@ -51,8 +70,10 @@ export default function Sidebar({
   onClose,
   collapsed,
   onToggleCollapse,
+  role,
 }: SidebarProps) {
   const pathname = usePathname();
+  const navItems = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role));
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -78,7 +99,7 @@ export default function Sidebar({
 
       {/* Nav items */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {navItems.map(({ label, href, icon: Icon }) => {
           // Active detection: exact match for root routes, prefix match for nested
           const isActive =
             href === "/dashboard"

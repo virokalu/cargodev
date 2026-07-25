@@ -55,7 +55,9 @@ export default async function EditVehiclePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
+  // Operator's vehicle write access is table-level only (row colour, from
+  // the list view) — the full edit form is Administrator/Manager only.
+  const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
   const { id } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([

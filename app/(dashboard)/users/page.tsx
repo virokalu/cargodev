@@ -1,12 +1,21 @@
 import { requireUser } from "@/lib/services/auth-guard";
-import { listStaff } from "@/lib/services/user.service";
+import { listStaff, isSuperAdmin } from "@/lib/services/user.service";
 import { UsersTable } from "@/components/users/users-table";
 
-// US-02: only Administrators see the Users screen at all — everyone else is
-// redirected before any staff data is fetched.
+// Administrator and Manager can view the Users screen; only Administrator
+// can add, edit, or (de)activate staff — enforced again server-side in
+// users/actions.ts. Operator and Viewer are redirected before any staff
+// data is fetched.
 export default async function UsersPage() {
-  const user = await requireUser(["ADMINISTRATOR"]);
-  const staff = await listStaff(user.orgId);
+  const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
+  const staff = await listStaff(user);
 
-  return <UsersTable staff={staff} currentUserId={user.id} />;
+  return (
+    <UsersTable
+      staff={staff}
+      currentUserId={user.id}
+      canManageUsers={user.role === "ADMINISTRATOR"}
+      actorIsSuperAdmin={isSuperAdmin(user)}
+    />
+  );
 }

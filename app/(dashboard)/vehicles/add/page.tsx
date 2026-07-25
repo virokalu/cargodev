@@ -5,7 +5,9 @@ import { COUNTRIES } from "@/lib/constants/countries";
 import { VehicleForm } from "@/components/vehicles/vehicle-form";
 
 export default async function AddVehiclePage() {
-  const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
+  // Operator's vehicle write access is table-level only (row colour) —
+  // adding a new vehicle is Administrator/Manager only.
+  const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
 
   // Fetched here (not in the client component) so the serial preview and the
   // Row Colour Status select render on first paint with no loading flash —

@@ -4,7 +4,7 @@
 
 import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { computeEffectiveShipmentStatus } from "@/lib/shipment-status";
+import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
 
 /** Every lookup-based distribution below carries an id alongside the display
  * name — the dashboard charts link each slice/bar straight to that exact
@@ -88,6 +88,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
         yom: true,
         model: { select: { name: true, brand: { select: { name: true } } } },
         customer: { select: { name: true } },
+        rowColourStatus: { select: { name: true } },
       },
     }),
     prisma.vehicle.groupBy({
@@ -151,7 +152,11 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
   };
   const pendingVehicles: VehicleSummary[] = [];
   for (const row of fcStatusRows) {
-    const effective = computeEffectiveShipmentStatus(row.shipmentStatus, row.etd);
+    const cancelled = isCancelShipmentRowColour(row.rowColourStatus?.name);
+    const effective = computeEffectiveShipmentStatus(row.shipmentStatus, row.etd, cancelled);
+    // Cancelled vehicles aren't Pending, Booking Received, or Shipped —
+    // they don't belong in any of these three dashboard buckets.
+    if (effective === "CANCELLED") continue;
     statusTally[effective]++;
     if (effective === "PENDING") {
       pendingVehicles.push({

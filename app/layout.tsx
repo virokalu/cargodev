@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { getOrganizationName } from "@/lib/services/organization.service";
+import { env } from "@/lib/env";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
-export const metadata: Metadata = {
-  title: "CargoDev — Global Motors",
-  description: "Vehicle import management system",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const orgName = await getOrganizationName(env.ORG_ID);
+  return {
+    title: `CargoDev — ${orgName}`,
+    description: "Vehicle import management system",
+  };
+}
 
 export default function RootLayout({
   children,

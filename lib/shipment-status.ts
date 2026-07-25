@@ -4,7 +4,18 @@
 // client component, for a live preview *before* saving) can import the
 // exact same logic instead of two hand-kept-in-sync copies.
 
-import type { ShipmentStatus } from "@/lib/constants/shipment-status";
+import type { ShipmentStatus, StorableShipmentStatus } from "@/lib/constants/shipment-status";
+
+/** The one row colour status that overrides shipment status to Cancelled
+ * (FC only — see computeEffectiveShipmentStatus). Matched by name against
+ * the existing seeded "Unit Canceled" row colour status — there's no
+ * separate flag or DB column for this, same as how "Transport Complete"
+ * is its own special-cased name for the transportCellOnly behaviour. */
+const CANCEL_SHIPMENT_ROW_COLOUR_NAME = "Unit Canceled";
+
+export function isCancelShipmentRowColour(rowColourStatusName: string | null | undefined): boolean {
+  return rowColourStatusName === CANCEL_SHIPMENT_ROW_COLOUR_NAME;
+}
 
 export function todayAtMidnight(): Date {
   const today = new Date();
@@ -16,11 +27,19 @@ export function todayAtMidnight(): Date {
  * BOOKING_RECEIVED -> SHIPPED once today is after the ETD date, but if the
  * cron hasn't run yet today the UI would show a stale status. This never
  * writes to the DB — it's purely what gets displayed until the cron (or an
- * edit that changes ETD) catches up for real. */
+ * edit that changes ETD) catches up for real.
+ *
+ * `cancelled` works the same way: true whenever the vehicle is FC and its
+ * current row colour status is "Unit Canceled" — never stored, purely
+ * computed, and immediately reactive to changing the row colour away from
+ * it (callers pass `false` for FL vehicles, since shipment status isn't
+ * tracked for FL at all). */
 export function computeEffectiveShipmentStatus(
-  status: ShipmentStatus,
-  etd: Date | null
+  status: StorableShipmentStatus,
+  etd: Date | null,
+  cancelled: boolean
 ): ShipmentStatus {
+  if (cancelled) return "CANCELLED";
   if (status !== "BOOKING_RECEIVED" || !etd) return status;
   return etd.getTime() < todayAtMidnight().getTime() ? "SHIPPED" : status;
 }
@@ -34,10 +53,10 @@ export function computeEffectiveShipmentStatus(
  * transition exactly, so a live client-side preview and the actual save
  * can never disagree. */
 export function computeShipmentStatusAfterEtdChange(
-  currentStatus: ShipmentStatus,
+  currentStatus: StorableShipmentStatus,
   hadEtd: boolean,
   hasEtd: boolean
-): ShipmentStatus {
+): StorableShipmentStatus {
   if (!hadEtd && hasEtd && currentStatus === "PENDING") return "BOOKING_RECEIVED";
   if (hadEtd && !hasEtd) return "PENDING";
   return currentStatus;
