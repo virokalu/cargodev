@@ -76,3 +76,33 @@ export function makeGrowingBarShape(
     );
   };
 }
+
+/** XAxis `tick` renderer — makes the category label itself clickable,
+ * separately from any bar drawn above it. Used by "Transport Status by
+ * Company" so clicking the company name goes to that company's full
+ * vehicle set (both Complete and In Progress together), distinct from
+ * clicking one of its two bars (which filters to just that status). */
+export function makeClickableAxisTick(
+  categories: { id: string; label: string }[],
+  onSelect: (id: string) => void
+) {
+  return function ClickableTick(props: { x?: number | string; y?: number | string; payload?: { value?: unknown } }) {
+    const x = Number(props.x ?? 0);
+    const y = Number(props.y ?? 0);
+    const value = String(props.payload?.value ?? "");
+    const entry = categories.find((c) => c.label === value);
+
+    return (
+      <text
+        x={x}
+        y={y + 12}
+        textAnchor="middle"
+        fontSize={11}
+        className="fill-muted-foreground cursor-pointer hover:fill-foreground hover:underline"
+        onClick={() => entry && onSelect(entry.id)}
+      >
+        {value}
+      </text>
+    );
+  };
+}

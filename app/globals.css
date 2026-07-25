@@ -95,6 +95,40 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Login screen's brand panel ("Midnight Depth"). Always dark regardless
+   * of app theme — same as the persistent sidebar — so these aren't
+   * redefined under .dark below. Kept as their own tokens rather than
+   * folded into the palette above since nothing else in the app consumes
+   * them, only app/(auth)/login/page.tsx does. Deliberately merged into
+   * this single :root block rather than a second one — Turbopack's CSS
+   * pipeline here only keeps the first :root block in the file and
+   * silently drops everything after a second one. */
+  --login-bg-1: oklch(0.10 0.03 259);
+  --login-bg-2: oklch(0.155 0.06 253);
+  --login-bg-3: oklch(0.085 0.025 261);
+  --login-glow: oklch(0.55 0.19 254 / 0.32);
+  --login-glow-chip: oklch(0.55 0.19 254 / 0.55);
+  --login-glow-headline: oklch(0.55 0.19 254 / 0.35);
+  --login-glow-stat: oklch(0.55 0.19 254 / 0.4);
+  --login-seam: oklch(0.66 0.15 256 / 0.2);
+  --login-accent: oklch(0.78 0.12 254);
+  --login-body: oklch(0.75 0.025 257);
+  --login-label: oklch(0.58 0.03 257);
+  --login-footer: oklch(0.42 0.025 257);
+
+  /* Vehicles Tracked (FC/FL) and RORO/Container pie charts — deliberately
+   * off the blue/green/yellow used everywhere else (chart-1/2/3/4 and the
+   * info/success/warning tokens they share), so these two neutral 2-way
+   * splits don't visually read as status/semantic colors. The two charts
+   * also get two distinct color *families*, not just different hues within
+   * one family — violet/purple (cool) for track, red/orange (warm) for
+   * shipping method — so the two charts read as clearly different at a
+   * glance instead of both looking like "the same purple-ish palette". */
+  --chart-track-fc: oklch(0.55 0.20 285);
+  --chart-track-fl: oklch(0.58 0.20 322);
+  --chart-roro: oklch(0.58 0.20 18);
+  --chart-container: oklch(0.68 0.17 48);
 }
 
 .dark {
@@ -128,6 +162,10 @@
   --chart-3: oklch(0.68 0.15 152);
   --chart-4: oklch(0.78 0.15 70);
   --chart-5: oklch(0.65 0.2 27);
+  --chart-track-fc: oklch(0.68 0.18 285);
+  --chart-track-fl: oklch(0.70 0.18 322);
+  --chart-roro: oklch(0.68 0.19 18);
+  --chart-container: oklch(0.75 0.16 48);
   --sidebar: oklch(0.14 0.07 258);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -136,26 +174,6 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-}
-
-/* Login screen's brand panel ("Midnight Depth"). Always dark regardless of
- * app theme — same as the persistent sidebar — so it lives outside the
- * light/dark --background family and isn't redefined under .dark. Kept as
- * its own tokens rather than folded into the palette above since nothing
- * else in the app consumes them, only app/(auth)/login/page.tsx does. */
-:root {
-  --login-bg-1: oklch(0.10 0.03 259);
-  --login-bg-2: oklch(0.155 0.06 253);
-  --login-bg-3: oklch(0.085 0.025 261);
-  --login-glow: oklch(0.55 0.19 254 / 0.32);
-  --login-glow-chip: oklch(0.55 0.19 254 / 0.55);
-  --login-glow-headline: oklch(0.55 0.19 254 / 0.35);
-  --login-glow-stat: oklch(0.55 0.19 254 / 0.4);
-  --login-seam: oklch(0.66 0.15 256 / 0.5);
-  --login-accent: oklch(0.78 0.12 254);
-  --login-body: oklch(0.75 0.025 257);
-  --login-label: oklch(0.58 0.03 257);
-  --login-footer: oklch(0.42 0.025 257);
 }
 
 .login-panel-bg {

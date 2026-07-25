@@ -55,12 +55,17 @@ function VehicleSummaryDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <div className={cn("space-y-2 overflow-y-auto", vehicles.length > 0 && "max-h-[60vh]")}>
+        <div
+          className={cn(
+            "overflow-y-auto",
+            vehicles.length > 0 ? "grid grid-cols-1 gap-2 sm:grid-cols-2 max-h-[60vh]" : ""
+          )}
+        >
           {vehicles.length === 0 ? (
             <p className="text-sm text-muted-foreground">{emptyLabel}</p>
           ) : (
