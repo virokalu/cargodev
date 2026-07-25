@@ -21,11 +21,16 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        // Emails are always stored lowercase (zod's emailSchema normalizes on
+        // every write) — normalize the login input the same way so
+        // "Viro@Gmail.com" matches the "viro@gmail.com" row in the database.
+        const email = credentials.email.trim().toLowerCase();
+
         // Look up staff user only — customers cannot log in in Phase 1.
         const user = await prisma.user.findFirst({
           where: {
             org_id: env.ORG_ID,
-            email: credentials.email,
+            email,
             userType: "STAFF",
             loginEnabled: true,
           },
