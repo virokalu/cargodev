@@ -21,7 +21,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
+import { SHIPMENT_STATUS_META, type StorableShipmentStatus } from "@/lib/constants/shipment-status";
 import { ROTATING_CHART_COLORS } from "@/lib/constants/chart-colors";
 import type { DashboardStats, IdNameCount } from "@/lib/services/dashboard.service";
 import { useHoveredIndex, renderActivePieSlice, makeGrowingBarShape, makeClickableAxisTick } from "@/components/dashboard/use-hovered-index";
@@ -47,7 +47,7 @@ const trackConfig = {
 // badges elsewhere in the app (vehicles table, filters) — warning/info/
 // success — instead of generic chart-N colours, so a status means the same
 // colour everywhere it appears, not just on this one chart.
-const STATUS_COLOR: Record<ShipmentStatus, string> = {
+const STATUS_COLOR: Record<StorableShipmentStatus, string> = {
   PENDING: "var(--warning)",
   BOOKING_RECEIVED: "var(--info)",
   SHIPPED: "var(--success)",

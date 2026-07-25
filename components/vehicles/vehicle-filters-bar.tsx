@@ -37,7 +37,7 @@ interface VehicleFiltersBarProps {
 }
 
 const DEBOUNCE_MS = 300;
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
+const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 
 export function VehicleFiltersBar({
   params,

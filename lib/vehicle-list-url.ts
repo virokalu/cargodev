@@ -55,7 +55,7 @@ const SORT_KEYS: VehicleListSortKey[] = [
   "recycleDate",
 ];
 
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED"];
+const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
 const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
 

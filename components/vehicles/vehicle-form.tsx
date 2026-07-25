@@ -43,10 +43,16 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
-import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
+import {
+  SHIPMENT_STATUS_META,
+  STORABLE_SHIPMENT_STATUSES,
+  type ShipmentStatus,
+  type StorableShipmentStatus,
+} from "@/lib/constants/shipment-status";
 import {
   computeEffectiveShipmentStatus,
   computeShipmentStatusAfterEtdChange,
+  isCancelShipmentRowColour,
 } from "@/lib/shipment-status";
 import {
   createVehicleAction,
@@ -365,20 +371,39 @@ export function VehicleForm({
   // instead of only updating after the round trip. In edit mode that means
   // comparing against the ETD as it was when the page loaded (hadEtd);
   // computeEffectiveShipmentStatus on top handles picking an ETD that's
-  // already in the past showing as Shipped immediately, same as the table.
+  // already in the past showing as Shipped immediately, same as the table —
+  // and the same treatment for picking "Unit Canceled" as the Row Colour
+  // Status field right here in the form, not just the table's inline editor.
   const liveEtd = state.etd ? new Date(state.etd) : null;
+  const liveRowColourName = rowColourStatuses.find(
+    (status) => status.id === state.rowColourStatusId
+  )?.name;
+  const liveCancelled = isFC && isCancelShipmentRowColour(liveRowColourName);
   const derivedShipmentStatus: ShipmentStatus = isFC
-    ? computeEffectiveShipmentStatus(state.etd ? "BOOKING_RECEIVED" : "PENDING", liveEtd)
+    ? computeEffectiveShipmentStatus(state.etd ? "BOOKING_RECEIVED" : "PENDING", liveEtd, liveCancelled)
     : "PENDING";
+  // CANCELLED is never a valid input to the ETD-transition helper below (it
+  // only knows about the 3 real stored statuses) — if the vehicle loaded
+  // already Cancelled, reconstruct what the underlying status would be
+  // instead, so un-cancelling by changing the row colour in this same form
+  // session recomputes Booking Received/Shipped correctly rather than
+  // getting stuck on Cancelled forever.
+  const existingBaseStatus: StorableShipmentStatus | null =
+    existingShipmentStatus === "CANCELLED"
+      ? (initialValues?.etd ?? null) !== null
+        ? "BOOKING_RECEIVED"
+        : "PENDING"
+      : (existingShipmentStatus ?? null);
   const liveEditShipmentStatus: ShipmentStatus | null =
-    mode === "edit" && isFC && existingShipmentStatus
+    mode === "edit" && isFC && existingBaseStatus
       ? computeEffectiveShipmentStatus(
           computeShipmentStatusAfterEtdChange(
-            existingShipmentStatus,
+            existingBaseStatus,
             (initialValues?.etd ?? null) !== null,
             state.etd !== null
           ),
-          liveEtd
+          liveEtd,
+          liveCancelled
         )
       : null;
   const shipmentStatus =
@@ -564,7 +589,7 @@ export function VehicleForm({
               {canSetShipmentStatusManually ? (
                 <>
                   <div className="flex flex-wrap gap-1.5">
-                    {(Object.keys(SHIPMENT_STATUS_META) as ShipmentStatus[]).map((status) => {
+                    {STORABLE_SHIPMENT_STATUSES.map((status) => {
                       const meta = SHIPMENT_STATUS_META[status];
                       const active = state.manualShipmentStatus === status;
                       return (

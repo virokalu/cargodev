@@ -42,10 +42,11 @@ export function VehicleTableScrollArea({ children }: { children: React.ReactNode
   );
 }
 
-const DOT_COLOR: Record<"warning" | "info" | "success", string> = {
+const DOT_COLOR: Record<"warning" | "info" | "success" | "destructive", string> = {
   warning: "bg-warning",
   info: "bg-info",
   success: "bg-success",
+  destructive: "bg-destructive",
 };
 
 /** Lives in the Actions cell of every row — status colour, scaled to zero
