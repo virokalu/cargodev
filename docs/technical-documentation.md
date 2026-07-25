@@ -56,7 +56,7 @@ The colour value is data, not code — admins can adjust colours without a deplo
 | # | Field | Type / control | Behaviour |
 |---|---|---|---|
 | 1 | Serial No | `FC`/`FL` prefix + auto-increment | Auto-generated per prefix; manual entry allowed for legacy records (see §3) |
-| 2 | Auction Item No | text | — |
+| 2 | ~~Auction Item No~~ | text | **Deprecated 2026-07-25** — turned out to be a duplicate of Auction Lot No (#11), added by mistake. Hidden from the form and the vehicles table; the underlying column stays in the schema (no migration), just unused going forward. Existing values are left as-is. |
 | 3 | Chassis No | text | Unique per org (soft-warn on duplicates for legacy data) |
 | 4 | Shipment Status | derived enum | Pending → Booking Received → Shipped (automated, §1) |
 | 5 | Model | single combobox, hierarchical | Brand → Model → Grade, normalized reference tables, inline add (§4) |

@@ -606,14 +606,13 @@ export function VehicleForm({
           </SectionCard>
 
           {/* ── Vehicle Information ────────────────────────────────── */}
+          {/* Auction Item No is deliberately not shown here — it turned out
+              to be a duplicate of Auction Lot No (Tech Doc §2), added by
+              mistake. Hidden everywhere rather than dropped from the schema:
+              existing values are left alone (this field simply no longer
+              has an input, so edits pass the existing value straight
+              through unchanged), and new vehicles just never populate it. */}
           <SectionCard icon={Car} title="Vehicle Information">
-            <TextField
-              id="auctionItemNo"
-              label="Auction Item No"
-              value={state.auctionItemNo}
-              onChange={(value) => setField("auctionItemNo", value)}
-              maxLength={100}
-            />
             <TextField
               id="chassisNo"
               label="Chassis Number"

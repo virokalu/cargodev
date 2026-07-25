@@ -552,6 +552,32 @@ export async function updateVehicleRowColourStatus(
   });
 }
 
+/** Quick inline-edit from the vehicle table — same validation/audit
+ * guarantees as the full edit form, just for this one field. `null` is a
+ * real, distinct value here (CLAUDE.md tri-state rule: "not entered yet"),
+ * never coerced to false. */
+export async function updateVehicleAuctionBillPaid(
+  orgId: string,
+  actorId: string,
+  id: string,
+  auctionBillPaid: boolean | null
+): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id }, data: { auctionBillPaid } });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "UPDATE_VEHICLE_AUCTION_BILL_PAID",
+      entity: "Vehicle",
+      entityId: id,
+      before: { auctionBillPaid: existing.auctionBillPaid },
+      after: { auctionBillPaid },
+    });
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Vehicle list query layer (Tech Doc §1/§2, US-06/07/08) — powers the main
 // vehicle table: FC/FL toggle, search, per-column filters, sort, pagination.
