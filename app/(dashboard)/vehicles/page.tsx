@@ -60,8 +60,12 @@ export default async function VehiclesPage({
   };
 
   // US-02: Viewer is read-only everywhere — no inline editors, no Edit/Delete
-  // controls rendered in the table, not just disabled.
+  // controls rendered in the table, not just disabled. Operator's write
+  // access is table-level only (row colour) — adding a vehicle and full
+  // edit are both Admin/Manager only.
+  const canCreate = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
   const canWrite = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
+  const canEditVehicle = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
   const canDelete = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
 
   return (
@@ -73,12 +77,14 @@ export default async function VehiclesPage({
             {total} vehicle{total === 1 ? "" : "s"} found.
           </p>
         </div>
-        <Link href="/vehicles/add">
-          <Button>
-            <Plus className="mr-2 size-4" />
-            Add Vehicle
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/vehicles/add">
+            <Button>
+              <Plus className="mr-2 size-4" />
+              Add Vehicle
+            </Button>
+          </Link>
+        )}
       </div>
 
       <VehicleFiltersBar
@@ -94,6 +100,7 @@ export default async function VehiclesPage({
         params={params}
         rowColourStatuses={rowColourStatuses}
         canWrite={canWrite}
+        canEditVehicle={canEditVehicle}
         canDelete={canDelete}
       />
     </div>

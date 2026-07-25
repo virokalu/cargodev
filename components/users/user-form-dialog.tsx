@@ -67,6 +67,8 @@ interface UserFormDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Present = edit mode; null/undefined = create mode. */
   staff?: StaffFormValues | null;
+  /** Only the seeded "Administrator" account can grant the Administrator role. */
+  actorIsSuperAdmin: boolean;
   onSaved: () => void;
 }
 
@@ -74,7 +76,13 @@ interface UserFormDialogProps {
 // keyed by the target record so opening a different row (or Add User after
 // an edit) remounts with fresh state instead of needing an effect to
 // re-seed it (react-hooks/set-state-in-effect).
-export function UserFormDialog({ open, onOpenChange, staff, onSaved }: UserFormDialogProps) {
+export function UserFormDialog({
+  open,
+  onOpenChange,
+  staff,
+  actorIsSuperAdmin,
+  onSaved,
+}: UserFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -82,6 +90,7 @@ export function UserFormDialog({ open, onOpenChange, staff, onSaved }: UserFormD
           <UserFormBody
             key={staff?.id ?? "create"}
             staff={staff}
+            actorIsSuperAdmin={actorIsSuperAdmin}
             onOpenChange={onOpenChange}
             onSaved={onSaved}
           />
@@ -93,13 +102,22 @@ export function UserFormDialog({ open, onOpenChange, staff, onSaved }: UserFormD
 
 function UserFormBody({
   staff,
+  actorIsSuperAdmin,
   onOpenChange,
   onSaved,
 }: {
   staff?: StaffFormValues | null;
+  actorIsSuperAdmin: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  // Regular admins can't grant (or already hold, on some other row) the
+  // Administrator role — only the super-admin can. The dialog is never
+  // opened in edit mode for an existing admin row (the table locks that
+  // button), so this only really matters for the create-mode dropdown.
+  const roleOptions = actorIsSuperAdmin
+    ? ROLE_OPTIONS
+    : ROLE_OPTIONS.filter((opt) => opt.value !== "ADMINISTRATOR");
   const isEdit = !!staff;
   const [state, setState] = useState<FormState>(() =>
     staff
@@ -223,7 +241,7 @@ function UserFormBody({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLE_OPTIONS.map((opt) => (
+                {roleOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>

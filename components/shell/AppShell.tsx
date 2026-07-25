@@ -26,6 +26,7 @@ export default function AppShell({ children, user }: AppShellProps) {
         onClose={() => setMobileOpen(false)}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        role={user.role}
       />
 
       <div className="flex flex-col flex-1 min-w-0">

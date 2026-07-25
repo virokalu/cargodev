@@ -3,9 +3,9 @@ import { listCustomers } from "@/lib/services/customer.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { CustomersTable } from "@/components/customers/customers-table";
 
-// Any authenticated staff member can view the Customers list; only Manager
-// and Administrator can add/edit (US-02 — "Manager additionally manages
-// customers"), enforced again server-side in customers/actions.ts.
+// Any authenticated staff member can view the Customers list; only
+// Administrator and Manager can add/edit — Operator (and Viewer) are
+// view-only here, enforced again server-side in customers/actions.ts.
 export default async function CustomersPage() {
   const user = await requireUser();
   const customers = await listCustomers(user.orgId);

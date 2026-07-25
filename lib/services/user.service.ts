@@ -25,6 +25,20 @@ import * as activityLog from "@/lib/services/activity-log.service";
 
 const PASSWORD_SALT_ROUNDS = 10;
 
+// The seeded super-admin account (prisma/seed.ts) is identified by this
+// literal name, not just its role — every org has exactly one, and
+// createStaff() below refuses to let anyone create a second one. It's
+// invisible in the Users list to everyone but itself, and it's the only
+// account that can create/edit/deactivate other ADMINISTRATOR-role rows.
+// Regular admins can freely manage Manager/Operator/Viewer accounts, but
+// never each other — this is a deliberate blast-radius limit: no single
+// admin who isn't the super-admin can lock every other admin out.
+const SUPER_ADMIN_NAME = "Administrator";
+
+export function isSuperAdmin(actor: Pick<SessionUser, "name" | "role">): boolean {
+  return actor.role === "ADMINISTRATOR" && actor.name === SUPER_ADMIN_NAME;
+}
+
 export interface StaffListItem {
   id: string;
   name: string;
@@ -45,12 +59,14 @@ const STAFF_SELECT = {
   lastActiveAt: true,
 } satisfies Prisma.UserSelect;
 
-export async function listStaff(orgId: string, query?: string): Promise<StaffListItem[]> {
+export async function listStaff(actor: SessionUser, query?: string): Promise<StaffListItem[]> {
   const q = query?.trim();
   const staff = await prisma.user.findMany({
     where: {
-      org_id: orgId,
+      org_id: actor.orgId,
       userType: "STAFF",
+      // The super-admin row is invisible to everyone but itself.
+      ...(isSuperAdmin(actor) ? {} : { NOT: { name: SUPER_ADMIN_NAME, role: "ADMINISTRATOR" } }),
       ...(q
         ? {
             OR: [
@@ -68,10 +84,19 @@ export async function listStaff(orgId: string, query?: string): Promise<StaffLis
   return staff as StaffListItem[];
 }
 
-/** Fetches one staff row scoped to the org, or throws NOT_FOUND. */
-async function getOwnedStaff(orgId: string, staffId: string) {
+/**
+ * Fetches one staff row scoped to the org, or throws NOT_FOUND.
+ *
+ * When `actor` isn't the super-admin, a super-admin target is reported as
+ * NOT_FOUND rather than FORBIDDEN — same as it being missing from
+ * listStaff, so its existence isn't revealed by a different error shape.
+ */
+async function getOwnedStaff(actor: SessionUser, staffId: string) {
   const existing = await prisma.user.findUnique({ where: { id: staffId } });
-  if (!existing || existing.org_id !== orgId || existing.userType !== "STAFF") {
+  if (!existing || existing.org_id !== actor.orgId || existing.userType !== "STAFF") {
+    throw new ServiceError("NOT_FOUND", "Staff account not found.");
+  }
+  if (existing.name === SUPER_ADMIN_NAME && existing.role === "ADMINISTRATOR" && !isSuperAdmin(actor)) {
     throw new ServiceError("NOT_FOUND", "Staff account not found.");
   }
   return existing;
@@ -87,6 +112,22 @@ export async function createStaff(actor: SessionUser, rawInput: unknown): Promis
     );
   }
   const input = parsed.data;
+
+  if (input.role === "ADMINISTRATOR" && !isSuperAdmin(actor)) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Only the Administrator account can create administrator accounts.",
+      { role: "Only the Administrator account can assign this role" }
+    );
+  }
+  if (input.name === SUPER_ADMIN_NAME) {
+    throw new ServiceError(
+      "VALIDATION",
+      `"${SUPER_ADMIN_NAME}" is reserved for the system super-admin account.`,
+      { name: "This name is reserved" }
+    );
+  }
+
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
 
   try {
@@ -144,16 +185,33 @@ export async function updateStaff(
     );
   }
   const input = parsed.data;
-  const existing = await getOwnedStaff(actor.orgId, staffId);
+  const existing = await getOwnedStaff(actor, staffId);
+  const actorIsSuperAdmin = isSuperAdmin(actor);
 
-  // Admin roles are only editable by admins — the page itself is
-  // Admin-gated, but this check is the layer that actually holds if
-  // updateStaff is ever called a different way (CLAUDE.md RBAC rule).
-  if (input.role !== existing.role && actor.role !== "ADMINISTRATOR") {
+  // Any existing Administrator account — including the actor's own row — can
+  // only be edited here by the super-admin. Regular admins update their own
+  // details via My Profile instead; this table is for managing *other*
+  // accounts, and no single regular admin should be able to touch another's.
+  if (existing.role === "ADMINISTRATOR" && !actorIsSuperAdmin) {
     throw new ServiceError(
       "FORBIDDEN",
-      "Only an administrator can change a staff member's role.",
-      { role: "Only an administrator can change roles" }
+      "Only the Administrator account can edit administrator accounts.",
+      { role: "Only the Administrator account can edit this account" }
+    );
+  }
+  // Promoting someone into the Administrator role is equally restricted.
+  if (input.role === "ADMINISTRATOR" && !actorIsSuperAdmin) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Only the Administrator account can grant the administrator role.",
+      { role: "Only the Administrator account can assign this role" }
+    );
+  }
+  if (input.name === SUPER_ADMIN_NAME && !actorIsSuperAdmin) {
+    throw new ServiceError(
+      "VALIDATION",
+      `"${SUPER_ADMIN_NAME}" is reserved for the system super-admin account.`,
+      { name: "This name is reserved" }
     );
   }
 
@@ -209,7 +267,16 @@ export async function setStaffActive(
   staffId: string,
   active: boolean
 ): Promise<StaffListItem> {
-  const existing = await getOwnedStaff(actor.orgId, staffId);
+  const existing = await getOwnedStaff(actor, staffId);
+
+  // Same rule as updateStaff — no one but the super-admin can activate or
+  // deactivate an Administrator account.
+  if (existing.role === "ADMINISTRATOR" && !isSuperAdmin(actor)) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Only the Administrator account can activate or deactivate administrator accounts."
+    );
+  }
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.user.update({

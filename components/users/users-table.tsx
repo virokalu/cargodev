@@ -35,9 +35,20 @@ function getInitials(name: string): string {
 interface UsersTableProps {
   staff: StaffListItem[];
   currentUserId: string;
+  /** Manager can view this screen but not add/edit/(de)activate anyone —
+   * only Administrator can. Gates the Add User button and the whole
+   * Actions column, not just disables it (same pattern as CustomersTable). */
+  canManageUsers: boolean;
+  /** Only the seeded "Administrator" account can edit other admin accounts. */
+  actorIsSuperAdmin: boolean;
 }
 
-export function UsersTable({ staff, currentUserId }: UsersTableProps) {
+export function UsersTable({
+  staff,
+  currentUserId,
+  canManageUsers,
+  actorIsSuperAdmin,
+}: UsersTableProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,10 +97,12 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
             {staff.length} team member{staff.length === 1 ? "" : "s"}.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-1.5 size-4" />
-          Add User
-        </Button>
+        {canManageUsers && (
+          <Button onClick={openCreate}>
+            <Plus className="mr-1.5 size-4" />
+            Add User
+          </Button>
+        )}
       </div>
 
       <div className="relative w-full sm:max-w-xs">
@@ -107,19 +120,27 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="border-r">User</TableHead>
-              <TableHead className="border-r">Role</TableHead>
-              <TableHead className="w-24 text-right">Actions</TableHead>
+              <TableHead className={canManageUsers ? "border-r" : undefined}>Role</TableHead>
+              {canManageUsers && <TableHead className="w-24 text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={canManageUsers ? 3 : 2}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   No team members match your search.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((member) => (
+              filtered.map((member) => {
+                // Regular admins can see each other but can't edit or
+                // (de)activate one another — only the super-admin can.
+                const locked = member.role === "ADMINISTRATOR" && !actorIsSuperAdmin;
+                const lockedTitle = "Only the Administrator account can manage administrator accounts";
+                return (
                 <TableRow key={member.id} className={!member.loginEnabled ? "opacity-60" : undefined}>
                   <TableCell className="border-r">
                     <div className="flex items-center gap-3 py-1">
@@ -139,43 +160,52 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="border-r">
+                  <TableCell className={canManageUsers ? "border-r" : undefined}>
                     <RoleBadge role={member.role} />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Edit ${member.name}`}
-                        onClick={() => openEdit(member)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={
-                          member.loginEnabled ? `Deactivate ${member.name}` : `Activate ${member.name}`
-                        }
-                        title={
-                          member.id === currentUserId
-                            ? "You can't deactivate your own account"
-                            : undefined
-                        }
-                        disabled={member.id === currentUserId || pendingToggleId === member.id}
-                        onClick={() => handleToggleActive(member)}
-                      >
-                        {member.loginEnabled ? (
-                          <Power className="size-4 text-success" />
-                        ) : (
-                          <PowerOff className="size-4 text-destructive" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManageUsers && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Edit ${member.name}`}
+                          title={locked ? lockedTitle : undefined}
+                          disabled={locked}
+                          onClick={() => openEdit(member)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={
+                            member.loginEnabled ? `Deactivate ${member.name}` : `Activate ${member.name}`
+                          }
+                          title={
+                            locked
+                              ? lockedTitle
+                              : member.id === currentUserId
+                                ? "You can't deactivate your own account"
+                                : undefined
+                          }
+                          disabled={
+                            locked || member.id === currentUserId || pendingToggleId === member.id
+                          }
+                          onClick={() => handleToggleActive(member)}
+                        >
+                          {member.loginEnabled ? (
+                            <Power className="size-4 text-success" />
+                          ) : (
+                            <PowerOff className="size-4 text-destructive" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -185,6 +215,7 @@ export function UsersTable({ staff, currentUserId }: UsersTableProps) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         staff={editing}
+        actorIsSuperAdmin={actorIsSuperAdmin}
         onSaved={() => router.refresh()}
       />
     </div>
