@@ -130,8 +130,10 @@ function transportByStyle(row: VehicleListRow): React.CSSProperties | undefined 
 // FTJ MAIN.pdf's physical sheet order, with Shipment Status (not on that
 // sheet) kept right after Model/Grade, Row Colour Status at the very end,
 // "SHIPMENT DATE" mapped to ETD (ETA dropped — not on the sheet either),
-// and "REMARKS" split out of what was one Doc Sent to Client cell into its
-// own column next to it, rather than the unbuilt RemarkEntry feature.
+// and "Doc Sent Remark" split out of what was one Doc Sent to Client cell
+// into its own column next to it. Vehicle Remark is a separate plain-text
+// field on the vehicle (not the old append-only RemarkEntry thread), shown
+// as its own column next to Jibaishake.
 //
 // Auction Item No is NOT a column here — turned out to be a duplicate of
 // Auction Lot No (Tech Doc §2), added by mistake. Hidden rather than
@@ -228,8 +230,8 @@ const SCROLL_COLUMNS: {
   { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
   { key: "trackingNo", header: "Tracking No", render: (row) => row.trackingNo ?? "—" },
   {
-    key: "remarks",
-    header: "Remarks",
+    key: "docSentComment",
+    header: "Doc Sent Remark",
     render: (row) =>
       row.docSentComment ? (
         <span className="block max-w-40 truncate" title={row.docSentComment}>
@@ -253,6 +255,18 @@ const SCROLL_COLUMNS: {
       row.jibaishake ? (
         <span className="block max-w-32 truncate" title={row.jibaishake}>
           {row.jibaishake}
+        </span>
+      ) : (
+        "—"
+      ),
+  },
+  {
+    key: "vehicleRemark",
+    header: "Vehicle Remark",
+    render: (row) =>
+      row.vehicleRemark ? (
+        <span className="block max-w-40 truncate" title={row.vehicleRemark}>
+          {row.vehicleRemark}
         </span>
       ) : (
         "—"

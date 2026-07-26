@@ -163,6 +163,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         docSentComment: input.docSentComment,
         recycleDate: input.recycleDate,
         jibaishake: input.jibaishake,
+        vehicleRemark: input.vehicleRemark,
       },
     });
 
@@ -280,6 +281,7 @@ export interface VehicleEditData {
   docSentComment: string | null;
   recycleDate: Date | null;
   jibaishake: string | null;
+  vehicleRemark: string | null;
 }
 
 /** Fetches a vehicle shaped for the edit form. Returns null if it doesn't
@@ -319,6 +321,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       docSentComment: true,
       recycleDate: true,
       jibaishake: true,
+      vehicleRemark: true,
       model: { select: { id: true, name: true, brand: { select: { id: true, name: true } } } },
       grade: { select: { id: true, name: true } },
       auctionHall: { select: { id: true, name: true } },
@@ -381,6 +384,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     docSentComment: vehicle.docSentComment,
     recycleDate: vehicle.recycleDate,
     jibaishake: vehicle.jibaishake,
+    vehicleRemark: vehicle.vehicleRemark,
   };
 }
 
@@ -517,6 +521,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         docSentComment: input.docSentComment,
         recycleDate: input.recycleDate,
         jibaishake: input.jibaishake,
+        vehicleRemark: input.vehicleRemark,
 
         shipmentStatus: nextStatus,
       },
@@ -776,6 +781,7 @@ export interface VehicleListRow {
   docSentComment: string | null;
   recycleDate: Date | null;
   jibaishake: string | null;
+  vehicleRemark: string | null;
   shipmentStatus: ShipmentStatus;
   effectiveShipmentStatus: EffectiveShipmentStatus;
   rowColourStatus: { id: string; name: string; colour: string; transportCellOnly: boolean } | null;
@@ -936,6 +942,7 @@ export async function listVehicles(
         docSentComment: true,
         recycleDate: true,
         jibaishake: true,
+        vehicleRemark: true,
         shipmentStatus: true,
         model: { select: { name: true, brand: { select: { name: true } } } },
         grade: { select: { name: true } },
@@ -986,6 +993,7 @@ export async function listVehicles(
     docSentComment: v.docSentComment,
     recycleDate: v.recycleDate,
     jibaishake: v.jibaishake,
+    vehicleRemark: v.vehicleRemark,
     shipmentStatus: v.shipmentStatus,
     effectiveShipmentStatus: computeEffectiveShipmentStatus(
       v.shipmentStatus,

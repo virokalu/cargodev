@@ -155,6 +155,7 @@ export interface FormState {
   docSentComment: string;
   recycleDate: string | null;
   jibaishake: string;
+  vehicleRemark: string;
 }
 
 const INITIAL_STATE: FormState = {
@@ -199,6 +200,7 @@ const INITIAL_STATE: FormState = {
   docSentComment: "",
   recycleDate: null,
   jibaishake: "",
+  vehicleRemark: "",
 };
 
 /** Builds the raw payload the server's vehicleCreateSchema expects. */
@@ -255,6 +257,7 @@ function buildPayload(state: FormState) {
     docSentComment: state.docSentComment,
     recycleDate: state.recycleDate,
     jibaishake: state.jibaishake,
+    vehicleRemark: state.vehicleRemark,
   };
 }
 
@@ -981,13 +984,17 @@ export function VehicleForm({
               value={state.docSentDate}
               onChange={(value) => setField("docSentDate", value)}
             />
-            <TextField
-              id="docSentComment"
-              label="Doc Sent Remark"
-              value={state.docSentComment}
-              onChange={(value) => setField("docSentComment", value)}
-              maxLength={500}
-            />
+            <div className="sm:col-span-2">
+              <Label htmlFor="docSentComment" className="mb-1.5">
+                Doc Sent Remark
+              </Label>
+              <Textarea
+                id="docSentComment"
+                value={state.docSentComment}
+                onChange={(event) => setField("docSentComment", event.target.value)}
+                maxLength={500}
+              />
+            </div>
             <DateField
               id="recycleDate"
               label="Recycle Date"
@@ -1036,8 +1043,8 @@ export function VehicleForm({
                 </Badge>
               </div>
               <p className="border-t pt-3 text-xs text-muted-foreground">
-                Auction sheet, vehicle photos, documents and remarks become available once file
-                storage is wired up — added in a follow-up task.
+                Auction sheet, vehicle photos and documents become available once file storage is
+                wired up — added in a follow-up task.
               </p>
             </CardContent>
           </Card>
@@ -1060,6 +1067,22 @@ export function VehicleForm({
               Cancel
             </Button>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Vehicle Remark</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                id="vehicleRemark"
+                placeholder="Add a note about this vehicle…"
+                value={state.vehicleRemark}
+                onChange={(event) => setField("vehicleRemark", event.target.value)}
+                maxLength={2000}
+                rows={4}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
