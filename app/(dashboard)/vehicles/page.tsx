@@ -9,6 +9,7 @@ import {
   getGradeById,
   getAuctionHallById,
   getFreightAgentById,
+  getPackingAgentById,
   getVehicleLocationById,
   getTransportCompanyById,
 } from "@/lib/services/lookup.service";
@@ -35,6 +36,7 @@ export default async function VehiclesPage({
     grade,
     auctionHall,
     freightAgent,
+    packingAgent,
     vehicleLocation,
     transportCompany,
   ] = await Promise.all([
@@ -46,6 +48,7 @@ export default async function VehiclesPage({
     params.gradeId !== "ALL" ? getGradeById(user.orgId, params.gradeId) : null,
     params.auctionHallId !== "ALL" ? getAuctionHallById(user.orgId, params.auctionHallId) : null,
     params.freightAgentId !== "ALL" ? getFreightAgentById(user.orgId, params.freightAgentId) : null,
+    params.packingAgentId !== "ALL" ? getPackingAgentById(user.orgId, params.packingAgentId) : null,
     params.vehicleLocationId !== "ALL" ? getVehicleLocationById(user.orgId, params.vehicleLocationId) : null,
     params.transportById !== "ALL" ? getTransportCompanyById(user.orgId, params.transportById) : null,
   ]);
@@ -55,6 +58,7 @@ export default async function VehiclesPage({
     grade,
     auctionHall,
     freightAgent,
+    packingAgent,
     vehicleLocation,
     transportCompany,
   };

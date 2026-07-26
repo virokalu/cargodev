@@ -89,6 +89,9 @@ const vehicleSharedFields = {
   freightAgentId: optionalId,
   shippingMethod: z.enum(["RORO", "CONTAINER"]).nullable().optional(),
   trackingNo: optionalText(100),
+  // Only meaningful when shippingMethod = CONTAINER — vehicle.service nulls
+  // it out otherwise, same treatment as the other FC-only shipping fields.
+  packingAgentId: optionalId,
 
   transportById: optionalId,
   vehicleLocationId: optionalId,
@@ -113,6 +116,7 @@ function checkSharedVehicleRules(
   data: {
     shippingMethod?: "RORO" | "CONTAINER" | null;
     freightAgentId?: string | null;
+    packingAgentId?: string | null;
     etd?: Date | null;
     eta?: Date | null;
   },
@@ -122,7 +126,14 @@ function checkSharedVehicleRules(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["freightAgentId"],
-      message: "Select a freight agent before choosing RORO/Container",
+      message: "Select a forwarding agent before choosing RORO/Container",
+    });
+  }
+  if (data.shippingMethod === "CONTAINER" && !data.packingAgentId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["packingAgentId"],
+      message: "Select a packing agent for Container shipments",
     });
   }
   if (data.etd && data.eta && data.eta.getTime() <= data.etd.getTime()) {

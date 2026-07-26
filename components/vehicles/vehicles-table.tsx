@@ -214,13 +214,14 @@ const SCROLL_COLUMNS: {
     cellStyle: transportByStyle,
   },
   { key: "vehicleLocation", header: "Vehicle Location", render: (row) => row.vehicleLocationName ?? "—" },
-  { key: "freightAgent", header: "Freight Agent", render: (row) => row.freightAgentName ?? "—" },
+  { key: "freightAgent", header: "Forwarding Agent", render: (row) => row.freightAgentName ?? "—" },
   {
     key: "shippingMethod",
     header: "RORO / Container",
     render: (row) =>
       row.shippingMethod === "RORO" ? "RORO" : row.shippingMethod === "CONTAINER" ? "Container" : "—",
   },
+  { key: "packingAgent", header: "Packing Agent", render: (row) => row.packingAgentName ?? "—" },
   { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
   { key: "etd", header: "ETD", sortKey: "etd", render: (row) => formatDate(row.etd) },
   { key: "blNo", header: "BL No", render: (row) => row.blNo ?? "—" },

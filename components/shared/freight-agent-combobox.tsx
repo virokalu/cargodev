@@ -218,7 +218,7 @@ export function FreightAgentCombobox({
                 setQuery(next);
                 setDrafting(false);
               }}
-              placeholder="Search freight agents…"
+              placeholder="Search forwarding agents…"
             />
             <CommandList>
               {loading && (
@@ -228,7 +228,7 @@ export function FreightAgentCombobox({
                 </div>
               )}
               {!loading && options.length === 0 && !trimmedQuery && (
-                <CommandEmpty>Type to search freight agents…</CommandEmpty>
+                <CommandEmpty>Type to search forwarding agents…</CommandEmpty>
               )}
               {!loading && (
                 <CommandGroup>
@@ -328,7 +328,7 @@ export function FreightAgentCombobox({
                     (drafting ? (
                       <div className="space-y-2 border-t px-2 py-2">
                         <p className="text-xs text-muted-foreground">
-                          Add &quot;{trimmedQuery}&quot; as new freight agent — select what it offers:
+                          Add &quot;{trimmedQuery}&quot; as new forwarding agent — select what it offers:
                         </p>
                         <CapabilityToggles
                           offersRoro={draftRoro}
@@ -360,7 +360,7 @@ export function FreightAgentCombobox({
                     ) : (
                       <CommandItem value={`__create__${trimmedQuery}`} onSelect={startDraft}>
                         <Plus className="size-4" />
-                        Add &quot;{trimmedQuery}&quot; as new freight agent
+                        Add &quot;{trimmedQuery}&quot; as new forwarding agent
                       </CommandItem>
                     ))}
                 </CommandGroup>

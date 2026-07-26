@@ -37,6 +37,7 @@ import {
   searchGradesAction,
   searchAuctionHallsAction,
   searchFreightAgentsAction,
+  searchPackingAgentsAction,
   searchVehicleLocationsAction,
   searchTransportCompaniesAction,
 } from "@/app/(dashboard)/vehicles/actions";
@@ -50,6 +51,7 @@ const PANEL_FILTER_KEYS = [
   "gradeId",
   "auctionHallId",
   "freightAgentId",
+  "packingAgentId",
   "vehicleLocationId",
   "transportById",
   "shippingMethod",
@@ -64,6 +66,7 @@ export interface VehicleFilterSelections {
   grade: FilterOption | null;
   auctionHall: FilterOption | null;
   freightAgent: FilterOption | null;
+  packingAgent: FilterOption | null;
   vehicleLocation: FilterOption | null;
   transportCompany: FilterOption | null;
 }
@@ -163,13 +166,23 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               />
             </div>
             <div>
-              <Label className="mb-1.5">Freight Agent</Label>
+              <Label className="mb-1.5">Forwarding Agent</Label>
               <FilterCombobox
                 value={selected.freightAgent}
                 onChange={(option) => push({ freightAgentId: option?.id ?? "ALL" })}
                 search={(query) => searchFreightAgentsAction(query)}
-                placeholder="All freight agents"
-                allLabel="All freight agents"
+                placeholder="All forwarding agents"
+                allLabel="All forwarding agents"
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5">Packing Agent</Label>
+              <FilterCombobox
+                value={selected.packingAgent}
+                onChange={(option) => push({ packingAgentId: option?.id ?? "ALL" })}
+                search={(query) => searchPackingAgentsAction(query)}
+                placeholder="All packing agents"
+                allLabel="All packing agents"
               />
             </div>
             <div>

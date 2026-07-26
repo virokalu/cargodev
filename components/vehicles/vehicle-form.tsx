@@ -79,6 +79,9 @@ import {
   searchFreightAgentsAction,
   createFreightAgentAction,
   updateFreightAgentAction,
+  searchPackingAgentsAction,
+  createPackingAgentAction,
+  renamePackingAgentAction,
   searchCustomersAction,
   createCustomerAction,
   renameCustomerAction,
@@ -132,6 +135,8 @@ export interface FormState {
   blNo: string;
   freightAgent: FreightAgentOption | null;
   shippingMethod: "" | "RORO" | "CONTAINER";
+  // Only meaningful (and only shown) when shippingMethod === "CONTAINER".
+  packingAgent: ComboboxOption | null;
   trackingNo: string;
 
   transportBy: ComboboxOption | null;
@@ -175,6 +180,7 @@ const INITIAL_STATE: FormState = {
   blNo: "",
   freightAgent: null,
   shippingMethod: "",
+  packingAgent: null,
   trackingNo: "",
 
   transportBy: null,
@@ -230,6 +236,7 @@ function buildPayload(state: FormState) {
     blNo: state.blNo,
     freightAgentId: state.freightAgent?.id ?? null,
     shippingMethod: state.shippingMethod || null,
+    packingAgentId: state.packingAgent?.id ?? null,
     trackingNo: state.trackingNo,
 
     transportById: state.transportBy?.id ?? null,
@@ -462,6 +469,10 @@ export function VehicleForm({
         ...previous,
         shippingMethod: method,
         freightAgent: agentStillValid ? previous.freightAgent : null,
+        // Packing agent only applies to Container — drop it the moment the
+        // method changes to anything else, same reasoning as the freight
+        // agent reset above.
+        packingAgent: method === "CONTAINER" ? previous.packingAgent : null,
       };
     });
   }
@@ -782,7 +793,7 @@ export function VehicleForm({
               />
               <FreightAgentCombobox
                 id="freightAgentId"
-                label="Freight Agent"
+                label="Forwarding Agent"
                 value={state.freightAgent}
                 onChange={handleFreightAgentChange}
                 search={(query) => searchFreightAgentsAction(query, state.shippingMethod || undefined)}
@@ -824,6 +835,20 @@ export function VehicleForm({
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.shippingMethod}</p>
                 )}
               </div>
+              {state.shippingMethod === "CONTAINER" && (
+                <ComboboxCreate
+                  id="packingAgentId"
+                  label="Packing Agent"
+                  createLabel="packing agent"
+                  value={state.packingAgent}
+                  onChange={(value) => setField("packingAgent", value)}
+                  search={searchPackingAgentsAction}
+                  onCreate={createPackingAgentAction}
+                  onRename={(option, name) => renamePackingAgentAction(option.id, name)}
+                  required
+                  error={fieldErrors.packingAgentId}
+                />
+              )}
               <TextField
                 id="trackingNo"
                 label="Tracking No"
@@ -958,7 +983,7 @@ export function VehicleForm({
             />
             <TextField
               id="docSentComment"
-              label="Doc Sent Comment"
+              label="Doc Sent Remark"
               value={state.docSentComment}
               onChange={(value) => setField("docSentComment", value)}
               maxLength={500}
