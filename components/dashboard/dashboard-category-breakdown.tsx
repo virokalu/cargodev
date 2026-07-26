@@ -31,7 +31,7 @@ type CategoryKey = "location" | "transportBy" | "freightAgent" | "exportVolume" 
 const CATEGORY_OPTIONS: { key: CategoryKey; label: string; emptyLabel: string }[] = [
   { key: "location", label: "Vehicle Location", emptyLabel: "No vehicle locations entered yet." },
   { key: "transportBy", label: "Transport Company", emptyLabel: "No transport company assigned yet." },
-  { key: "freightAgent", label: "Freight Agent", emptyLabel: "No freight agent assigned yet." },
+  { key: "freightAgent", label: "Forwarding Agent", emptyLabel: "No forwarding agent assigned yet." },
   { key: "exportVolume", label: "Export Volume by Destination", emptyLabel: "No FC export destinations yet." },
   { key: "brand", label: "Brand", emptyLabel: "No brands entered yet." },
 ];

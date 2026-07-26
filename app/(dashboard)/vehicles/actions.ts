@@ -11,6 +11,7 @@ import { ServiceError, type ServiceErrorCode } from "@/lib/errors";
 import * as vehicleService from "@/lib/services/vehicle.service";
 import * as lookupService from "@/lib/services/lookup.service";
 import * as customerService from "@/lib/services/customer.service";
+import * as remarkService from "@/lib/services/remark.service";
 
 // Operator's entire vehicle write access is "table level" only — the row
 // colour dropdown inline in the table. They can't add new vehicles, open the
@@ -236,6 +237,25 @@ export async function updateFreightAgentAction(
   return updated;
 }
 
+// ── Packing Agent (only relevant when shippingMethod = CONTAINER) ─────────
+
+export async function searchPackingAgentsAction(query: string) {
+  const user = await requireUser();
+  return lookupService.searchPackingAgents(user.orgId, query);
+}
+
+export async function createPackingAgentAction(name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.findOrCreatePackingAgent(user.orgId, name);
+}
+
+export async function renamePackingAgentAction(id: string, name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const renamed = await lookupService.renamePackingAgent(user.orgId, id, name);
+  revalidatePath("/vehicles");
+  return renamed;
+}
+
 // ── Customer ──────────────────────────────────────────────────────────────
 
 export async function searchCustomersAction(query: string) {
@@ -253,4 +273,26 @@ export async function renameCustomerAction(id: string, name: string) {
   const renamed = await customerService.renameCustomer(user.orgId, id, name);
   revalidatePath("/vehicles");
   return renamed;
+}
+
+// ── Vehicle Remarks (append-only — no update/delete action exists) ────────
+
+export type RemarkActionResult =
+  | { ok: true; remark: remarkService.RemarkListItem }
+  | { ok: false; message: string; fieldErrors?: Record<string, string> };
+
+export async function addRemarkAction(vehicleId: string, body: string): Promise<RemarkActionResult> {
+  // Same access as the full edit form this panel lives on — Operator/Viewer
+  // don't reach this page at all (STAFF_CAN_EDIT_VEHICLE, not STAFF_CAN_WRITE).
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    const remark = await remarkService.addRemark(user, vehicleId, body);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true, remark };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message, fieldErrors: error.fieldErrors };
+    }
+    throw error;
+  }
 }

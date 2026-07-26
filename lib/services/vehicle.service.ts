@@ -52,6 +52,9 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
+  // Packing agent only ever applies to Container shipments — same
+  // strip-regardless-of-what-was-posted treatment as the fields above.
+  const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
 
   // Freight agent capability re-check — server never trusts the client alone
   // to have filtered the RORO/Container options (CLAUDE.md rule 4).
@@ -69,6 +72,22 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         `${agent.name} does not offer ${shippingMethod === "RORO" ? "RORO" : "Container"} shipping.`,
         { shippingMethod: "This agent doesn't offer that method." }
       );
+    }
+  }
+
+  // Packing agent is required for Container shipments — re-checked
+  // server-side same as everything else the client only enforces in the UI.
+  if (shippingMethod === "CONTAINER") {
+    if (!packingAgentId) {
+      throw new ServiceError("VALIDATION", "Packing agent is required for Container shipments.", {
+        packingAgentId: "Select a packing agent.",
+      });
+    }
+    const packingAgent = await prisma.packingAgent.findUnique({ where: { id: packingAgentId } });
+    if (!packingAgent || packingAgent.org_id !== user.orgId) {
+      throw new ServiceError("VALIDATION", "Selected packing agent not found.", {
+        packingAgentId: "Select a valid packing agent.",
+      });
     }
   }
 
@@ -125,6 +144,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         blNo,
         freightAgentId,
         shippingMethod,
+        packingAgentId,
         trackingNo,
 
         transportById: input.transportById,
@@ -241,6 +261,7 @@ export interface VehicleEditData {
   blNo: string | null;
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
   shippingMethod: ShippingMethod | null;
+  packingAgent: LookupRef | null;
   trackingNo: string | null;
 
   transportBy: LookupRef | null;
@@ -303,6 +324,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       auctionHall: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true } },
       freightAgent: { select: { id: true, name: true, offersRoro: true, offersContainer: true } },
+      packingAgent: { select: { id: true, name: true } },
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
       rowColourStatus: { select: { name: true } },
@@ -342,6 +364,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     blNo: vehicle.blNo,
     freightAgent: vehicle.freightAgent,
     shippingMethod: vehicle.shippingMethod,
+    packingAgent: vehicle.packingAgent,
     trackingNo: vehicle.trackingNo,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
@@ -394,6 +417,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
+  const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
 
   if (shippingMethod && freightAgentId) {
     const agent = await prisma.freightAgent.findUnique({ where: { id: freightAgentId } });
@@ -409,6 +433,20 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         `${agent.name} does not offer ${shippingMethod === "RORO" ? "RORO" : "Container"} shipping.`,
         { shippingMethod: "This agent doesn't offer that method." }
       );
+    }
+  }
+
+  if (shippingMethod === "CONTAINER") {
+    if (!packingAgentId) {
+      throw new ServiceError("VALIDATION", "Packing agent is required for Container shipments.", {
+        packingAgentId: "Select a packing agent.",
+      });
+    }
+    const packingAgent = await prisma.packingAgent.findUnique({ where: { id: packingAgentId } });
+    if (!packingAgent || packingAgent.org_id !== user.orgId) {
+      throw new ServiceError("VALIDATION", "Selected packing agent not found.", {
+        packingAgentId: "Select a valid packing agent.",
+      });
     }
   }
 
@@ -460,6 +498,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         blNo,
         freightAgentId,
         shippingMethod,
+        packingAgentId,
         trackingNo,
 
         transportById: input.transportById,
@@ -690,6 +729,7 @@ export interface VehicleListParams {
   gradeId: string | "ALL";
   auctionHallId: string | "ALL";
   freightAgentId: string | "ALL";
+  packingAgentId: string | "ALL";
   vehicleLocationId: string | "ALL";
   transportById: string | "ALL";
   shippingMethod: ShippingMethod | "ALL";
@@ -720,6 +760,7 @@ export interface VehicleListRow {
   blNo: string | null;
   freightAgentName: string | null;
   shippingMethod: ShippingMethod | null;
+  packingAgentName: string | null;
   trackingNo: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
@@ -783,6 +824,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.gradeId !== "ALL") where.gradeId = params.gradeId;
   if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
   if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
+  if (params.packingAgentId !== "ALL") where.packingAgentId = params.packingAgentId;
   if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
   if (params.transportById !== "ALL") where.transportById = params.transportById;
   if (params.shippingMethod !== "ALL") where.shippingMethod = params.shippingMethod;
@@ -900,6 +942,7 @@ export async function listVehicles(
         auctionHall: { select: { name: true } },
         customer: { select: { name: true } },
         freightAgent: { select: { name: true } },
+        packingAgent: { select: { name: true } },
         transportBy: { select: { name: true } },
         vehicleLocation: { select: { name: true } },
         rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
@@ -927,6 +970,7 @@ export async function listVehicles(
     blNo: v.blNo,
     freightAgentName: v.freightAgent?.name ?? null,
     shippingMethod: v.shippingMethod,
+    packingAgentName: v.packingAgent?.name ?? null,
     trackingNo: v.trackingNo,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,

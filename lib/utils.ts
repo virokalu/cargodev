@@ -20,3 +20,18 @@ export function toDateInputValue(value: Date | null | undefined): string | null 
   if (!value) return null;
   return value.toISOString().slice(0, 10);
 }
+
+/** "Jul 21, 2026, 3:45 PM" — formatDate plus a time, for timestamps where
+ * the time of day matters (e.g. an append-only remarks thread). */
+export function formatDateTime(value: Date | string | null | undefined): string {
+  if (!value) return "—";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}

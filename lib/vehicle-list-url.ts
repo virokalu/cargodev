@@ -28,6 +28,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   gradeId: "ALL",
   auctionHallId: "ALL",
   freightAgentId: "ALL",
+  packingAgentId: "ALL",
   vehicleLocationId: "ALL",
   transportById: "ALL",
   shippingMethod: "ALL",
@@ -98,6 +99,7 @@ export function parseVehicleListParams(
     gradeId: firstValue(searchParams.grade) || "ALL",
     auctionHallId: firstValue(searchParams.hall) || "ALL",
     freightAgentId: firstValue(searchParams.agent) || "ALL",
+    packingAgentId: firstValue(searchParams.packingAgent) || "ALL",
     vehicleLocationId: firstValue(searchParams.location) || "ALL",
     transportById: firstValue(searchParams.transport) || "ALL",
     shippingMethod: SHIPPING_METHODS.includes(method as ShippingMethod)
@@ -134,6 +136,7 @@ export function buildVehiclesHref(
   if (merged.gradeId !== "ALL") query.set("grade", merged.gradeId);
   if (merged.auctionHallId !== "ALL") query.set("hall", merged.auctionHallId);
   if (merged.freightAgentId !== "ALL") query.set("agent", merged.freightAgentId);
+  if (merged.packingAgentId !== "ALL") query.set("packingAgent", merged.packingAgentId);
   if (merged.vehicleLocationId !== "ALL") query.set("location", merged.vehicleLocationId);
   if (merged.transportById !== "ALL") query.set("transport", merged.transportById);
   if (merged.shippingMethod !== "ALL") query.set("method", merged.shippingMethod);

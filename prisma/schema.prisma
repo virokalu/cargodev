@@ -66,6 +66,7 @@ model Organization {
   transportCos    TransportCompany[]
   vehicleLocations VehicleLocation[]
   freightAgents   FreightAgent[]
+  packingAgents   PackingAgent[]
   rowStatuses     RowColourStatus[]
   serialCounters  SerialCounter[]
   notifications   Notification[]
@@ -210,6 +211,21 @@ model FreightAgent {
   @@unique([org_id, name])
 }
 
+// Packing Agent — only relevant when a vehicle's shipping method is
+// CONTAINER (service layer nulls Vehicle.packingAgentId out otherwise).
+// Plain name-only managed lookup, same shape as TransportCompany/AuctionHall
+// — no capability flags like FreightAgent, since it isn't offered per
+// RORO/Container, it's simply inapplicable outside Container.
+model PackingAgent {
+  id       String       @id @default(cuid())
+  org_id   String
+  name     String
+  org      Organization @relation(fields: [org_id], references: [id])
+  vehicles Vehicle[]
+
+  @@unique([org_id, name])
+}
+
 // Row colour is data, not code — admins configure colours in Settings.
 // "Transport Complete" is special: colours only the Transport By cell, not the whole row.
 model RowColourStatus {
@@ -284,6 +300,9 @@ model Vehicle {
   vehicleLocationId   String?
   freightAgentId      String?
   shippingMethod      ShippingMethod? // RORO or CONTAINER — validated against agent capabilities
+  // Only meaningful when shippingMethod = CONTAINER — service layer nulls
+  // this out otherwise, same treatment as the FC-only shipping fields above.
+  packingAgentId      String?
 
   massoDate   DateTime? // Deregistration (抹消) date
   billNumber  String?
@@ -315,6 +334,7 @@ model Vehicle {
   transportBy     TransportCompany? @relation(fields: [transportById], references: [id])
   vehicleLocation VehicleLocation? @relation(fields: [vehicleLocationId], references: [id])
   freightAgent    FreightAgent?    @relation(fields: [freightAgentId], references: [id])
+  packingAgent    PackingAgent?    @relation(fields: [packingAgentId], references: [id])
   rowColourStatus RowColourStatus? @relation(fields: [rowColourStatusId], references: [id])
 
   remarks        RemarkEntry[]
@@ -332,6 +352,7 @@ model Vehicle {
   // Supports the vehicle list filter panel (each is a direct equality filter).
   @@index([org_id, auctionHallId])
   @@index([org_id, freightAgentId])
+  @@index([org_id, packingAgentId])
   @@index([org_id, vehicleLocationId])
   @@index([org_id, modelId])
   @@index([org_id, gradeId])
