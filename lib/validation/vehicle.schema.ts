@@ -109,6 +109,7 @@ const vehicleSharedFields = {
   docSentComment: optionalText(500),
   recycleDate: optionalDate,
   jibaishake: optionalText(500),
+  vehicleRemark: optionalText(2000),
 };
 
 /** Cross-field rules shared by create and edit. */

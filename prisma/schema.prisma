@@ -100,7 +100,6 @@ model User {
 
   // CUSTOMER users can own vehicles; STAFF users cannot (enforced in service layer)
   vehicles     Vehicle[]    @relation("CustomerVehicles")
-  remarks      RemarkEntry[]
   activityLogs ActivityLog[]
   notifications Notification[]
 
@@ -315,6 +314,10 @@ model Vehicle {
   recycleDate DateTime? // #31 — confirmed as a date field
   jibaishake  String?   // #32 — free text for now; can be structured later without migration pain
 
+  // Vehicle Remark — plain free-text note on the vehicle itself, overwritable
+  // (not the old append-only RemarkEntry thread). Same shape as docSentComment/jibaishake.
+  vehicleRemark String?
+
   rowColourStatusId String? // FK → RowColourStatus (nullable — no colour = no status set)
 
   // Soft delete — null = active. Every read path (table, edit, chassis-dup
@@ -337,7 +340,6 @@ model Vehicle {
   packingAgent    PackingAgent?    @relation(fields: [packingAgentId], references: [id])
   rowColourStatus RowColourStatus? @relation(fields: [rowColourStatusId], references: [id])
 
-  remarks        RemarkEntry[]
   photos         VehiclePhoto[]
   documents      VehicleDocument[]
   statusHistory  StatusHistory[]
@@ -359,27 +361,6 @@ model Vehicle {
   @@index([org_id, destination])
   @@index([org_id, rowColourStatusId])
   @@index([org_id, shippingMethod])
-}
-
-// ─────────────────────────────────────────────
-// REMARKS — append-only thread per vehicle (§6)
-// Never editable or deletable. Author + timestamp always recorded.
-// ─────────────────────────────────────────────
-
-model RemarkEntry {
-  id        String   @id @default(cuid())
-  vehicleId String
-  authorId  String   // User who wrote the remark
-  body      String
-  createdAt DateTime @default(now())
-
-  // Deleting a vehicle removes its own remarks with it — the append-only
-  // rule (never edit/delete a remark while its vehicle exists) doesn't
-  // extend to "must outlive the vehicle it's about."
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id])
-
-  @@index([vehicleId])
 }
 
 // ─────────────────────────────────────────────

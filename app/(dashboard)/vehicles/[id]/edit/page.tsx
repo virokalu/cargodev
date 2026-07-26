@@ -2,11 +2,9 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
 import { getVehicleForEdit, type VehicleEditData } from "@/lib/services/vehicle.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
-import { listRemarks } from "@/lib/services/remark.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { toDateInputValue } from "@/lib/utils";
 import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form";
-import { VehicleRemarksPanel } from "@/components/vehicles/vehicle-remarks-panel";
 
 /** Maps the DB shape to the form's shape — id/name lookup refs pass straight
  * through as ComboboxOption ({id, name}), dates become "YYYY-MM-DD" strings
@@ -50,6 +48,7 @@ function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
     docSentComment: vehicle.docSentComment ?? "",
     recycleDate: toDateInputValue(vehicle.recycleDate),
     jibaishake: vehicle.jibaishake ?? "",
+    vehicleRemark: vehicle.vehicleRemark ?? "",
   };
 }
 
@@ -72,21 +71,16 @@ export default async function EditVehiclePage({
     notFound();
   }
 
-  const remarks = await listRemarks(user.orgId, vehicle.id);
-
   return (
-    <div className="space-y-6">
-      <VehicleForm
-        mode="edit"
-        vehicleId={vehicle.id}
-        existingSerial={vehicle.serial}
-        existingTrack={vehicle.track}
-        existingShipmentStatus={vehicle.shipmentStatus}
-        initialValues={toFormValues(vehicle)}
-        rowColourStatuses={rowColourStatuses}
-        countries={COUNTRIES}
-      />
-      <VehicleRemarksPanel vehicleId={vehicle.id} remarks={remarks} canAdd />
-    </div>
+    <VehicleForm
+      mode="edit"
+      vehicleId={vehicle.id}
+      existingSerial={vehicle.serial}
+      existingTrack={vehicle.track}
+      existingShipmentStatus={vehicle.shipmentStatus}
+      initialValues={toFormValues(vehicle)}
+      rowColourStatuses={rowColourStatuses}
+      countries={COUNTRIES}
+    />
   );
 }
