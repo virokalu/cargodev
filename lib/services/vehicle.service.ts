@@ -8,6 +8,7 @@ import type { Prisma, SerialPrefix, ShipmentStatus, ShippingMethod, Vehicle } fr
 // lib/shipment-status.ts) — fields that hold an *effective* status use this
 // wider app-level type instead.
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
+import { SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/services/auth-guard";
@@ -21,6 +22,7 @@ import * as activityLog from "@/lib/services/activity-log.service";
 import {
   computeEffectiveShipmentStatus,
   computeShipmentStatusAfterEtdChange,
+  deriveShipmentStatusFromEtd,
   isCancelShipmentRowColour,
   todayAtMidnight,
 } from "@/lib/shipment-status";
@@ -117,7 +119,18 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     // read) belongs to the separate shipment-status service that runs on
     // *edits*, not creation.
     const startsBookingReceived = isFC && etd !== null;
-    const legacyStatus = input.isLegacyEntry && isFC ? input.shipmentStatus : null;
+    let legacyStatus = input.isLegacyEntry && isFC ? input.shipmentStatus : null;
+    // A legacy record can be hand-marked Pending or Booking Received even
+    // though an ETD was also entered that contradicts it (e.g. Booking
+    // Received picked but the ETD is already in the past — that vehicle
+    // has shipped, whatever was picked). Re-derive from the ETD instead of
+    // trusting a pick that doesn't match it, whenever an ETD is actually
+    // present — but never override an explicit Shipped, and never touch
+    // this when no ETD was entered at all (see deriveShipmentStatusFromEtd
+    // for why this can't just be fixed later).
+    if (legacyStatus && legacyStatus !== "SHIPPED" && etd !== null) {
+      legacyStatus = deriveShipmentStatusFromEtd(etd);
+    }
     const initialStatus = legacyStatus ?? (startsBookingReceived ? "BOOKING_RECEIVED" : "PENDING");
 
     const created = await tx.vehicle.create({
@@ -900,64 +913,50 @@ function buildVehicleListOrderBy(
   }
 }
 
-export async function listVehicles(
-  orgId: string,
-  params: VehicleListParams
-): Promise<VehicleListResult> {
-  const where = buildVehicleListWhere(orgId, params);
-  const orderBy = buildVehicleListOrderBy(params.sortBy, params.sortDir);
-  const skip = (params.page - 1) * params.pageSize;
+const VEHICLE_LIST_SELECT = {
+  id: true,
+  serial: true,
+  serialPrefix: true,
+  chassisNo: true,
+  auctionItemNo: true,
+  auctionLotNo: true,
+  yom: true,
+  purchaseDate: true,
+  destination: true,
+  etd: true,
+  eta: true,
+  blNo: true,
+  shippingMethod: true,
+  trackingNo: true,
+  auctionBillPaid: true,
+  logBook: true,
+  extraKey: true,
+  docsArrivedDate: true,
+  nameChangeDeadline: true,
+  massoDate: true,
+  billNumber: true,
+  lcNo: true,
+  docSentDate: true,
+  docSentComment: true,
+  recycleDate: true,
+  jibaishake: true,
+  vehicleRemark: true,
+  shipmentStatus: true,
+  model: { select: { name: true, brand: { select: { name: true } } } },
+  grade: { select: { name: true } },
+  auctionHall: { select: { name: true } },
+  customer: { select: { name: true } },
+  freightAgent: { select: { name: true } },
+  packingAgent: { select: { name: true } },
+  transportBy: { select: { name: true } },
+  vehicleLocation: { select: { name: true } },
+  rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
+} satisfies Prisma.VehicleSelect;
 
-  const [total, vehicles] = await Promise.all([
-    prisma.vehicle.count({ where }),
-    prisma.vehicle.findMany({
-      where,
-      orderBy,
-      skip,
-      take: params.pageSize,
-      select: {
-        id: true,
-        serial: true,
-        serialPrefix: true,
-        chassisNo: true,
-        auctionItemNo: true,
-        auctionLotNo: true,
-        yom: true,
-        purchaseDate: true,
-        destination: true,
-        etd: true,
-        eta: true,
-        blNo: true,
-        shippingMethod: true,
-        trackingNo: true,
-        auctionBillPaid: true,
-        logBook: true,
-        extraKey: true,
-        docsArrivedDate: true,
-        nameChangeDeadline: true,
-        massoDate: true,
-        billNumber: true,
-        lcNo: true,
-        docSentDate: true,
-        docSentComment: true,
-        recycleDate: true,
-        jibaishake: true,
-        vehicleRemark: true,
-        shipmentStatus: true,
-        model: { select: { name: true, brand: { select: { name: true } } } },
-        grade: { select: { name: true } },
-        auctionHall: { select: { name: true } },
-        customer: { select: { name: true } },
-        freightAgent: { select: { name: true } },
-        packingAgent: { select: { name: true } },
-        transportBy: { select: { name: true } },
-        vehicleLocation: { select: { name: true } },
-        rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
-      },
-    }),
-  ]);
+type VehicleListRawRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_LIST_SELECT }>;
 
-  const rows: VehicleListRow[] = vehicles.map((v) => ({
+function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
+  return {
     id: v.id,
     serial: v.serial,
     track: v.serialPrefix,
@@ -1001,7 +1000,64 @@ export async function listVehicles(
       v.serialPrefix === "FC" && isCancelShipmentRowColour(v.rowColourStatus?.name)
     ),
     rowColourStatus: v.rowColourStatus,
-  }));
+  };
+}
+
+export async function listVehicles(
+  orgId: string,
+  params: VehicleListParams
+): Promise<VehicleListResult> {
+  const where = buildVehicleListWhere(orgId, params);
+  const skip = (params.page - 1) * params.pageSize;
+
+  // Shipment Status can't be sorted with a DB-level ORDER BY: the column
+  // only ever holds the 3 storable values, but the table displays (and
+  // this sort has to match) the *effective* status — also dependent on ETD
+  // and the "Unit Canceled" row colour, a JS-computed value with no real
+  // column behind it (see lib/shipment-status.ts). So this one sort key
+  // fetches every matching row instead of a single DB page, sorts by the
+  // same computeEffectiveShipmentStatus the table renders, then paginates
+  // in memory. Fine at this app's scale (Phase 1, single org, 6-8 staff);
+  // every other sort key still does a normal DB ORDER BY + LIMIT/OFFSET.
+  if (params.sortBy === "shipmentStatus") {
+    const [total, allVehicles] = await Promise.all([
+      prisma.vehicle.count({ where }),
+      prisma.vehicle.findMany({ where, select: VEHICLE_LIST_SELECT }),
+    ]);
+    const sortDirMultiplier = params.sortDir === "asc" ? 1 : -1;
+    const rows = allVehicles
+      .map(toVehicleListRow)
+      .sort(
+        (a, b) =>
+          sortDirMultiplier *
+          (SHIPMENT_STATUS_ORDER.indexOf(a.effectiveShipmentStatus) -
+            SHIPMENT_STATUS_ORDER.indexOf(b.effectiveShipmentStatus))
+      )
+      .slice(skip, skip + params.pageSize);
+
+    return {
+      rows,
+      total,
+      page: params.page,
+      pageSize: params.pageSize,
+      totalPages: Math.max(1, Math.ceil(total / params.pageSize)),
+    };
+  }
+
+  const orderBy = buildVehicleListOrderBy(params.sortBy, params.sortDir);
+
+  const [total, vehicles] = await Promise.all([
+    prisma.vehicle.count({ where }),
+    prisma.vehicle.findMany({
+      where,
+      orderBy,
+      skip,
+      take: params.pageSize,
+      select: VEHICLE_LIST_SELECT,
+    }),
+  ]);
+
+  const rows: VehicleListRow[] = vehicles.map(toVehicleListRow);
 
   return {
     rows,

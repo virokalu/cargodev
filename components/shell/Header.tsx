@@ -125,7 +125,7 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
 
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
               >
                 <LogOut className="w-4 h-4" />
                 Sign out

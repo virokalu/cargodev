@@ -25,6 +25,17 @@ export const STORABLE_SHIPMENT_STATUSES: StorableShipmentStatus[] = [
   "SHIPPED",
 ];
 
+/** Canonical Pending → Booking Received → Shipped → Cancelled order — used
+ * to sort the vehicles table by Shipment Status against the *effective*
+ * status (see lib/shipment-status.ts), since the underlying DB enum has no
+ * CANCELLED value to sort by in the first place. */
+export const SHIPMENT_STATUS_ORDER: ShipmentStatus[] = [
+  "PENDING",
+  "BOOKING_RECEIVED",
+  "SHIPPED",
+  "CANCELLED",
+];
+
 export const SHIPMENT_STATUS_META: Record<
   ShipmentStatus,
   { label: string; badgeVariant: "warning" | "info" | "success" | "destructive" }
