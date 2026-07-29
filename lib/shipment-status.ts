@@ -44,6 +44,19 @@ export function computeEffectiveShipmentStatus(
   return etd.getTime() < todayAtMidnight().getTime() ? "SHIPPED" : status;
 }
 
+/** What a fresh FC vehicle's status should actually be, from its ETD alone —
+ * used to correct a legacy entry hand-picked as Pending despite an ETD also
+ * being entered. That combination is self-contradictory (Pending means "no
+ * ETD yet"), and unlike a wrong Booking Received, nothing fixes a wrong
+ * Pending later: computeEffectiveShipmentStatus's read-time guard only ever
+ * promotes Booking Received -> Shipped, never Pending -> anything, and
+ * shipment status can't be edited by hand after creation except at legacy
+ * entry. So this has to be corrected at creation time, not on read. */
+export function deriveShipmentStatusFromEtd(etd: Date | null): StorableShipmentStatus {
+  if (!etd) return "PENDING";
+  return etd.getTime() < todayAtMidnight().getTime() ? "SHIPPED" : "BOOKING_RECEIVED";
+}
+
 /** ETD-driven status transition on edit (Tech Doc §1): adding an ETD to a
  * Pending FC vehicle moves it to Booking Received; clearing an ETD always
  * reverts to Pending, regardless of current status. Editing ETD to a

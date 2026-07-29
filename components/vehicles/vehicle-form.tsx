@@ -52,6 +52,7 @@ import {
 import {
   computeEffectiveShipmentStatus,
   computeShipmentStatusAfterEtdChange,
+  deriveShipmentStatusFromEtd,
   isCancelShipmentRowColour,
 } from "@/lib/shipment-status";
 import {
@@ -416,11 +417,25 @@ export function VehicleForm({
           liveCancelled
         )
       : null;
+  // A legacy record can be hand-marked Pending or Booking Received even
+  // though an ETD was also entered below that contradicts it (e.g. Booking
+  // Received picked but the ETD is already in the past — that vehicle has
+  // shipped, whatever was picked) — re-derive from the ETD instead of
+  // trusting a pick that doesn't match it, same correction
+  // vehicle.service.ts's createVehicle applies on save (see
+  // deriveShipmentStatusFromEtd for why this can't just be fixed later), so
+  // this preview never disagrees with what submitting will actually save.
+  // Never overrides an explicit Shipped pick, and never fires without an
+  // ETD actually entered.
+  const manualShipmentStatus =
+    state.manualShipmentStatus !== "SHIPPED" && liveEtd
+      ? deriveShipmentStatusFromEtd(liveEtd)
+      : state.manualShipmentStatus;
   const shipmentStatus =
     mode === "edit"
       ? (liveEditShipmentStatus ?? existingShipmentStatus ?? derivedShipmentStatus)
       : canSetShipmentStatusManually
-        ? state.manualShipmentStatus
+        ? manualShipmentStatus
         : derivedShipmentStatus;
 
   // "YYYY-MM-DD" strings compare correctly with <= (ISO date strings sort
@@ -629,6 +644,17 @@ export function VehicleForm({
                     Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
                     tracked through the normal ETD flow.
                   </p>
+                  {manualShipmentStatus !== state.manualShipmentStatus && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-warning">
+                      <AlertTriangle className="size-3.5 shrink-0" />
+                      Will actually save as{" "}
+                      <Badge variant={SHIPMENT_STATUS_META[manualShipmentStatus].badgeVariant}>
+                        {SHIPMENT_STATUS_META[manualShipmentStatus].label}
+                      </Badge>{" "}
+                      — {SHIPMENT_STATUS_META[state.manualShipmentStatus].label}{" "}
+                      doesn&apos;t match the ETD already entered below.
+                    </p>
+                  )}
                 </>
               ) : (
                 <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
@@ -664,7 +690,7 @@ export function VehicleForm({
               maxLength={100}
             />
             {chassisDuplicate && !fieldErrors.chassisNo && (
-              <div className="sm:col-span-2 -mt-2 flex items-center gap-2 text-xs text-warning-foreground">
+              <div className="sm:col-span-2 -mt-2 flex items-center gap-2 text-xs text-warning">
                 <AlertTriangle className="size-3.5 shrink-0" />
                 A vehicle with this chassis number already exists — you can still save.
               </div>
