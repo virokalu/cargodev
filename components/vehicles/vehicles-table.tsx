@@ -437,19 +437,26 @@ export function VehiclesTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id} className={ROW_HEIGHT_CLASS}>
-                      {SCROLL_COLUMNS.map((column, i) => (
-                        <TableCell
-                          key={column.key}
-                          className={cn(column.center && "text-center", i < SCROLL_COLUMNS.length - 1 && "border-r")}
-                          style={column.cellStyle?.(row)}
-                        >
-                          {column.render(row, columnContext)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                  {rows.map((row) => {
+                    const rowBg =
+                      row.rowColourStatus && !row.rowColourStatus.transportCellOnly
+                        ? row.rowColourStatus.colour
+                        : undefined;
+
+                    return (
+                      <TableRow key={row.id} className={ROW_HEIGHT_CLASS} style={{ backgroundColor: rowBg }}>
+                        {SCROLL_COLUMNS.map((column, i) => (
+                          <TableCell
+                            key={column.key}
+                            className={cn(column.center && "text-center", i < SCROLL_COLUMNS.length - 1 && "border-r")}
+                            style={column.cellStyle?.(row)}
+                          >
+                            {column.render(row, columnContext)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </DetailPaneTable>
             </div>
