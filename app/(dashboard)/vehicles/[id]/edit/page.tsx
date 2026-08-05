@@ -6,7 +6,6 @@ import { listVehicleFiles } from "@/lib/services/file.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { toDateInputValue } from "@/lib/utils";
 import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form";
-import { VehicleFilesPanel } from "@/components/vehicles/vehicle-files-panel";
 
 /** Maps the DB shape to the form's shape — id/name lookup refs pass straight
  * through as ComboboxOption ({id, name}), dates become "YYYY-MM-DD" strings
@@ -79,18 +78,16 @@ export default async function EditVehiclePage({
   const files = await listVehicleFiles(user.orgId, vehicle.id);
 
   return (
-    <div className="space-y-6">
-      <VehicleForm
-        mode="edit"
-        vehicleId={vehicle.id}
-        existingSerial={vehicle.serial}
-        existingTrack={vehicle.track}
-        existingShipmentStatus={vehicle.shipmentStatus}
-        initialValues={toFormValues(vehicle)}
-        rowColourStatuses={rowColourStatuses}
-        countries={COUNTRIES}
-      />
-      <VehicleFilesPanel vehicleId={vehicle.id} files={files} canEdit />
-    </div>
+    <VehicleForm
+      mode="edit"
+      vehicleId={vehicle.id}
+      existingSerial={vehicle.serial}
+      existingTrack={vehicle.track}
+      existingShipmentStatus={vehicle.shipmentStatus}
+      initialValues={toFormValues(vehicle)}
+      files={files}
+      rowColourStatuses={rowColourStatuses}
+      countries={COUNTRIES}
+    />
   );
 }

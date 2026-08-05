@@ -41,9 +41,12 @@ import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobo
 import { FreightAgentCombobox } from "@/components/shared/freight-agent-combobox";
 import { CountrySelect } from "@/components/shared/country-select";
 import { AuctionSheetUpload } from "@/components/shared/uploads/auction-sheet-upload";
+import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-gallery";
+import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
 import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
+import type { VehicleFiles } from "@/lib/services/file.service";
 import {
   SHIPMENT_STATUS_META,
   STORABLE_SHIPMENT_STATUSES,
@@ -107,6 +110,11 @@ interface VehicleFormProps {
    * choice is made. */
   nextFcSerial?: string;
   nextFlSerial?: string;
+  /** Edit mode only — Auction Sheet/Documents/Photos, rendered in the right
+   * rail in "persist" mode (immediate DB write per upload/delete). Create
+   * mode renders the same three cards in "stage" mode instead, off
+   * FormState.auctionSheetUrl/stagedPhotoUrls/stagedDocuments. */
+  files?: VehicleFiles;
   rowColourStatuses: RowColourStatusOption[];
   countries: CountryOption[];
 }
@@ -135,6 +143,9 @@ export interface FormState {
   // vehicle exists. Editing the auction sheet happens through the Files
   // panel's immediate-persist action instead (see vehicle.schema.ts).
   auctionSheetUrl: string;
+  // Same create-only staging as auctionSheetUrl above.
+  stagedPhotoUrls: string[];
+  stagedDocuments: StagedDocument[];
 
   etd: string | null;
   eta: string | null;
@@ -182,6 +193,8 @@ const INITIAL_STATE: FormState = {
   customer: null,
   destination: "",
   auctionSheetUrl: "",
+  stagedPhotoUrls: [],
+  stagedDocuments: [],
 
   etd: null,
   eta: null,
@@ -242,6 +255,8 @@ function buildPayload(state: FormState) {
     // Ignored by the server for edit-mode submits (not part of
     // vehicleUpdateSchema) — only meaningful on create.
     auctionSheetUrl: state.auctionSheetUrl,
+    photoUrls: state.stagedPhotoUrls,
+    documents: state.stagedDocuments,
 
     etd: state.etd,
     eta: state.eta,
@@ -359,6 +374,7 @@ export function VehicleForm({
   initialValues,
   nextFcSerial,
   nextFlSerial,
+  files,
   rowColourStatuses,
   countries,
 }: VehicleFormProps) {
@@ -747,6 +763,7 @@ export function VehicleForm({
               placeholder="ZX"
               disabled={!state.model}
               disabledHint="Select a model first"
+              error={fieldErrors.gradeId}
             />
             <NumberField
               id="yom"
@@ -767,12 +784,14 @@ export function VehicleForm({
               search={searchAuctionHallsAction}
               onCreate={createAuctionHallAction}
               onRename={(option, name) => renameAuctionHallAction(option.id, name)}
+              error={fieldErrors.auctionHallId}
             />
             <DateField
               id="purchaseDate"
               label="Purchase Date"
               value={state.purchaseDate}
               onChange={(value) => setField("purchaseDate", value)}
+              error={fieldErrors.purchaseDate}
             />
             <TextField
               id="auctionLotNo"
@@ -780,6 +799,7 @@ export function VehicleForm({
               value={state.auctionLotNo}
               onChange={(value) => setField("auctionLotNo", value)}
               maxLength={100}
+              error={fieldErrors.auctionLotNo}
             />
             <ComboboxCreate
               id="customer"
@@ -799,19 +819,6 @@ export function VehicleForm({
               value={state.destination}
               onChange={(name) => setField("destination", name)}
             />
-            {/* Create-only — editing the auction sheet happens through the
-                Files panel below the edit form instead (immediate-persist,
-                not staged form state; see FormState.auctionSheetUrl). */}
-            {mode === "create" && (
-              <div className="sm:col-span-2">
-                <span className="mb-1.5 block text-sm font-semibold">Auction Sheet</span>
-                <AuctionSheetUpload
-                  mode="stage"
-                  value={state.auctionSheetUrl}
-                  onChange={(url) => setField("auctionSheetUrl", url)}
-                />
-              </div>
-            )}
           </SectionCard>
 
           {/* ── Shipment Details (FC only) ─────────────────────────── */}
@@ -826,6 +833,7 @@ export function VehicleForm({
                 label="ETD"
                 value={state.etd}
                 onChange={(value) => setField("etd", value)}
+                error={fieldErrors.etd}
               />
               <DateField
                 id="eta"
@@ -841,6 +849,7 @@ export function VehicleForm({
                 value={state.blNo}
                 onChange={(value) => setField("blNo", value)}
                 maxLength={100}
+                error={fieldErrors.blNo}
               />
               <FreightAgentCombobox
                 id="freightAgentId"
@@ -906,6 +915,7 @@ export function VehicleForm({
                 value={state.trackingNo}
                 onChange={(value) => setField("trackingNo", value)}
                 maxLength={100}
+                error={fieldErrors.trackingNo}
               />
             </SectionCard>
           )}
@@ -921,6 +931,7 @@ export function VehicleForm({
               search={searchTransportCompaniesAction}
               onCreate={createTransportCompanyAction}
               onRename={(option, name) => renameTransportCompanyAction(option.id, name)}
+              error={fieldErrors.transportById}
             />
             <ComboboxCreate
               id="vehicleLocation"
@@ -931,12 +942,14 @@ export function VehicleForm({
               search={searchVehicleLocationsAction}
               onCreate={createVehicleLocationAction}
               onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
+              error={fieldErrors.vehicleLocationId}
             />
             <DateField
               id="massoDate"
               label="Masso Date"
               value={state.massoDate}
               onChange={(value) => setField("massoDate", value)}
+              error={fieldErrors.massoDate}
             />
             <TextField
               id="billNumber"
@@ -944,6 +957,7 @@ export function VehicleForm({
               value={state.billNumber}
               onChange={(value) => setField("billNumber", value)}
               maxLength={100}
+              error={fieldErrors.billNumber}
             />
             <TextField
               id="lcNo"
@@ -951,12 +965,14 @@ export function VehicleForm({
               value={state.lcNo}
               onChange={(value) => setField("lcNo", value)}
               maxLength={100}
+              error={fieldErrors.lcNo}
             />
             <DateField
               id="docsArrivedDate"
               label="Docs Arrived Date"
               value={state.docsArrivedDate}
               onChange={(value) => setField("docsArrivedDate", value)}
+              error={fieldErrors.docsArrivedDate}
             />
           </SectionCard>
 
@@ -982,6 +998,7 @@ export function VehicleForm({
               label="Name Change Deadline"
               value={state.nameChangeDeadline}
               onChange={(value) => setField("nameChangeDeadline", value)}
+              error={fieldErrors.nameChangeDeadline}
             />
             <div>
               <Label htmlFor="rowColourStatusId" className="mb-1.5">
@@ -1031,6 +1048,7 @@ export function VehicleForm({
               label="Doc Sent to Client"
               value={state.docSentDate}
               onChange={(value) => setField("docSentDate", value)}
+              error={fieldErrors.docSentDate}
             />
             <div className="sm:col-span-2">
               <Label htmlFor="docSentComment" className="mb-1.5">
@@ -1041,13 +1059,19 @@ export function VehicleForm({
                 value={state.docSentComment}
                 onChange={(event) => setField("docSentComment", event.target.value)}
                 maxLength={500}
+                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.docSentComment}
               />
+              {fieldErrors.docSentComment && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
+              )}
             </div>
             <DateField
               id="recycleDate"
               label="Recycle Date"
               value={state.recycleDate}
               onChange={(value) => setField("recycleDate", value)}
+              error={fieldErrors.recycleDate}
             />
             <div className="sm:col-span-2">
               <Label htmlFor="jibaishake" className="mb-1.5">
@@ -1058,7 +1082,12 @@ export function VehicleForm({
                 value={state.jibaishake}
                 onChange={(event) => setField("jibaishake", event.target.value)}
                 maxLength={500}
+                className={fieldErrors.jibaishake ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.jibaishake}
               />
+              {fieldErrors.jibaishake && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.jibaishake}</p>
+              )}
             </div>
           </SectionCard>
         </div>
@@ -1090,13 +1119,90 @@ export function VehicleForm({
                   {SHIPMENT_STATUS_META[shipmentStatus].label}
                 </Badge>
               </div>
-              {mode === "create" && (
-                <p className="border-t pt-3 text-xs text-muted-foreground">
-                  Vehicle photos and documents become available once this vehicle is saved.
-                </p>
-              )}
             </CardContent>
           </Card>
+
+          {/* ── Auction Sheet, Documents & Photos ───────────────────── */}
+          {/* Right-rail placement matches the approved design
+              (docs/designs/…10.21.10 AM (2).jpeg), extended to group Auction
+              Sheet alongside Documents/Photos, and to the edit page too
+              (same right-rail slot, same three cards — "stage" on create
+              since there's no vehicleId yet, "persist" on edit since every
+              upload/delete writes straight to the DB). */}
+          {mode === "create" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Auction Sheet</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuctionSheetUpload
+                  mode="stage"
+                  value={state.auctionSheetUrl}
+                  onChange={(url) => setField("auctionSheetUrl", url)}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {mode === "edit" && files && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Auction Sheet</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuctionSheetUpload mode="persist" vehicleId={vehicleId!} currentUrl={files.auctionSheetUrl} />
+              </CardContent>
+            </Card>
+          )}
+
+          {mode === "create" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <VehicleDocumentList
+                  mode="stage"
+                  documents={state.stagedDocuments}
+                  onChange={(documents) => setField("stagedDocuments", documents)}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {mode === "edit" && files && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <VehicleDocumentList mode="persist" vehicleId={vehicleId!} documents={files.documents} canEdit />
+              </CardContent>
+            </Card>
+          )}
+
+          {mode === "create" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Vehicle Photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <VehiclePhotoGallery
+                  mode="stage"
+                  photos={state.stagedPhotoUrls}
+                  onChange={(urls) => setField("stagedPhotoUrls", urls)}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {mode === "edit" && files && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Vehicle Photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <VehiclePhotoGallery mode="persist" vehicleId={vehicleId!} photos={files.photos} canEdit />
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
             <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
@@ -1129,7 +1235,12 @@ export function VehicleForm({
                 onChange={(event) => setField("vehicleRemark", event.target.value)}
                 maxLength={2000}
                 rows={4}
+                className={fieldErrors.vehicleRemark ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.vehicleRemark}
               />
+              {fieldErrors.vehicleRemark && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.vehicleRemark}</p>
+              )}
             </CardContent>
           </Card>
         </div>

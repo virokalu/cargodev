@@ -1,8 +1,13 @@
 "use client";
 
 // Documents — multiple PDFs per vehicle with a filename, uploader, and date
-// (US-26). Edit-mode only, same reasoning as VehiclePhotoGallery: a
-// document's vehicleId FK can't point at a vehicle that doesn't exist yet.
+// (US-26). Two modes, same reasoning as AuctionSheetUpload (see
+// auction-sheet-upload.tsx):
+//  - "stage": Add Vehicle form — no vehicleId exists yet, each uploaded
+//    {url, name} pair is handed back via onChange and submitted with the
+//    rest of the create payload.
+//  - "persist": Edit page's Files panel — writes straight to the DB via
+//    addVehicleDocumentAction the moment each upload finishes.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,13 +18,20 @@ import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
 import { addVehicleDocumentAction, deleteVehicleDocumentAction } from "@/app/(dashboard)/vehicles/actions";
 import type { VehicleDocumentListItem } from "@/lib/services/file.service";
 
-interface DocumentUploadRowProps {
-  vehicleId: string;
-  file: File;
-  onSettled: () => void;
+export interface StagedDocument {
+  url: string;
+  name: string;
 }
 
-function DocumentUploadRow({ vehicleId, file, onSettled }: DocumentUploadRowProps) {
+interface DocumentUploadRowProps {
+  vehicleId?: string;
+  file: File;
+  onSettled: () => void;
+  /** Stage mode only — called with the R2 URL + original filename once the upload finishes. */
+  onStaged?: (document: StagedDocument) => void;
+}
+
+function DocumentUploadRow({ vehicleId, file, onSettled, onStaged }: DocumentUploadRowProps) {
   const router = useRouter();
   const { progress, error, upload } = useFileUpload();
 
@@ -28,8 +40,12 @@ function DocumentUploadRow({ vehicleId, file, onSettled }: DocumentUploadRowProp
     upload(file, { kind: "VEHICLE_DOCUMENT", vehicleId })
       .then(async (url) => {
         if (cancelled) return;
-        await addVehicleDocumentAction(vehicleId, url, file.name);
-        router.refresh();
+        if (vehicleId) {
+          await addVehicleDocumentAction(vehicleId, url, file.name);
+          router.refresh();
+        } else {
+          onStaged?.({ url, name: file.name });
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -56,13 +72,11 @@ function DocumentUploadRow({ vehicleId, file, onSettled }: DocumentUploadRowProp
   );
 }
 
-interface VehicleDocumentListProps {
-  vehicleId: string;
-  documents: VehicleDocumentListItem[];
-  canEdit: boolean;
-}
+type VehicleDocumentListProps =
+  | { mode: "persist"; vehicleId: string; documents: VehicleDocumentListItem[]; canEdit: boolean }
+  | { mode: "stage"; documents: StagedDocument[]; onChange: (documents: StagedDocument[]) => void };
 
-export function VehicleDocumentList({ vehicleId, documents, canEdit }: VehicleDocumentListProps) {
+export function VehicleDocumentList(props: VehicleDocumentListProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [inFlight, setInFlight] = useState<File[]>([]);
@@ -79,12 +93,37 @@ export function VehicleDocumentList({ vehicleId, documents, canEdit }: VehicleDo
     setInFlight((prev) => prev.filter((f) => f !== file));
   }
 
-  async function handleDelete(documentId: string) {
+  async function handleDelete(vehicleId: string, documentId: string) {
     setDeletingId(documentId);
     await deleteVehicleDocumentAction(vehicleId, documentId);
     setDeletingId(null);
     router.refresh();
   }
+
+  const canEdit = props.mode === "persist" ? props.canEdit : true;
+
+  // Normalized so the list below has one render path regardless of mode —
+  // "stage" documents have no id/uploader/date until they're actually
+  // persisted on save.
+  const items: { key: string; url: string; name: string; meta: string | null; onDelete: (() => void) | null }[] =
+    props.mode === "persist"
+      ? props.documents.map((doc) => ({
+          key: doc.id,
+          url: doc.url,
+          name: doc.name,
+          meta: `${doc.uploaderName} · ${formatDate(doc.createdAt)}`,
+          onDelete: canEdit ? () => handleDelete(props.vehicleId, doc.id) : null,
+        }))
+      : props.documents.map((doc) => ({
+          key: doc.url,
+          url: doc.url,
+          name: doc.name,
+          meta: null,
+          // No R2 cleanup here — same accepted "harmless orphan" tradeoff as
+          // AuctionSheetUpload's stage mode when a staged file is replaced
+          // before submit.
+          onDelete: () => props.onChange(props.documents.filter((d) => d.url !== doc.url)),
+        }));
 
   return (
     <div className="space-y-3">
@@ -108,44 +147,47 @@ export function VehicleDocumentList({ vehicleId, documents, canEdit }: VehicleDo
           {inFlight.map((file, i) => (
             <DocumentUploadRow
               key={`${file.name}-${i}`}
-              vehicleId={vehicleId}
+              vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
               file={file}
               onSettled={() => handleRowSettled(file)}
+              onStaged={
+                props.mode === "stage"
+                  ? (document) => props.onChange([...props.documents, document])
+                  : undefined
+              }
             />
           ))}
         </div>
       )}
 
-      {documents.length === 0 ? (
+      {items.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <FileText className="size-4" />
           No documents yet.
         </p>
       ) : (
         <div className="space-y-1.5">
-          {documents.map((doc) => (
-            <div key={doc.id} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+          {items.map((item) => (
+            <div key={item.key} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
               <FileText className="size-4 shrink-0 text-muted-foreground" />
               <a
-                href={doc.url}
+                href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 truncate font-medium hover:underline"
               >
-                {doc.name}
+                {item.name}
               </a>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {doc.uploaderName} · {formatDate(doc.createdAt)}
-              </span>
-              {canEdit && (
+              {item.meta && <span className="shrink-0 text-xs text-muted-foreground">{item.meta}</span>}
+              {item.onDelete && (
                 <button
                   type="button"
                   aria-label="Delete document"
-                  disabled={deletingId === doc.id}
-                  onClick={() => handleDelete(doc.id)}
+                  disabled={deletingId === item.key}
+                  onClick={item.onDelete}
                   className="shrink-0 text-destructive"
                 >
-                  {deletingId === doc.id ? (
+                  {deletingId === item.key ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <Trash2 className="size-4" />

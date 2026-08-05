@@ -45,8 +45,8 @@ function getClient(): S3Client {
   return client;
 }
 
-/** vehicleId is omitted only for AUCTION_SHEET during vehicle creation — no
- * vehicle row exists yet, so the object lives under a staging path instead. */
+/** vehicleId is omitted while staging any upload kind during vehicle creation —
+ * no vehicle row exists yet, so the object lives under a staging path instead. */
 export function buildObjectKey(params: {
   orgId: string;
   vehicleId?: string;

@@ -16,8 +16,10 @@ export const UPLOAD_LIMITS = {
 
 export const presignRequestSchema = z
   .object({
-    // Omitted only for AUCTION_SHEET during vehicle creation — no vehicle
-    // row exists yet to check ownership against.
+    // Omitted while staging any of the three kinds during vehicle creation —
+    // no vehicle row exists yet to check ownership against. Present for
+    // edit-mode uploads (replace auction sheet, add photo/document to an
+    // existing vehicle), where the presign route re-checks ownership.
     vehicleId: z.string().min(1).optional(),
     kind: z.enum(["AUCTION_SHEET", "VEHICLE_PHOTO", "VEHICLE_DOCUMENT"]),
     fileName: z.string().min(1).max(255),
@@ -25,13 +27,6 @@ export const presignRequestSchema = z
     fileSize: z.number().int().positive(),
   })
   .superRefine((data, ctx) => {
-    if (data.kind !== "AUCTION_SHEET" && !data.vehicleId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["vehicleId"],
-        message: "vehicleId is required.",
-      });
-    }
     const rule = UPLOAD_LIMITS[data.kind];
     if (!rule.mimeTypes.includes(data.contentType as never)) {
       ctx.addIssue({

@@ -38,9 +38,10 @@ export async function POST(request: NextRequest) {
   }
   const input = parsed.data;
 
-  // Ownership check only when a vehicleId is present (edit-mode replace, or
-  // Photos/Documents). Absent means create-time Auction Sheet staging — the
-  // role check above is the only gate in that case.
+  // Ownership check only when a vehicleId is present (edit-mode replace/add).
+  // Absent means create-time staging (Auction Sheet, Photos, or Documents,
+  // all attached once the vehicle is actually saved) — the role check above
+  // is the only gate in that case.
   if (input.vehicleId) {
     try {
       await getOwnedVehicle(session.user.orgId, input.vehicleId);
