@@ -154,6 +154,12 @@ export const vehicleCreateSchema = z
     // Only honoured by the service when isLegacyEntry && track === "FC" —
     // otherwise status stays derived from ETD (Tech Doc §1).
     shipmentStatus: z.enum(["PENDING", "BOOKING_RECEIVED", "SHIPPED"]).nullable().optional(),
+    // Create-only, like the fields above — staged during Add Vehicle via the
+    // presigned-upload flow, submitted with the rest of the create payload.
+    // Deliberately NOT in vehicleSharedFields: editing the auction sheet
+    // happens exclusively through the Files panel's immediate-persist action,
+    // never through this form's update payload (see vehicle-form.tsx).
+    auctionSheetUrl: optionalText(2000),
 
     ...vehicleSharedFields,
   })

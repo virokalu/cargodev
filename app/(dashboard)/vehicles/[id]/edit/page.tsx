@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
 import { getVehicleForEdit, type VehicleEditData } from "@/lib/services/vehicle.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
+import { listVehicleFiles } from "@/lib/services/file.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { toDateInputValue } from "@/lib/utils";
 import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form";
+import { VehicleFilesPanel } from "@/components/vehicles/vehicle-files-panel";
 
 /** Maps the DB shape to the form's shape — id/name lookup refs pass straight
  * through as ComboboxOption ({id, name}), dates become "YYYY-MM-DD" strings
@@ -71,16 +73,24 @@ export default async function EditVehiclePage({
     notFound();
   }
 
+  // Fetched after confirming the vehicle exists — listVehicleFiles does its
+  // own ownership check and would throw rather than gracefully 404 if run
+  // in parallel with a vehicle that turns out not to exist.
+  const files = await listVehicleFiles(user.orgId, vehicle.id);
+
   return (
-    <VehicleForm
-      mode="edit"
-      vehicleId={vehicle.id}
-      existingSerial={vehicle.serial}
-      existingTrack={vehicle.track}
-      existingShipmentStatus={vehicle.shipmentStatus}
-      initialValues={toFormValues(vehicle)}
-      rowColourStatuses={rowColourStatuses}
-      countries={COUNTRIES}
-    />
+    <div className="space-y-6">
+      <VehicleForm
+        mode="edit"
+        vehicleId={vehicle.id}
+        existingSerial={vehicle.serial}
+        existingTrack={vehicle.track}
+        existingShipmentStatus={vehicle.shipmentStatus}
+        initialValues={toFormValues(vehicle)}
+        rowColourStatuses={rowColourStatuses}
+        countries={COUNTRIES}
+      />
+      <VehicleFilesPanel vehicleId={vehicle.id} files={files} canEdit />
+    </div>
   );
 }

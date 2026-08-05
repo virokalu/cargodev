@@ -140,6 +140,10 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         serialNumber,
         serial,
         shipmentStatus: initialStatus,
+        // Create-only field, staged via the presigned-upload flow before the
+        // vehicle exists — see vehicle.schema.ts for why this isn't in
+        // vehicleSharedFields (edits go through the Files panel instead).
+        auctionSheetUrl: input.auctionSheetUrl,
 
         auctionItemNo: input.auctionItemNo,
         chassisNo: input.chassisNo,

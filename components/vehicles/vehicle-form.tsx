@@ -40,6 +40,7 @@ import { DateField } from "@/components/shared/date-field";
 import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobox-create";
 import { FreightAgentCombobox } from "@/components/shared/freight-agent-combobox";
 import { CountrySelect } from "@/components/shared/country-select";
+import { AuctionSheetUpload } from "@/components/shared/uploads/auction-sheet-upload";
 import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
@@ -130,6 +131,10 @@ export interface FormState {
   auctionLotNo: string;
   customer: ComboboxOption | null;
   destination: string;
+  // Create-only — staged here via the presigned-upload flow before the
+  // vehicle exists. Editing the auction sheet happens through the Files
+  // panel's immediate-persist action instead (see vehicle.schema.ts).
+  auctionSheetUrl: string;
 
   etd: string | null;
   eta: string | null;
@@ -176,6 +181,7 @@ const INITIAL_STATE: FormState = {
   auctionLotNo: "",
   customer: null,
   destination: "",
+  auctionSheetUrl: "",
 
   etd: null,
   eta: null,
@@ -233,6 +239,9 @@ function buildPayload(state: FormState) {
     auctionLotNo: state.auctionLotNo,
     customerId: state.customer?.id ?? null,
     destination: state.destination,
+    // Ignored by the server for edit-mode submits (not part of
+    // vehicleUpdateSchema) — only meaningful on create.
+    auctionSheetUrl: state.auctionSheetUrl,
 
     etd: state.etd,
     eta: state.eta,
@@ -790,6 +799,19 @@ export function VehicleForm({
               value={state.destination}
               onChange={(name) => setField("destination", name)}
             />
+            {/* Create-only — editing the auction sheet happens through the
+                Files panel below the edit form instead (immediate-persist,
+                not staged form state; see FormState.auctionSheetUrl). */}
+            {mode === "create" && (
+              <div className="sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-semibold">Auction Sheet</span>
+                <AuctionSheetUpload
+                  mode="stage"
+                  value={state.auctionSheetUrl}
+                  onChange={(url) => setField("auctionSheetUrl", url)}
+                />
+              </div>
+            )}
           </SectionCard>
 
           {/* ── Shipment Details (FC only) ─────────────────────────── */}
@@ -1068,10 +1090,11 @@ export function VehicleForm({
                   {SHIPMENT_STATUS_META[shipmentStatus].label}
                 </Badge>
               </div>
-              <p className="border-t pt-3 text-xs text-muted-foreground">
-                Auction sheet, vehicle photos and documents become available once file storage is
-                wired up — added in a follow-up task.
-              </p>
+              {mode === "create" && (
+                <p className="border-t pt-3 text-xs text-muted-foreground">
+                  Vehicle photos and documents become available once this vehicle is saved.
+                </p>
+              )}
             </CardContent>
           </Card>
 
