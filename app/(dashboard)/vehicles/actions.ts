@@ -11,6 +11,7 @@ import { ServiceError, type ServiceErrorCode } from "@/lib/errors";
 import * as vehicleService from "@/lib/services/vehicle.service";
 import * as lookupService from "@/lib/services/lookup.service";
 import * as customerService from "@/lib/services/customer.service";
+import * as fileService from "@/lib/services/file.service";
 
 // Operator's entire vehicle write access is "table level" only — the row
 // colour dropdown inline in the table. They can't add new vehicles, open the
@@ -272,4 +273,75 @@ export async function renameCustomerAction(id: string, name: string) {
   const renamed = await customerService.renameCustomer(user.orgId, id, name);
   revalidatePath("/vehicles");
   return renamed;
+}
+
+// ── Vehicle files (auction sheet, photos, documents) ──────────────────────
+
+export type FileMutationResult = { ok: true } | { ok: false; message: string };
+
+export async function setAuctionSheetAction(vehicleId: string, url: string): Promise<FileMutationResult> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await fileService.setAuctionSheet(user, vehicleId, url);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+export async function addVehiclePhotoAction(vehicleId: string, url: string): Promise<FileMutationResult> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await fileService.addVehiclePhoto(user, vehicleId, url);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+export async function deleteVehiclePhotoAction(vehicleId: string, photoId: string): Promise<FileMutationResult> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await fileService.deleteVehiclePhoto(user, vehicleId, photoId);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+export async function addVehicleDocumentAction(
+  vehicleId: string,
+  url: string,
+  name: string
+): Promise<FileMutationResult> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await fileService.addVehicleDocument(user, vehicleId, url, name);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+export async function deleteVehicleDocumentAction(
+  vehicleId: string,
+  documentId: string
+): Promise<FileMutationResult> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await fileService.deleteVehicleDocument(user, vehicleId, documentId);
+    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, message: error.message };
+    throw error;
+  }
 }

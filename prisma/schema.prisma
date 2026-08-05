@@ -102,6 +102,8 @@ model User {
   vehicles     Vehicle[]    @relation("CustomerVehicles")
   activityLogs ActivityLog[]
   notifications Notification[]
+  uploadedPhotos    VehiclePhoto[]
+  uploadedDocuments VehicleDocument[]
 
   @@unique([org_id, email])
   @@index([org_id, userType])
@@ -369,25 +371,29 @@ model Vehicle {
 
 // Multiple photos per vehicle
 model VehiclePhoto {
-  id        String   @id @default(cuid())
-  vehicleId String
-  url       String   // Cloudflare R2 URL (presigned for uploads, standard for reads)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  vehicleId    String
+  url          String   // Cloudflare R2 URL (presigned for uploads, standard for reads)
+  uploadedById String
+  createdAt    DateTime @default(now())
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
 
   @@index([vehicleId])
 }
 
 // Multiple documents per vehicle (B/L, export cert, invoices, etc.)
 model VehicleDocument {
-  id        String   @id @default(cuid())
-  vehicleId String
-  url       String
-  name      String   // Original filename shown in the UI
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  vehicleId    String
+  url          String
+  name         String   // Original filename shown in the UI
+  uploadedById String
+  createdAt    DateTime @default(now())
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
 
   @@index([vehicleId])
 }

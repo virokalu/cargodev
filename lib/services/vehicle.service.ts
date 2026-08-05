@@ -140,6 +140,10 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         serialNumber,
         serial,
         shipmentStatus: initialStatus,
+        // Create-only field, staged via the presigned-upload flow before the
+        // vehicle exists — see vehicle.schema.ts for why this isn't in
+        // vehicleSharedFields (edits go through the Files panel instead).
+        auctionSheetUrl: input.auctionSheetUrl,
 
         auctionItemNo: input.auctionItemNo,
         chassisNo: input.chassisNo,
@@ -199,6 +203,36 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
           trigger: "ETD_SAVED",
           triggeredBy: user.id,
         },
+      });
+    }
+
+    // Photos/Documents staged via the presigned-upload flow before the
+    // vehicle existed (like auctionSheetUrl above) — attach them now that
+    // created.id exists, still inside this transaction. Logged with the same
+    // action names file.service.ts uses for the post-creation path, so the
+    // audit trail reads the same either way.
+    for (const url of input.photoUrls) {
+      const photo = await tx.vehiclePhoto.create({ data: { vehicleId: created.id, url, uploadedById: user.id } });
+      await activityLog.record(tx, {
+        orgId: user.orgId,
+        actorId: user.id,
+        action: "ADD_VEHICLE_PHOTO",
+        entity: "VehiclePhoto",
+        entityId: photo.id,
+        after: { url },
+      });
+    }
+    for (const document of input.documents) {
+      const createdDocument = await tx.vehicleDocument.create({
+        data: { vehicleId: created.id, url: document.url, name: document.name, uploadedById: user.id },
+      });
+      await activityLog.record(tx, {
+        orgId: user.orgId,
+        actorId: user.id,
+        action: "ADD_VEHICLE_DOCUMENT",
+        entity: "VehicleDocument",
+        entityId: createdDocument.id,
+        after: { url: document.url, name: document.name },
       });
     }
 

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
 import { getVehicleForEdit, type VehicleEditData } from "@/lib/services/vehicle.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
+import { listVehicleFiles } from "@/lib/services/file.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { toDateInputValue } from "@/lib/utils";
 import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form";
@@ -71,6 +72,11 @@ export default async function EditVehiclePage({
     notFound();
   }
 
+  // Fetched after confirming the vehicle exists — listVehicleFiles does its
+  // own ownership check and would throw rather than gracefully 404 if run
+  // in parallel with a vehicle that turns out not to exist.
+  const files = await listVehicleFiles(user.orgId, vehicle.id);
+
   return (
     <VehicleForm
       mode="edit"
@@ -79,6 +85,7 @@ export default async function EditVehiclePage({
       existingTrack={vehicle.track}
       existingShipmentStatus={vehicle.shipmentStatus}
       initialValues={toFormValues(vehicle)}
+      files={files}
       rowColourStatuses={rowColourStatuses}
       countries={COUNTRIES}
     />
