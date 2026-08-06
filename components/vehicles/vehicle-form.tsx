@@ -19,9 +19,13 @@ import {
   Loader2,
   AlertTriangle,
   Save,
+  Info,
+  FileText,
+  Folder,
+  Image as ImageIcon,
+  StickyNote,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -1094,33 +1098,30 @@ export function VehicleForm({
 
         {/* ── Right rail ─────────────────────────────────────────── */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Track</span>
-                <Badge variant="outline">{state.track}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Serial</span>
-                <span className="font-mono">
-                  {state.isLegacyEntry
+          <SectionCard icon={Info} title="Summary" contentClassName="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Track</span>
+              <Badge variant="outline">{state.track}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Serial</span>
+              <span className="font-mono">
+                {mode === "edit"
+                  ? existingSerial
+                  : state.isLegacyEntry
                     ? state.legacySerialNumberText
                       ? `${state.track}${state.legacySerialNumberText}`
                       : "—"
                     : nextSerialPreview}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
-                  {SHIPMENT_STATUS_META[shipmentStatus].label}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                {SHIPMENT_STATUS_META[shipmentStatus].label}
+              </Badge>
+            </div>
+          </SectionCard>
 
           {/* ── Auction Sheet, Documents & Photos ───────────────────── */}
           {/* Right-rail placement matches the approved design
@@ -1130,100 +1131,65 @@ export function VehicleForm({
               since there's no vehicleId yet, "persist" on edit since every
               upload/delete writes straight to the DB). */}
           {mode === "create" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Auction Sheet</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AuctionSheetUpload
-                  mode="stage"
-                  value={state.auctionSheetUrl}
-                  onChange={(url) => setField("auctionSheetUrl", url)}
-                />
-              </CardContent>
-            </Card>
-          )}
-          {mode === "edit" && files && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Auction Sheet</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AuctionSheetUpload mode="persist" vehicleId={vehicleId!} currentUrl={files.auctionSheetUrl} />
-              </CardContent>
-            </Card>
-          )}
-
-          {mode === "create" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VehicleDocumentList
-                  mode="stage"
-                  documents={state.stagedDocuments}
-                  onChange={(documents) => setField("stagedDocuments", documents)}
-                />
-              </CardContent>
-            </Card>
-          )}
-          {mode === "edit" && files && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VehicleDocumentList mode="persist" vehicleId={vehicleId!} documents={files.documents} canEdit />
-              </CardContent>
-            </Card>
-          )}
-
-          {mode === "create" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Vehicle Photos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VehiclePhotoGallery
-                  mode="stage"
-                  photos={state.stagedPhotoUrls}
-                  onChange={(urls) => setField("stagedPhotoUrls", urls)}
-                />
-              </CardContent>
-            </Card>
-          )}
-          {mode === "edit" && files && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Vehicle Photos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VehiclePhotoGallery mode="persist" vehicleId={vehicleId!} photos={files.photos} canEdit />
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Vehicle Remark</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                id="vehicleRemark"
-                placeholder="Add a note about this vehicle…"
-                value={state.vehicleRemark}
-                onChange={(event) => setField("vehicleRemark", event.target.value)}
-                maxLength={2000}
-                rows={4}
-                className={fieldErrors.vehicleRemark ? "border-destructive" : undefined}
-                aria-invalid={!!fieldErrors.vehicleRemark}
+            <SectionCard icon={FileText} title="Auction Sheet" contentClassName="">
+              <AuctionSheetUpload
+                mode="stage"
+                value={state.auctionSheetUrl}
+                onChange={(url) => setField("auctionSheetUrl", url)}
               />
-              {fieldErrors.vehicleRemark && (
-                <p className="mt-1 text-xs text-destructive">{fieldErrors.vehicleRemark}</p>
-              )}
-            </CardContent>
-          </Card>
+            </SectionCard>
+          )}
+          {mode === "edit" && files && (
+            <SectionCard icon={FileText} title="Auction Sheet" contentClassName="">
+              <AuctionSheetUpload mode="persist" vehicleId={vehicleId!} currentUrl={files.auctionSheetUrl} />
+            </SectionCard>
+          )}
+
+          {mode === "create" && (
+            <SectionCard icon={Folder} title="Documents" contentClassName="">
+              <VehicleDocumentList
+                mode="stage"
+                documents={state.stagedDocuments}
+                onChange={(documents) => setField("stagedDocuments", documents)}
+              />
+            </SectionCard>
+          )}
+          {mode === "edit" && files && (
+            <SectionCard icon={Folder} title="Documents" contentClassName="">
+              <VehicleDocumentList mode="persist" vehicleId={vehicleId!} documents={files.documents} canEdit />
+            </SectionCard>
+          )}
+
+          {mode === "create" && (
+            <SectionCard icon={ImageIcon} title="Vehicle Photos" contentClassName="">
+              <VehiclePhotoGallery
+                mode="stage"
+                photos={state.stagedPhotoUrls}
+                onChange={(urls) => setField("stagedPhotoUrls", urls)}
+              />
+            </SectionCard>
+          )}
+          {mode === "edit" && files && (
+            <SectionCard icon={ImageIcon} title="Vehicle Photos" contentClassName="">
+              <VehiclePhotoGallery mode="persist" vehicleId={vehicleId!} photos={files.photos} canEdit />
+            </SectionCard>
+          )}
+
+          <SectionCard icon={StickyNote} title="Vehicle Remark" contentClassName="">
+            <Textarea
+              id="vehicleRemark"
+              placeholder="Add a note about this vehicle…"
+              value={state.vehicleRemark}
+              onChange={(event) => setField("vehicleRemark", event.target.value)}
+              maxLength={2000}
+              rows={4}
+              className={fieldErrors.vehicleRemark ? "border-destructive" : undefined}
+              aria-invalid={!!fieldErrors.vehicleRemark}
+            />
+            {fieldErrors.vehicleRemark && (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.vehicleRemark}</p>
+            )}
+          </SectionCard>
 
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
             <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
