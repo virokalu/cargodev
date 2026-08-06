@@ -1204,25 +1204,6 @@ export function VehicleForm({
             </Card>
           )}
 
-          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-            <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
-              {submitting ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
-              {mode === "edit" ? "Update Vehicle" : "Save Vehicle"}
-            </Button>
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={<Link href="/vehicles" />}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </div>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg font-bold">Vehicle Remark</CardTitle>
@@ -1243,6 +1224,25 @@ export function VehicleForm({
               )}
             </CardContent>
           </Card>
+
+          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+            <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
+              {submitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {mode === "edit" ? "Update Vehicle" : "Save Vehicle"}
+            </Button>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link href="/vehicles" />}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>
     </div>
