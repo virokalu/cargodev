@@ -22,7 +22,15 @@ import { useRouter } from "next/navigation";
 import { TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-const INTERACTIVE_SELECTOR = "a, button, [role='button'], select, input";
+// [data-slot="select-content"] covers the Auction Bill Paid / Row Colour
+// Status dropdowns' *popup* specifically — Base UI's Select renders it
+// through a Portal, so its DOM lives outside this row entirely, but React
+// still bubbles the click through the component tree (JSX ancestry, not
+// DOM ancestry) up to this row's onClick. Without this, event.target on a
+// selected option is a plain <div> that the plain "a, button, ..." check
+// below doesn't recognize as interactive, so choosing an option was
+// wrongly treated as "click landed on cell content" and navigated away.
+const INTERACTIVE_SELECTOR = "a, button, [role='button'], select, input, [data-slot='select-content']";
 
 const RowHoverContext = createContext<{
   hoveredId: string | null;
