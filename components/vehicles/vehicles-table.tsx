@@ -31,7 +31,7 @@ import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
-import { ClickableRow } from "@/components/vehicles/clickable-row";
+import { ClickableRow, RowHoverProvider } from "@/components/vehicles/clickable-row";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -309,6 +309,7 @@ export function VehiclesTable({
           No vehicles match your search and filters.
         </div>
       ) : (
+        <RowHoverProvider>
         <StatusScrollProvider>
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
@@ -339,23 +340,14 @@ export function VehiclesTable({
                     return (
                       <ClickableRow
                         key={row.id}
+                        id={row.id}
                         href={`/vehicles/${row.id}`}
                         className={ROW_HEIGHT_CLASS}
-                        style={{ backgroundColor: rowBg }}
+                        rowColour={rowBg}
                       >
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("font-mono font-medium", !rowBg && "bg-card")}
-                        >
-                          {row.serial}
-                        </TableCell>
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("font-mono text-xs", !rowBg && "bg-card")}
-                        >
-                          {row.chassisNo ?? "—"}
-                        </TableCell>
-                        <TableCell style={{ backgroundColor: rowBg }} className={cn(!rowBg && "bg-card")}>
+                        <TableCell className="font-mono font-medium">{row.serial}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.chassisNo ?? "—"}</TableCell>
+                        <TableCell>
                           {row.brandName || row.modelName ? (
                             <>
                               {/* max-w-[206px] = the 220px column minus TableCell's own p-2
@@ -382,7 +374,7 @@ export function VehiclesTable({
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell style={{ backgroundColor: rowBg }} className={cn(!rowBg && "bg-card")}>
+                        <TableCell>
                           <div className="flex items-center gap-1.5">
                             <StatusScrollDot status={row.effectiveShipmentStatus} />
                             {canEditVehicle || canDelete ? (
@@ -444,9 +436,10 @@ export function VehiclesTable({
                     return (
                       <ClickableRow
                         key={row.id}
+                        id={row.id}
                         href={`/vehicles/${row.id}`}
                         className={ROW_HEIGHT_CLASS}
-                        style={{ backgroundColor: rowBg }}
+                        rowColour={rowBg}
                       >
                         {SCROLL_COLUMNS.map((column, i) => (
                           <TableCell
@@ -465,6 +458,7 @@ export function VehiclesTable({
             </div>
           </div>
         </StatusScrollProvider>
+        </RowHoverProvider>
       )}
 
       <div className="flex items-center justify-between">

@@ -6,15 +6,22 @@
 
 import type { ShipmentStatus, StorableShipmentStatus } from "@/lib/constants/shipment-status";
 
-/** The one row colour status that overrides shipment status to Cancelled
- * (FC only — see computeEffectiveShipmentStatus). Matched by name against
- * the existing seeded "Unit Canceled" row colour status — there's no
- * separate flag or DB column for this, same as how "Transport Complete"
- * is its own special-cased name for the transportCellOnly behaviour. */
-const CANCEL_SHIPMENT_ROW_COLOUR_NAME = "Unit Canceled";
+/** The row colour statuses that override shipment status to Cancelled (FC
+ * only — see computeEffectiveShipmentStatus). Matched by name against the
+ * existing seeded row colour statuses — there's no separate flag or DB
+ * column for this, same as how "Transport Complete" is its own
+ * special-cased name for the transportCellOnly behaviour. "Unit Canceled"
+ * is the literal cancellation; "Resold in Auction" means the vehicle never
+ * shipped to this customer either, so it reads the same way. */
+// Exported (not just the predicate below) so the vehicle list's Prisma
+// where-clause filter (vehicle.service.ts's CANCELLED_WHERE) can match the
+// same names instead of hand-keeping its own "Unit Canceled" literal in
+// sync with this one.
+export const CANCEL_SHIPMENT_ROW_COLOUR_NAMES = ["Unit Canceled", "Resold in Auction"] as const;
 
 export function isCancelShipmentRowColour(rowColourStatusName: string | null | undefined): boolean {
-  return rowColourStatusName === CANCEL_SHIPMENT_ROW_COLOUR_NAME;
+  if (!rowColourStatusName) return false;
+  return (CANCEL_SHIPMENT_ROW_COLOUR_NAMES as readonly string[]).includes(rowColourStatusName);
 }
 
 export function todayAtMidnight(): Date {
@@ -30,10 +37,10 @@ export function todayAtMidnight(): Date {
  * edit that changes ETD) catches up for real.
  *
  * `cancelled` works the same way: true whenever the vehicle is FC and its
- * current row colour status is "Unit Canceled" — never stored, purely
- * computed, and immediately reactive to changing the row colour away from
- * it (callers pass `false` for FL vehicles, since shipment status isn't
- * tracked for FL at all). */
+ * current row colour status is one of CANCEL_SHIPMENT_ROW_COLOUR_NAMES —
+ * never stored, purely computed, and immediately reactive to changing the
+ * row colour away from it (callers pass `false` for FL vehicles, since
+ * shipment status isn't tracked for FL at all). */
 export function computeEffectiveShipmentStatus(
   status: StorableShipmentStatus,
   etd: Date | null,

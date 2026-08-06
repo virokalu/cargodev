@@ -412,8 +412,9 @@ export function VehicleForm({
   // comparing against the ETD as it was when the page loaded (hadEtd);
   // computeEffectiveShipmentStatus on top handles picking an ETD that's
   // already in the past showing as Shipped immediately, same as the table —
-  // and the same treatment for picking "Unit Canceled" as the Row Colour
-  // Status field right here in the form, not just the table's inline editor.
+  // and the same treatment for picking a cancel-triggering Row Colour
+  // Status (CANCEL_SHIPMENT_ROW_COLOUR_NAMES) right here in the form, not
+  // just the table's inline editor.
   const liveEtd = state.etd ? new Date(state.etd) : null;
   const liveRowColourName = rowColourStatuses.find(
     (status) => status.id === state.rowColourStatusId

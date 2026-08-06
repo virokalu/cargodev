@@ -25,6 +25,7 @@ import {
   deriveShipmentStatusFromEtd,
   isCancelShipmentRowColour,
   todayAtMidnight,
+  CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
 } from "@/lib/shipment-status";
 
 export async function createVehicle(user: SessionUser, rawInput: unknown): Promise<Vehicle> {
@@ -742,7 +743,7 @@ export async function updateVehicleAuctionBillPaid(
 // CANCELLED branch below and an exclusion on the other three branches.
 const CANCELLED_WHERE: Prisma.VehicleWhereInput = {
   serialPrefix: "FC",
-  rowColourStatus: { name: "Unit Canceled" },
+  rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } },
 };
 
 /** Same effective-status guard as computeEffectiveShipmentStatus, expressed
@@ -1098,8 +1099,9 @@ export async function listVehicles(
   // Shipment Status can't be sorted with a DB-level ORDER BY: the column
   // only ever holds the 3 storable values, but the table displays (and
   // this sort has to match) the *effective* status — also dependent on ETD
-  // and the "Unit Canceled" row colour, a JS-computed value with no real
-  // column behind it (see lib/shipment-status.ts). So this one sort key
+  // and the cancel-triggering row colours (CANCEL_SHIPMENT_ROW_COLOUR_NAMES),
+  // a JS-computed value with no real column behind it (see
+  // lib/shipment-status.ts). So this one sort key
   // fetches every matching row instead of a single DB page, sorts by the
   // same computeEffectiveShipmentStatus the table renders, then paginates
   // in memory. Fine at this app's scale (Phase 1, single org, 6-8 staff);
