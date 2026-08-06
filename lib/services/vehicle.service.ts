@@ -286,7 +286,7 @@ interface LookupRef {
   name: string;
 }
 
-export interface VehicleEditData {
+export interface VehicleDetailData {
   id: string;
   serial: string;
   track: SerialPrefix;
@@ -323,7 +323,7 @@ export interface VehicleEditData {
   logBook: boolean | null;
   extraKey: boolean | null;
   nameChangeDeadline: Date | null;
-  rowColourStatusId: string | null;
+  rowColourStatus: { id: string; name: string; colour: string } | null;
   docSentDate: Date | null;
   docSentComment: string | null;
   recycleDate: Date | null;
@@ -331,10 +331,12 @@ export interface VehicleEditData {
   vehicleRemark: string | null;
 }
 
-/** Fetches a vehicle shaped for the edit form. Returns null if it doesn't
- * exist or belongs to a different org (the edit page treats both as 404 —
- * never leak which org a given id belongs to). */
-export async function getVehicleForEdit(orgId: string, id: string): Promise<VehicleEditData | null> {
+/** Fetches a vehicle shaped for display — the edit form and the read-only
+ * detail page (US-10) both need every field, just one renders them as
+ * inputs and the other as plain text. Returns null if it doesn't exist or
+ * belongs to a different org (both callers treat that as 404 — never leak
+ * which org a given id belongs to). */
+export async function getVehicleDetail(orgId: string, id: string): Promise<VehicleDetailData | null> {
   const vehicle = await prisma.vehicle.findUnique({
     where: { id },
     select: {
@@ -363,7 +365,6 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       logBook: true,
       extraKey: true,
       nameChangeDeadline: true,
-      rowColourStatusId: true,
       docSentDate: true,
       docSentComment: true,
       recycleDate: true,
@@ -377,7 +378,7 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       packingAgent: { select: { id: true, name: true } },
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
-      rowColourStatus: { select: { name: true } },
+      rowColourStatus: { select: { id: true, name: true, colour: true } },
     },
   });
 
@@ -426,13 +427,63 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     logBook: vehicle.logBook,
     extraKey: vehicle.extraKey,
     nameChangeDeadline: vehicle.nameChangeDeadline,
-    rowColourStatusId: vehicle.rowColourStatusId,
+    rowColourStatus: vehicle.rowColourStatus,
     docSentDate: vehicle.docSentDate,
     docSentComment: vehicle.docSentComment,
     recycleDate: vehicle.recycleDate,
     jibaishake: vehicle.jibaishake,
     vehicleRemark: vehicle.vehicleRemark,
   };
+}
+
+const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
+  ETD_SAVED: "ETD saved",
+  ETD_CLEARED: "ETD cleared",
+  CRON_JOB: "Automatic — daily job",
+  COMPUTED_GUARD: "Computed on read",
+  LEGACY_ENTRY: "Entered manually (legacy)",
+};
+
+export interface StatusHistoryItem {
+  id: string;
+  fromStatus: ShipmentStatus | null;
+  toStatus: ShipmentStatus;
+  triggerLabel: string;
+  /** null = System (cron/computed guard, no staff action). */
+  triggeredByName: string | null;
+  createdAt: Date;
+}
+
+/** US-17: "every status change with who/what triggered it and when."
+ * Chronological (oldest first) so the timeline UI can just render top to
+ * bottom. FL vehicles never get StatusHistory rows (shipment status isn't
+ * tracked for FL at all — CLAUDE.md), so this naturally comes back empty
+ * for them; callers don't need a separate FC check to call it safely, just
+ * to decide whether to render the section at all. */
+export async function listVehicleStatusHistory(orgId: string, vehicleId: string): Promise<StatusHistoryItem[]> {
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { org_id: true } });
+  if (!vehicle || vehicle.org_id !== orgId) return [];
+
+  const rows = await prisma.statusHistory.findMany({
+    where: { vehicleId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, fromStatus: true, toStatus: true, trigger: true, triggeredBy: true, createdAt: true },
+  });
+
+  const actorIds = [...new Set(rows.map((r) => r.triggeredBy).filter((id): id is string => id !== null))];
+  const actors = actorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+    : [];
+  const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
+
+  return rows.map((row) => ({
+    id: row.id,
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    triggerLabel: STATUS_HISTORY_TRIGGER_LABEL[row.trigger] ?? row.trigger,
+    triggeredByName: row.triggeredBy ? (actorNameById.get(row.triggeredBy) ?? null) : null,
+    createdAt: row.createdAt,
+  }));
 }
 
 async function assertVehicleInOrg(orgId: string, id: string) {

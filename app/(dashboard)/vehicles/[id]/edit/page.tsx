@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
-import { getVehicleForEdit, type VehicleEditData } from "@/lib/services/vehicle.service";
+import { getVehicleDetail, type VehicleDetailData } from "@/lib/services/vehicle.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
 import { listVehicleFiles } from "@/lib/services/file.service";
 import { COUNTRIES } from "@/lib/constants/countries";
@@ -11,7 +11,7 @@ import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form"
  * through as ComboboxOption ({id, name}), dates become "YYYY-MM-DD" strings
  * (what a native <input type="date"> produces/expects), everything else is
  * a direct field-for-field copy. */
-function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
+function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
   return {
     auctionItemNo: vehicle.auctionItemNo ?? "",
     chassisNo: vehicle.chassisNo ?? "",
@@ -44,7 +44,7 @@ function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
     logBook: vehicle.logBook,
     extraKey: vehicle.extraKey,
     nameChangeDeadline: toDateInputValue(vehicle.nameChangeDeadline),
-    rowColourStatusId: vehicle.rowColourStatusId ?? "",
+    rowColourStatusId: vehicle.rowColourStatus?.id ?? "",
     docSentDate: toDateInputValue(vehicle.docSentDate),
     docSentComment: vehicle.docSentComment ?? "",
     recycleDate: toDateInputValue(vehicle.recycleDate),
@@ -64,7 +64,7 @@ export default async function EditVehiclePage({
   const { id } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([
-    getVehicleForEdit(user.orgId, id),
+    getVehicleDetail(user.orgId, id),
     listRowColourStatuses(user.orgId),
   ]);
 

@@ -26,9 +26,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cell";
+import { TriStateCell } from "@/components/shared/tri-state-cell";
+import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
+import { ClickableRow } from "@/components/vehicles/clickable-row";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -105,24 +108,6 @@ function SortableHeader({
       {label}
       <Icon className={cn("size-3.5", isActive ? "text-foreground" : "text-muted-foreground/50")} />
     </Link>
-  );
-}
-
-function TriStateCell({ value }: { value: boolean | null }) {
-  if (value === null) return <span className="text-muted-foreground">—</span>;
-  return <Badge variant={value ? "success" : "secondary"}>{value ? "Yes" : "No"}</Badge>;
-}
-
-function RowColourCell({ status }: { status: VehicleListRow["rowColourStatus"] }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="inline-block size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: status.colour }}
-      />
-      {status.name}
-    </span>
   );
 }
 
@@ -352,7 +337,12 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <TableRow key={row.id} className={ROW_HEIGHT_CLASS} style={{ backgroundColor: rowBg }}>
+                      <ClickableRow
+                        key={row.id}
+                        href={`/vehicles/${row.id}`}
+                        className={ROW_HEIGHT_CLASS}
+                        style={{ backgroundColor: rowBg }}
+                      >
                         <TableCell
                           style={{ backgroundColor: rowBg }}
                           className={cn("font-mono font-medium", !rowBg && "bg-card")}
@@ -413,7 +403,7 @@ export function VehiclesTable({
                             )}
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </ClickableRow>
                     );
                   })}
                 </TableBody>
@@ -452,7 +442,12 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <TableRow key={row.id} className={ROW_HEIGHT_CLASS} style={{ backgroundColor: rowBg }}>
+                      <ClickableRow
+                        key={row.id}
+                        href={`/vehicles/${row.id}`}
+                        className={ROW_HEIGHT_CLASS}
+                        style={{ backgroundColor: rowBg }}
+                      >
                         {SCROLL_COLUMNS.map((column, i) => (
                           <TableCell
                             key={column.key}
@@ -462,7 +457,7 @@ export function VehiclesTable({
                             {column.render(row, columnContext)}
                           </TableCell>
                         ))}
-                      </TableRow>
+                      </ClickableRow>
                     );
                   })}
                 </TableBody>
