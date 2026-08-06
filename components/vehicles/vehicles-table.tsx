@@ -365,17 +365,25 @@ export function VehiclesTable({
                         >
                           {row.chassisNo ?? "—"}
                         </TableCell>
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("whitespace-normal", !rowBg && "bg-card")}
-                        >
+                        <TableCell style={{ backgroundColor: rowBg }} className={cn(!rowBg && "bg-card")}>
                           {row.brandName || row.modelName ? (
                             <>
-                              <div className="font-medium">
+                              {/* max-w-[206px] = the 220px column minus TableCell's own p-2
+                                  (14px at this app's 14px root) — width/min-width on the
+                                  <th> above is only an auto-layout *hint*, so truncate's
+                                  overflow:hidden needs a real width on the element itself
+                                  to actually have something to clip against. */}
+                              <div
+                                className="max-w-[206px] truncate font-medium"
+                                title={[row.brandName, row.modelName].filter(Boolean).join(" ")}
+                              >
                                 {[row.brandName, row.modelName].filter(Boolean).join(" ")}
                               </div>
                               {(row.gradeName || row.yom) && (
-                                <div className="text-xs text-muted-foreground">
+                                <div
+                                  className="max-w-[206px] truncate text-xs text-muted-foreground"
+                                  title={[row.gradeName, row.yom].filter(Boolean).join(" - ")}
+                                >
                                   {[row.gradeName, row.yom].filter(Boolean).join(" - ")}
                                 </div>
                               )}
