@@ -12,6 +12,7 @@ import { ReportGroupCard } from "@/components/reports/report-group-card";
 import { ReportHeader } from "@/components/reports/report-header";
 import { ReportSearchInput } from "@/components/reports/report-search-input";
 import { ReportSelectFilter } from "@/components/reports/report-select-filter";
+import { ReportStickyHeader } from "@/components/reports/report-sticky-header";
 import { ReportSummaryTile } from "@/components/reports/report-summary-tile";
 import { ReportTabs, type ReportTab } from "@/components/reports/report-tabs";
 import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
@@ -74,58 +75,60 @@ export function AuctionHallReportPanel({
 
   return (
     <div className="space-y-6">
-      <ReportHeader
-        onExportPdf={() => exportAuctionHallReportToPdf(filtered)}
-        onExportCsv={() => exportAuctionHallReportToCsv(filtered)}
-        exportDisabled={!hasResults}
-      />
+      <ReportStickyHeader>
+        <ReportHeader
+          onExportPdf={() => exportAuctionHallReportToPdf(filtered)}
+          onExportCsv={() => exportAuctionHallReportToCsv(filtered)}
+          exportDisabled={!hasResults}
+        />
 
-      <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+        <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ReportSummaryTile
-          icon={Gavel}
-          tone="primary"
-          value={totals.totalAuctionHalls}
-          label="Auction halls in report"
-          sublabel="matching current filters"
-        />
-        <ReportSummaryTile
-          icon={Car}
-          tone="info"
-          value={totals.totalVehicles}
-          label="Vehicles listed"
-          sublabel="across all auction halls"
-        />
-        <ReportSummaryTile
-          icon={Ban}
-          tone="destructive"
-          value={totals.totalCancelled}
-          label="Shipment Cancelled"
-          sublabel="no longer being shipped"
-        />
-      </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <ReportSummaryTile
+            icon={Gavel}
+            tone="primary"
+            value={totals.totalAuctionHalls}
+            label="Auction halls in report"
+            sublabel="matching current filters"
+          />
+          <ReportSummaryTile
+            icon={Car}
+            tone="info"
+            value={totals.totalVehicles}
+            label="Vehicles listed"
+            sublabel="across all auction halls"
+          />
+          <ReportSummaryTile
+            icon={Ban}
+            tone="destructive"
+            value={totals.totalCancelled}
+            label="Shipment Cancelled"
+            sublabel="no longer being shipped"
+          />
+        </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <ReportSearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search auction hall, lot, vehicle ID or model…"
-        />
-        <ReportSelectFilter
-          value={auctionHallId}
-          onChange={setAuctionHallId}
-          allLabel="All auction halls"
-          className="w-full sm:w-[200px]"
-          options={auctionHallOptions.map((option) => ({ value: option.id, label: option.name }))}
-        />
-        <ReportSelectFilter
-          value={status}
-          onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
-          allLabel="All statuses"
-          options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
-        />
-      </div>
+        <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center">
+          <ReportSearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search auction hall, lot, vehicle ID or model…"
+          />
+          <ReportSelectFilter
+            value={auctionHallId}
+            onChange={setAuctionHallId}
+            allLabel="All auction halls"
+            className="w-full sm:w-[200px]"
+            options={auctionHallOptions.map((option) => ({ value: option.id, label: option.name }))}
+          />
+          <ReportSelectFilter
+            value={status}
+            onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
+            allLabel="All statuses"
+            options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
+          />
+        </div>
+      </ReportStickyHeader>
 
       <div className="space-y-3">
         {hasResults ? (

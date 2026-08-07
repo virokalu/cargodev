@@ -11,6 +11,7 @@ import { ReportGroupCard } from "@/components/reports/report-group-card";
 import { ReportHeader } from "@/components/reports/report-header";
 import { ReportSearchInput } from "@/components/reports/report-search-input";
 import { ReportSelectFilter } from "@/components/reports/report-select-filter";
+import { ReportStickyHeader } from "@/components/reports/report-sticky-header";
 import { ReportSummaryTile } from "@/components/reports/report-summary-tile";
 import { ReportTabs, type ReportTab } from "@/components/reports/report-tabs";
 import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
@@ -121,70 +122,72 @@ export function CustomerVehicleReportPanel({
 
   return (
     <div className="space-y-6">
-      <ReportHeader
-        onExportPdf={() => exportCustomerReportToPdf(filtered)}
-        onExportCsv={() => exportCustomerReportToCsv(filtered)}
-        exportDisabled={!hasResults}
-      />
+      <ReportStickyHeader>
+        <ReportHeader
+          onExportPdf={() => exportCustomerReportToPdf(filtered)}
+          onExportCsv={() => exportCustomerReportToCsv(filtered)}
+          exportDisabled={!hasResults}
+        />
 
-      <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+        <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ReportSummaryTile
-          icon={Users}
-          tone="primary"
-          value={totals.totalCustomers}
-          label="Customers in report"
-          sublabel="matching current filters"
-        />
-        <ReportSummaryTile
-          icon={Car}
-          tone="info"
-          value={totals.totalVehicles}
-          label="Vehicles listed"
-          sublabel="across all customers"
-        />
-        <ReportSummaryTile
-          icon={Ban}
-          tone="destructive"
-          value={totals.totalCancelled}
-          label="Shipment Cancelled"
-          sublabel="no longer being shipped"
-        />
-      </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <ReportSummaryTile
+            icon={Users}
+            tone="primary"
+            value={totals.totalCustomers}
+            label="Customers in report"
+            sublabel="matching current filters"
+          />
+          <ReportSummaryTile
+            icon={Car}
+            tone="info"
+            value={totals.totalVehicles}
+            label="Vehicles listed"
+            sublabel="across all customers"
+          />
+          <ReportSummaryTile
+            icon={Ban}
+            tone="destructive"
+            value={totals.totalCancelled}
+            label="Shipment Cancelled"
+            sublabel="no longer being shipped"
+          />
+        </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <ReportSearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search customer, vehicle ID, chassis or model…"
-        />
-        <ReportSelectFilter
-          value={customerId}
-          onChange={setCustomerId}
-          allLabel="All customers"
-          className="w-full sm:w-[200px]"
-          options={customerOptions.map((option) => ({ value: option.id, label: option.name }))}
-        />
-        <ReportSelectFilter
-          value={status}
-          onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
-          allLabel="All statuses"
-          options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
-        />
-        <ReportSelectFilter
-          value={destination}
-          onChange={setDestination}
-          allLabel="All destinations"
-          options={destinationOptions.map((option) => ({ value: option, label: option }))}
-        />
-        <ReportSelectFilter
-          value={auctionHall}
-          onChange={setAuctionHall}
-          allLabel="All auction halls"
-          options={auctionHallOptions.map((option) => ({ value: option, label: option }))}
-        />
-      </div>
+        <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center">
+          <ReportSearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search customer, vehicle ID, chassis or model…"
+          />
+          <ReportSelectFilter
+            value={customerId}
+            onChange={setCustomerId}
+            allLabel="All customers"
+            className="w-full sm:w-[200px]"
+            options={customerOptions.map((option) => ({ value: option.id, label: option.name }))}
+          />
+          <ReportSelectFilter
+            value={status}
+            onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
+            allLabel="All statuses"
+            options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
+          />
+          <ReportSelectFilter
+            value={destination}
+            onChange={setDestination}
+            allLabel="All destinations"
+            options={destinationOptions.map((option) => ({ value: option, label: option }))}
+          />
+          <ReportSelectFilter
+            value={auctionHall}
+            onChange={setAuctionHall}
+            allLabel="All auction halls"
+            options={auctionHallOptions.map((option) => ({ value: option, label: option }))}
+          />
+        </div>
+      </ReportStickyHeader>
 
       <div className="space-y-3">
         {hasResults ? (
