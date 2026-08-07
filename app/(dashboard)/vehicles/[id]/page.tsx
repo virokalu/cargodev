@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
-import { getVehicleDetail, listVehicleStatusHistory } from "@/lib/services/vehicle.service";
+import { getVehicleDetail } from "@/lib/services/vehicle.service";
 import { listVehicleFiles } from "@/lib/services/file.service";
 import { VehicleDetailView } from "@/components/vehicles/vehicle-detail-view";
 
@@ -21,13 +21,10 @@ export default async function VehicleDetailPage({
   }
 
   // Fetched after confirming the vehicle exists, same reasoning as the edit
-  // page: both do their own ownership check and would throw rather than
-  // gracefully 404 if run in parallel with a vehicle that turns out not to
-  // exist.
-  const [files, statusHistory] = await Promise.all([
-    listVehicleFiles(user.orgId, vehicle.id),
-    listVehicleStatusHistory(user.orgId, vehicle.id),
-  ]);
+  // page: listVehicleFiles does its own ownership check and would throw
+  // rather than gracefully 404 if run in parallel with a vehicle that
+  // turns out not to exist.
+  const files = await listVehicleFiles(user.orgId, vehicle.id);
 
-  return <VehicleDetailView vehicle={vehicle} files={files} statusHistory={statusHistory} />;
+  return <VehicleDetailView vehicle={vehicle} files={files} />;
 }

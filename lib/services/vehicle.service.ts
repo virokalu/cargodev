@@ -460,7 +460,16 @@ export interface StatusHistoryItem {
  * bottom. FL vehicles never get StatusHistory rows (shipment status isn't
  * tracked for FL at all — CLAUDE.md), so this naturally comes back empty
  * for them; callers don't need a separate FC check to call it safely, just
- * to decide whether to render the section at all. */
+ * to decide whether to render the section at all.
+ *
+ * Not currently called — the detail page's Shipment Timeline moved to the
+ * operational milestone list in lib/shipment-milestones.ts (2026-08-07),
+ * which better matches how staff actually track a shipment (paid / transport
+ * assigned / LC open / booking received / loaded / shipped / delivered)
+ * than the narrow Pending→Booking Received→Shipped enum this reads. Kept
+ * for the planned "who changed it" audit view, since the underlying
+ * StatusHistory rows (actor + trigger + timestamp) are exactly what that
+ * needs and this query is already written for them. */
 export async function listVehicleStatusHistory(orgId: string, vehicleId: string): Promise<StatusHistoryItem[]> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { org_id: true } });
   if (!vehicle || vehicle.org_id !== orgId) return [];

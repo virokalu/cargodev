@@ -6,7 +6,7 @@
 // screen is look-only for every role, including Viewer.
 
 import Link from "next/link";
-import { ArrowLeft, Car } from "lucide-react";
+import { ArrowLeft, Car, Ban, Banknote, Truck, Landmark, CalendarCheck, Boxes, Ship, PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -16,15 +16,67 @@ import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-documen
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import type { VehicleDetailData, StatusHistoryItem } from "@/lib/services/vehicle.service";
+import { isCancelShipmentRowColour } from "@/lib/shipment-status";
+import { buildShipmentMilestones, type ShipmentMilestoneKey } from "@/lib/shipment-milestones";
+import { cn, formatDate } from "@/lib/utils";
+import type { VehicleDetailData } from "@/lib/services/vehicle.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
 
 interface VehicleDetailViewProps {
   vehicle: VehicleDetailData;
   files: VehicleFiles;
-  statusHistory: StatusHistoryItem[];
 }
+
+// Grouped by what actually happens at each step rather than one flat
+// colour — paperwork/financial (Auction Bill Paid, LC Open) in primary,
+// logistics arrangement (Rikso Given, Booking Received) in warning/amber,
+// in-transit (Loaded, Shipped) in info/cyan, arrival (Delivered) in
+// success/green. Reuses the app's existing semantic tokens (same ones the
+// Shipment Status badges use) so it stays readable in dark mode for free,
+// instead of inventing new colours with their own contrast to verify.
+const MILESTONE_STYLE: Record<
+  ShipmentMilestoneKey,
+  { icon: React.ElementType; tone: "primary" | "warning" | "info" | "success" }
+> = {
+  AUCTION_BILL_PAID: { icon: Banknote, tone: "primary" },
+  TRANSPORT_ASSIGNED: { icon: Truck, tone: "warning" },
+  LC_OPEN: { icon: Landmark, tone: "primary" },
+  BOOKING_RECEIVED: { icon: CalendarCheck, tone: "warning" },
+  LOADED: { icon: Boxes, tone: "info" },
+  SHIPPED: { icon: Ship, tone: "info" },
+  DELIVERED: { icon: PackageCheck, tone: "success" },
+};
+
+const TONE_BADGE_CLASS: Record<string, string> = {
+  primary: "bg-primary text-primary-foreground",
+  warning: "bg-warning text-warning-foreground",
+  info: "bg-info text-info-foreground",
+  success: "bg-success text-success-foreground",
+};
+
+const TONE_TEXT_CLASS: Record<string, string> = {
+  primary: "text-primary",
+  warning: "text-warning",
+  info: "text-info",
+  success: "text-success",
+};
+
+const TONE_LINE_CLASS: Record<string, string> = {
+  primary: "bg-primary/50",
+  warning: "bg-warning/50",
+  info: "bg-info/50",
+  success: "bg-success/50",
+};
+
+// The next step (first incomplete one) gets a light tint in its eventual
+// colour instead of plain grey — "coming up" reads differently from "not
+// relevant yet," which a flat done/not-done treatment couldn't show.
+const TONE_TINT_CLASS: Record<string, string> = {
+  primary: "border-primary/40 bg-primary/10 text-primary",
+  warning: "border-warning/40 bg-warning/10 text-warning",
+  info: "border-info/40 bg-info/10 text-info",
+  success: "border-success/40 bg-success/10 text-success",
+};
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   const isEmpty = value === null || value === undefined || value === "";
@@ -47,10 +99,28 @@ function FieldGroup({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-export function VehicleDetailView({ vehicle, files, statusHistory }: VehicleDetailViewProps) {
+export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
   const isFC = vehicle.track === "FC";
   const titleParts = [vehicle.brand?.name, vehicle.model?.name].filter(Boolean);
   const title = titleParts.length > 0 ? titleParts.join(" ") : vehicle.serial;
+  const milestones = buildShipmentMilestones({
+    auctionBillPaid: vehicle.auctionBillPaid,
+    transportBy: vehicle.transportBy,
+    lcNo: vehicle.lcNo,
+    etd: vehicle.etd,
+    eta: vehicle.eta,
+    destination: vehicle.destination,
+  });
+  const nextMilestoneIndex = milestones.findIndex((m) => !m.completed);
+  // Unit Canceled / Resold in Auction (see CANCEL_SHIPMENT_ROW_COLOUR_NAMES
+  // in lib/shipment-status.ts) mean none of the milestones above still
+  // apply — the deal fell through, it isn't just "not there yet." The
+  // header badge already shows the generic "Shipment Cancelled" status;
+  // this panel shows *which one specifically* happened, tinted with that
+  // row colour status's own configured colour instead of a flat red, so it
+  // reads consistently with how the table itself colours the row.
+  const cancelledRowColour =
+    vehicle.rowColourStatus && isCancelShipmentRowColour(vehicle.rowColourStatus.name) ? vehicle.rowColourStatus : null;
 
   return (
     <div className="space-y-6">
@@ -195,29 +265,71 @@ export function VehicleDetailView({ vehicle, files, statusHistory }: VehicleDeta
         </div>
 
         {isFC && (
-          <div className="rounded-lg border p-4">
+          <div className="self-start rounded-lg border p-4">
             <h2 className="mb-4 text-lg font-bold">Shipment Timeline</h2>
-            {statusHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No status changes recorded yet.</p>
+            {cancelledRowColour ? (
+              <div
+                className="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed py-8 text-center"
+                style={{
+                  borderColor: cancelledRowColour.colour,
+                  backgroundColor: `color-mix(in oklch, ${cancelledRowColour.colour} 12%, transparent)`,
+                }}
+              >
+                <Ban className="size-8" style={{ color: cancelledRowColour.colour }} aria-hidden="true" />
+                <div>
+                  <p className="text-base font-bold" style={{ color: cancelledRowColour.colour }}>
+                    {cancelledRowColour.name}
+                  </p>
+                  <p className="mt-1 px-4 text-xs text-muted-foreground">
+                    Shipment tracking milestones no longer apply to this vehicle.
+                  </p>
+                </div>
+              </div>
             ) : (
-              <ol className="space-y-4">
-                {statusHistory.map((item, i) => (
-                  <li key={item.id} className="relative pl-6">
-                    {i < statusHistory.length - 1 && (
-                      <span className="absolute top-5 left-[7px] h-full w-px bg-border" aria-hidden="true" />
+            <ol className="space-y-5">
+              {milestones.map((milestone, i) => {
+                const { icon: Icon, tone } = MILESTONE_STYLE[milestone.key];
+                const isNext = i === nextMilestoneIndex;
+                return (
+                  <li key={milestone.key} className="relative pl-11">
+                    {i < milestones.length - 1 && (
+                      <span
+                        className={cn(
+                          "absolute top-8 -bottom-5 left-4 w-px",
+                          milestone.completed ? TONE_LINE_CLASS[tone] : "bg-border"
+                        )}
+                        aria-hidden="true"
+                      />
                     )}
                     <span
-                      className="absolute top-0.5 left-0 size-3.5 rounded-full border-2 border-primary bg-primary/20"
-                      aria-hidden="true"
-                    />
-                    <p className="text-sm font-semibold">{SHIPMENT_STATUS_META[item.toStatus].label}</p>
-                    <p className="text-xs text-muted-foreground">{item.triggerLabel}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.triggeredByName ?? "System"} · {formatDateTime(item.createdAt)}
+                      className={cn(
+                        "absolute top-0 left-0 flex size-8 items-center justify-center rounded-full border-2",
+                        milestone.completed
+                          ? cn("border-transparent", TONE_BADGE_CLASS[tone])
+                          : isNext
+                            ? cn("border-dashed", TONE_TINT_CLASS[tone])
+                            : "border-dashed border-muted-foreground/25 text-muted-foreground/40"
+                      )}
+                    >
+                      <Icon className="size-4" aria-hidden="true" />
+                    </span>
+                    <p
+                      className={cn(
+                        "pt-1.5 text-sm font-semibold",
+                        milestone.completed
+                          ? TONE_TEXT_CLASS[tone]
+                          : isNext
+                            ? TONE_TEXT_CLASS[tone]
+                            : "text-muted-foreground"
+                      )}
+                    >
+                      {milestone.label}
                     </p>
+                    {milestone.date && <p className="text-xs text-muted-foreground">{formatDate(milestone.date)}</p>}
                   </li>
-                ))}
-              </ol>
+                );
+              })}
+            </ol>
             )}
           </div>
         )}
