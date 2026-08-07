@@ -3,7 +3,9 @@
 // Destination tab of Reports — same pattern as AuctionHallReportPanel, just
 // grouped by destination country. Destination is free text on Vehicle (no
 // lookup table), so the group key is the destination string itself rather
-// than an id — see lib/services/reports.service.ts.
+// than an id — see lib/services/reports.service.ts. Both FC and FL data are
+// fetched up front (see app/(dashboard)/reports/page.tsx) so the track
+// toggle switches instantly with no refetch.
 
 import { useMemo, useState } from "react";
 import { Ban, Car, Globe } from "lucide-react";
@@ -14,27 +16,34 @@ import { ReportSelectFilter } from "@/components/reports/report-select-filter";
 import { ReportStickyHeader } from "@/components/reports/report-sticky-header";
 import { ReportSummaryTile } from "@/components/reports/report-summary-tile";
 import { ReportTabs, type ReportTab } from "@/components/reports/report-tabs";
+import { ReportTrackToggle } from "@/components/reports/report-track-toggle";
 import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
 import { exportDestinationReportToCsv } from "@/lib/reports/export-csv";
 import { exportDestinationReportToPdf } from "@/lib/reports/export-pdf";
-import type { DestinationReportGroup, ReportVehicleStatus } from "@/lib/services/reports.service";
+import type { DestinationVehicleReportData, ReportTrack, ReportVehicleStatus } from "@/lib/services/reports.service";
 
 interface DestinationReportPanelProps {
-  destinations: DestinationReportGroup[];
-  destinationOptions: string[];
+  data: { fc: DestinationVehicleReportData; fl: DestinationVehicleReportData };
   activeTab: ReportTab;
   onTabChange: (tab: ReportTab) => void;
 }
 
-export function DestinationReportPanel({
-  destinations,
-  destinationOptions,
-  activeTab,
-  onTabChange,
-}: DestinationReportPanelProps) {
+export function DestinationReportPanel({ data, activeTab, onTabChange }: DestinationReportPanelProps) {
+  const [track, setTrack] = useState<ReportTrack>("FC");
   const [search, setSearch] = useState("");
   const [destination, setDestination] = useState("ALL");
   const [status, setStatus] = useState<ReportVehicleStatus | "ALL">("ALL");
+
+  const { destinations, destinationOptions } = track === "FC" ? data.fc : data.fl;
+
+  // See CustomerVehicleReportPanel — filter selections reference values
+  // scoped to whichever track's dataset produced them, so they need to
+  // reset when the track itself changes.
+  function handleTrackChange(next: ReportTrack) {
+    setTrack(next);
+    setDestination("ALL");
+    setStatus("ALL");
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -80,7 +89,10 @@ export function DestinationReportPanel({
           exportDisabled={!hasResults}
         />
 
-        <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+          <ReportTrackToggle track={track} onTrackChange={handleTrackChange} />
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <ReportSummaryTile

@@ -3,7 +3,10 @@
 // Customer Vehicle tab of Reports (CD-D1-16) — client-side search/filter
 // over a single server-fetched payload, same convention as the
 // Users/Customers screens (small data set, no pagination needed) rather
-// than the Vehicles table's URL-driven server refetch.
+// than the Vehicles table's URL-driven server refetch. Both FC and FL data
+// are fetched up front (see app/(dashboard)/reports/page.tsx) so the track
+// toggle below just switches which of the two the rest of this panel reads
+// from — no refetch.
 
 import { useMemo, useState } from "react";
 import { Ban, Car, Mail, MapPin, Phone, Users } from "lucide-react";
@@ -14,20 +17,14 @@ import { ReportSelectFilter } from "@/components/reports/report-select-filter";
 import { ReportStickyHeader } from "@/components/reports/report-sticky-header";
 import { ReportSummaryTile } from "@/components/reports/report-summary-tile";
 import { ReportTabs, type ReportTab } from "@/components/reports/report-tabs";
+import { ReportTrackToggle } from "@/components/reports/report-track-toggle";
 import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
 import { exportCustomerReportToCsv } from "@/lib/reports/export-csv";
 import { exportCustomerReportToPdf } from "@/lib/reports/export-pdf";
-import type {
-  CustomerOption,
-  CustomerReportGroup,
-  ReportVehicleStatus,
-} from "@/lib/services/reports.service";
+import type { CustomerVehicleReportData, ReportTrack, ReportVehicleStatus } from "@/lib/services/reports.service";
 
 interface CustomerVehicleReportPanelProps {
-  customers: CustomerReportGroup[];
-  customerOptions: CustomerOption[];
-  destinationOptions: string[];
-  auctionHallOptions: string[];
+  data: { fc: CustomerVehicleReportData; fl: CustomerVehicleReportData };
   activeTab: ReportTab;
   onTabChange: (tab: ReportTab) => void;
 }
@@ -65,19 +62,28 @@ function ContactLine({
   );
 }
 
-export function CustomerVehicleReportPanel({
-  customers,
-  customerOptions,
-  destinationOptions,
-  auctionHallOptions,
-  activeTab,
-  onTabChange,
-}: CustomerVehicleReportPanelProps) {
+export function CustomerVehicleReportPanel({ data, activeTab, onTabChange }: CustomerVehicleReportPanelProps) {
+  const [track, setTrack] = useState<ReportTrack>("FC");
   const [search, setSearch] = useState("");
   const [customerId, setCustomerId] = useState("ALL");
   const [status, setStatus] = useState<ReportVehicleStatus | "ALL">("ALL");
   const [destination, setDestination] = useState("ALL");
   const [auctionHall, setAuctionHall] = useState("ALL");
+
+  const { customers, customerOptions, destinationOptions, auctionHallOptions } = track === "FC" ? data.fc : data.fl;
+
+  // The dropdown filters above reference option values scoped to whichever
+  // track's dataset produced them — switching track can leave a selection
+  // pointing at a value that doesn't exist in the new track's options
+  // (e.g. a customer who only has FC vehicles), which would silently filter
+  // every result out. Reset them along with the track itself.
+  function handleTrackChange(next: ReportTrack) {
+    setTrack(next);
+    setCustomerId("ALL");
+    setStatus("ALL");
+    setDestination("ALL");
+    setAuctionHall("ALL");
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -129,7 +135,10 @@ export function CustomerVehicleReportPanel({
           exportDisabled={!hasResults}
         />
 
-        <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+          <ReportTrackToggle track={track} onTrackChange={handleTrackChange} />
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <ReportSummaryTile

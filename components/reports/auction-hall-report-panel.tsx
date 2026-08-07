@@ -4,7 +4,9 @@
 // just grouped by auction hall instead of customer, and with the smaller
 // 2-filter set (auction hall + status) that its own approved design
 // (docs/designs/Auctionhall_Report.png) shows, rather than the Customer tab's
-// extra destination/auction-hall cross-filters.
+// extra destination/auction-hall cross-filters. Both FC and FL data are
+// fetched up front (see app/(dashboard)/reports/page.tsx) so the track
+// toggle switches instantly with no refetch.
 
 import { useMemo, useState } from "react";
 import { Ban, Car, Gavel } from "lucide-react";
@@ -15,27 +17,34 @@ import { ReportSelectFilter } from "@/components/reports/report-select-filter";
 import { ReportStickyHeader } from "@/components/reports/report-sticky-header";
 import { ReportSummaryTile } from "@/components/reports/report-summary-tile";
 import { ReportTabs, type ReportTab } from "@/components/reports/report-tabs";
+import { ReportTrackToggle } from "@/components/reports/report-track-toggle";
 import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
 import { exportAuctionHallReportToCsv } from "@/lib/reports/export-csv";
 import { exportAuctionHallReportToPdf } from "@/lib/reports/export-pdf";
-import type { AuctionHallOption, AuctionHallReportGroup, ReportVehicleStatus } from "@/lib/services/reports.service";
+import type { AuctionHallVehicleReportData, ReportTrack, ReportVehicleStatus } from "@/lib/services/reports.service";
 
 interface AuctionHallReportPanelProps {
-  auctionHalls: AuctionHallReportGroup[];
-  auctionHallOptions: AuctionHallOption[];
+  data: { fc: AuctionHallVehicleReportData; fl: AuctionHallVehicleReportData };
   activeTab: ReportTab;
   onTabChange: (tab: ReportTab) => void;
 }
 
-export function AuctionHallReportPanel({
-  auctionHalls,
-  auctionHallOptions,
-  activeTab,
-  onTabChange,
-}: AuctionHallReportPanelProps) {
+export function AuctionHallReportPanel({ data, activeTab, onTabChange }: AuctionHallReportPanelProps) {
+  const [track, setTrack] = useState<ReportTrack>("FC");
   const [search, setSearch] = useState("");
   const [auctionHallId, setAuctionHallId] = useState("ALL");
   const [status, setStatus] = useState<ReportVehicleStatus | "ALL">("ALL");
+
+  const { auctionHalls, auctionHallOptions } = track === "FC" ? data.fc : data.fl;
+
+  // See CustomerVehicleReportPanel — filter selections reference values
+  // scoped to whichever track's dataset produced them, so they need to
+  // reset when the track itself changes.
+  function handleTrackChange(next: ReportTrack) {
+    setTrack(next);
+    setAuctionHallId("ALL");
+    setStatus("ALL");
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -82,7 +91,10 @@ export function AuctionHallReportPanel({
           exportDisabled={!hasResults}
         />
 
-        <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ReportTabs activeTab={activeTab} onTabChange={onTabChange} />
+          <ReportTrackToggle track={track} onTrackChange={handleTrackChange} />
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <ReportSummaryTile

@@ -1,8 +1,17 @@
-// Reports (CD-D1-14) — three read-only views of the same underlying FC
-// vehicle pool, grouped by customer, auction hall, or destination country.
-// FL vehicles are excluded from all three: shipment status, destination,
-// ETD/ETA aren't tracked for FL at all (CLAUDE.md), so they have nothing to
-// report here.
+// Reports (CD-D1-14) — three read-only views of the same underlying vehicle
+// pool, grouped by customer, auction hall, or destination country, each
+// scoped to one track (FC/export or FL/local) at a time — same FC/FL split
+// as the main Vehicles table (components/vehicles/vehicle-filters-bar.tsx).
+//
+// Destination, Auction Hall, Auction Lot No, Chassis No, and Customer are
+// all track-independent fields (set the same way for FC and FL — see
+// vehicle.service.ts createVehicle/updateVehicle, neither nulls them for
+// FL), so all three reports work for either track. Only ETD/ETA and
+// shipment status are genuinely FC-only: FL vehicles never carry ETD/ETA
+// and their shipmentStatus is permanently PENDING (vehicle.service.ts never
+// runs the ETD-driven transition for FL), so those columns just read as
+// blank/Pending for FL rows — same "same columns, empty for FL" precedent
+// the Vehicles table already uses, not a different FL-specific schema.
 //
 // Status is the exact same effective shipment status the Vehicles table
 // shows (Pending / Booking Received / Shipped / Shipment Cancelled) — no
@@ -10,12 +19,13 @@
 // anywhere in the Vehicle model, so unlike some reference mockups these
 // reports don't show a price/purchase-value figure.
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma, SerialPrefix } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
 
 export type ReportVehicleStatus = EffectiveShipmentStatus;
+export type ReportTrack = SerialPrefix;
 
 export interface ReportVehicleRow {
   id: string;
@@ -108,12 +118,15 @@ const REPORT_VEHICLE_SELECT = {
 
 type RawReportVehicle = Prisma.VehicleGetPayload<{ select: typeof REPORT_VEHICLE_SELECT }>;
 
-function toReportVehicleRow(v: RawReportVehicle): ReportVehicleRow {
-  const status = computeEffectiveShipmentStatus(
-    v.shipmentStatus,
-    v.etd,
-    isCancelShipmentRowColour(v.rowColourStatus?.name)
-  );
+// The "Unit Canceled" row colour only means "shipment cancelled" for FC —
+// an FL vehicle has no shipment to cancel, so the same row colour on an FL
+// row must not be read as a cancelled status (mirrors the FC-only gate
+// vehicle.service.ts's toVehicleListRow already applies for the same
+// reason). track is passed in rather than selected on the row because
+// every query here is already scoped to a single track.
+function toReportVehicleRow(v: RawReportVehicle, track: ReportTrack): ReportVehicleRow {
+  const cancelled = track === "FC" && isCancelShipmentRowColour(v.rowColourStatus?.name);
+  const status = computeEffectiveShipmentStatus(v.shipmentStatus, v.etd, cancelled);
   return {
     id: v.id,
     serial: v.serial,
@@ -129,9 +142,12 @@ function toReportVehicleRow(v: RawReportVehicle): ReportVehicleRow {
   };
 }
 
-export async function getCustomerVehicleReport(orgId: string): Promise<CustomerVehicleReportData> {
+export async function getCustomerVehicleReport(
+  orgId: string,
+  track: ReportTrack
+): Promise<CustomerVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: "FC", customerId: { not: null } },
+    where: { org_id: orgId, deletedAt: null, serialPrefix: track, customerId: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -140,7 +156,7 @@ export async function getCustomerVehicleReport(orgId: string): Promise<CustomerV
 
   for (const v of vehicles) {
     if (!v.customer) continue;
-    const row = toReportVehicleRow(v);
+    const row = toReportVehicleRow(v, track);
 
     let group = groups.get(v.customer.id);
     if (!group) {
@@ -177,9 +193,12 @@ export async function getCustomerVehicleReport(orgId: string): Promise<CustomerV
   return { customers, customerOptions, destinationOptions, auctionHallOptions };
 }
 
-export async function getAuctionHallVehicleReport(orgId: string): Promise<AuctionHallVehicleReportData> {
+export async function getAuctionHallVehicleReport(
+  orgId: string,
+  track: ReportTrack
+): Promise<AuctionHallVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: "FC", auctionHallId: { not: null } },
+    where: { org_id: orgId, deletedAt: null, serialPrefix: track, auctionHallId: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -188,7 +207,7 @@ export async function getAuctionHallVehicleReport(orgId: string): Promise<Auctio
 
   for (const v of vehicles) {
     if (!v.auctionHall) continue;
-    const row = toReportVehicleRow(v);
+    const row = toReportVehicleRow(v, track);
 
     let group = groups.get(v.auctionHall.id);
     if (!group) {
@@ -216,9 +235,12 @@ export async function getAuctionHallVehicleReport(orgId: string): Promise<Auctio
   return { auctionHalls, auctionHallOptions };
 }
 
-export async function getDestinationVehicleReport(orgId: string): Promise<DestinationVehicleReportData> {
+export async function getDestinationVehicleReport(
+  orgId: string,
+  track: ReportTrack
+): Promise<DestinationVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: "FC", destination: { not: null } },
+    where: { org_id: orgId, deletedAt: null, serialPrefix: track, destination: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -227,7 +249,7 @@ export async function getDestinationVehicleReport(orgId: string): Promise<Destin
 
   for (const v of vehicles) {
     if (!v.destination) continue;
-    const row = toReportVehicleRow(v);
+    const row = toReportVehicleRow(v, track);
 
     let group = groups.get(v.destination);
     if (!group) {
