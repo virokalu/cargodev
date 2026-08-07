@@ -25,7 +25,6 @@ interface ReportGroupCardProps {
   subtitle?: ReactNode;
   vehicles: ReportVehicleRow[];
   statusCounts: Record<ReportVehicleStatus, number>;
-  delayedCount: number;
   onDownloadPdf: () => void;
   extraColumns: ReportVehicleColumnKey[];
   defaultOpen?: boolean;
@@ -36,7 +35,6 @@ export function ReportGroupCard({
   subtitle,
   vehicles,
   statusCounts,
-  delayedCount,
   onDownloadPdf,
   extraColumns,
   defaultOpen = false,
@@ -87,7 +85,6 @@ export function ReportGroupCard({
               {statusCounts[status]} {SHIPMENT_STATUS_META[status].label}
             </span>
           ))}
-          {delayedCount > 0 && <span className="font-medium text-destructive">{delayedCount} Delayed</span>}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -138,12 +135,9 @@ export function ReportGroupCard({
                   <TableCell className="border-r">{formatDate(vehicle.etd)}</TableCell>
                   <TableCell className="border-r">{formatDate(vehicle.eta)}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant={SHIPMENT_STATUS_META[vehicle.status].badgeVariant}>
-                        {SHIPMENT_STATUS_META[vehicle.status].label}
-                      </Badge>
-                      {vehicle.isDelayed && <Badge variant="destructive">Delayed</Badge>}
-                    </div>
+                    <Badge variant={SHIPMENT_STATUS_META[vehicle.status].badgeVariant}>
+                      {SHIPMENT_STATUS_META[vehicle.status].label}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}

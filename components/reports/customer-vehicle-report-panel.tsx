@@ -6,7 +6,7 @@
 // than the Vehicles table's URL-driven server refetch.
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Car, Mail, MapPin, Phone, Users } from "lucide-react";
+import { Ban, Car, Mail, MapPin, Phone, Users } from "lucide-react";
 import { ReportGroupCard } from "@/components/reports/report-group-card";
 import { ReportHeader } from "@/components/reports/report-header";
 import { ReportSearchInput } from "@/components/reports/report-search-input";
@@ -109,12 +109,12 @@ export function CustomerVehicleReportPanel({
 
   const totals = useMemo(() => {
     let totalVehicles = 0;
-    let totalDelayed = 0;
+    let totalCancelled = 0;
     for (const customer of filtered) {
       totalVehicles += customer.vehicles.length;
-      totalDelayed += customer.vehicles.filter((v) => v.isDelayed).length;
+      totalCancelled += customer.vehicles.filter((v) => v.status === "CANCELLED").length;
     }
-    return { totalCustomers: filtered.length, totalVehicles, totalDelayed };
+    return { totalCustomers: filtered.length, totalVehicles, totalCancelled };
   }, [filtered]);
 
   const hasResults = filtered.length > 0;
@@ -145,11 +145,11 @@ export function CustomerVehicleReportPanel({
           sublabel="across all customers"
         />
         <ReportSummaryTile
-          icon={AlertTriangle}
+          icon={Ban}
           tone="destructive"
-          value={totals.totalDelayed}
-          label="Delayed vehicles"
-          sublabel="requires attention"
+          value={totals.totalCancelled}
+          label="Shipment Cancelled"
+          sublabel="no longer being shipped"
         />
       </div>
 
@@ -195,7 +195,6 @@ export function CustomerVehicleReportPanel({
               subtitle={<ContactLine email={customer.email} phone={customer.phone} country={customer.country} />}
               vehicles={customer.vehicles}
               statusCounts={customer.statusCounts}
-              delayedCount={customer.delayedCount}
               onDownloadPdf={() => exportCustomerReportToPdf([customer])}
               extraColumns={["auctionHall", "destination"]}
             />

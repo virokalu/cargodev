@@ -97,7 +97,7 @@ function buildReportPdf(
         ...columns.map((key) => REPORT_VEHICLE_COLUMN_CONFIG[key].getValue(v)),
         formatDate(v.etd),
         formatDate(v.eta),
-        v.isDelayed ? `${SHIPMENT_STATUS_META[v.status].label} (Delayed)` : SHIPMENT_STATUS_META[v.status].label,
+        SHIPMENT_STATUS_META[v.status].label,
       ]),
       styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [241, 245, 249], textColor: 30, fontStyle: "bold" },

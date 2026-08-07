@@ -6,19 +6,13 @@
 //
 // Status is the exact same effective shipment status the Vehicles table
 // shows (Pending / Booking Received / Shipped / Shipment Cancelled) — no
-// separate "report status" vocabulary. "Delayed" is a flag layered on top
-// (Shipped with its ETA already passed), not a 5th status: there's nowhere
-// in the schema that marks a shipment "arrived". There's likewise no
-// purchase-price field anywhere in the Vehicle model, so unlike some
-// reference mockups these reports don't show a price/purchase-value figure.
+// separate "report status" vocabulary. There's no purchase-price field
+// anywhere in the Vehicle model, so unlike some reference mockups these
+// reports don't show a price/purchase-value figure.
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  computeEffectiveShipmentStatus,
-  isCancelShipmentRowColour,
-  todayAtMidnight,
-} from "@/lib/shipment-status";
+import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
 
 export type ReportVehicleStatus = EffectiveShipmentStatus;
@@ -35,13 +29,11 @@ export interface ReportVehicleRow {
   etd: Date | null;
   eta: Date | null;
   status: ReportVehicleStatus;
-  isDelayed: boolean;
 }
 
 interface ReportGroupStats {
   vehicles: ReportVehicleRow[];
   statusCounts: Record<ReportVehicleStatus, number>;
-  delayedCount: number;
 }
 
 export interface CustomerReportGroup extends ReportGroupStats {
@@ -86,10 +78,6 @@ export interface AuctionHallVehicleReportData {
 export interface DestinationVehicleReportData {
   destinations: DestinationReportGroup[];
   destinationOptions: string[];
-}
-
-function isVehicleDelayed(status: EffectiveShipmentStatus, eta: Date | null): boolean {
-  return status === "SHIPPED" && eta !== null && eta.getTime() < todayAtMidnight().getTime();
 }
 
 function emptyStatusCounts(): Record<ReportVehicleStatus, number> {
@@ -138,7 +126,6 @@ function toReportVehicleRow(v: RawReportVehicle): ReportVehicleRow {
     etd: v.etd,
     eta: v.eta,
     status,
-    isDelayed: isVehicleDelayed(status, v.eta),
   };
 }
 
@@ -165,14 +152,12 @@ export async function getCustomerVehicleReport(orgId: string): Promise<CustomerV
         country: v.customer.country,
         vehicles: [],
         statusCounts: emptyStatusCounts(),
-        delayedCount: 0,
       };
       groups.set(v.customer.id, group);
     }
 
     group.vehicles.push(row);
     group.statusCounts[row.status]++;
-    if (row.isDelayed) group.delayedCount++;
   }
 
   const customers = Array.from(groups.values()).sort((a, b) =>
@@ -212,14 +197,12 @@ export async function getAuctionHallVehicleReport(orgId: string): Promise<Auctio
         auctionHallName: v.auctionHall.name,
         vehicles: [],
         statusCounts: emptyStatusCounts(),
-        delayedCount: 0,
       };
       groups.set(v.auctionHall.id, group);
     }
 
     group.vehicles.push(row);
     group.statusCounts[row.status]++;
-    if (row.isDelayed) group.delayedCount++;
   }
 
   const auctionHalls = Array.from(groups.values()).sort((a, b) =>
@@ -252,14 +235,12 @@ export async function getDestinationVehicleReport(orgId: string): Promise<Destin
         destination: v.destination,
         vehicles: [],
         statusCounts: emptyStatusCounts(),
-        delayedCount: 0,
       };
       groups.set(v.destination, group);
     }
 
     group.vehicles.push(row);
     group.statusCounts[row.status]++;
-    if (row.isDelayed) group.delayedCount++;
   }
 
   const destinations = Array.from(groups.values()).sort((a, b) => a.destination.localeCompare(b.destination));

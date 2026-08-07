@@ -7,7 +7,7 @@
 // extra destination/auction-hall cross-filters.
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Car, Gavel } from "lucide-react";
+import { Ban, Car, Gavel } from "lucide-react";
 import { ReportGroupCard } from "@/components/reports/report-group-card";
 import { ReportHeader } from "@/components/reports/report-header";
 import { ReportSearchInput } from "@/components/reports/report-search-input";
@@ -62,12 +62,12 @@ export function AuctionHallReportPanel({
 
   const totals = useMemo(() => {
     let totalVehicles = 0;
-    let totalDelayed = 0;
+    let totalCancelled = 0;
     for (const hall of filtered) {
       totalVehicles += hall.vehicles.length;
-      totalDelayed += hall.vehicles.filter((v) => v.isDelayed).length;
+      totalCancelled += hall.vehicles.filter((v) => v.status === "CANCELLED").length;
     }
-    return { totalAuctionHalls: filtered.length, totalVehicles, totalDelayed };
+    return { totalAuctionHalls: filtered.length, totalVehicles, totalCancelled };
   }, [filtered]);
 
   const hasResults = filtered.length > 0;
@@ -98,11 +98,11 @@ export function AuctionHallReportPanel({
           sublabel="across all auction halls"
         />
         <ReportSummaryTile
-          icon={AlertTriangle}
+          icon={Ban}
           tone="destructive"
-          value={totals.totalDelayed}
-          label="Delayed vehicles"
-          sublabel="requires attention"
+          value={totals.totalCancelled}
+          label="Shipment Cancelled"
+          sublabel="no longer being shipped"
         />
       </div>
 
@@ -136,7 +136,6 @@ export function AuctionHallReportPanel({
               subtitle={<p className="text-xs text-muted-foreground">Auction hall report</p>}
               vehicles={hall.vehicles}
               statusCounts={hall.statusCounts}
-              delayedCount={hall.delayedCount}
               onDownloadPdf={() => exportAuctionHallReportToPdf([hall])}
               extraColumns={["customer", "destination"]}
             />

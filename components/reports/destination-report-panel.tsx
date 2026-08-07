@@ -6,7 +6,7 @@
 // than an id — see lib/services/reports.service.ts.
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Car, Globe } from "lucide-react";
+import { Ban, Car, Globe } from "lucide-react";
 import { ReportGroupCard } from "@/components/reports/report-group-card";
 import { ReportHeader } from "@/components/reports/report-header";
 import { ReportSearchInput } from "@/components/reports/report-search-input";
@@ -60,12 +60,12 @@ export function DestinationReportPanel({
 
   const totals = useMemo(() => {
     let totalVehicles = 0;
-    let totalDelayed = 0;
+    let totalCancelled = 0;
     for (const entry of filtered) {
       totalVehicles += entry.vehicles.length;
-      totalDelayed += entry.vehicles.filter((v) => v.isDelayed).length;
+      totalCancelled += entry.vehicles.filter((v) => v.status === "CANCELLED").length;
     }
-    return { totalDestinations: filtered.length, totalVehicles, totalDelayed };
+    return { totalDestinations: filtered.length, totalVehicles, totalCancelled };
   }, [filtered]);
 
   const hasResults = filtered.length > 0;
@@ -96,11 +96,11 @@ export function DestinationReportPanel({
           sublabel="across all destinations"
         />
         <ReportSummaryTile
-          icon={AlertTriangle}
+          icon={Ban}
           tone="destructive"
-          value={totals.totalDelayed}
-          label="Delayed vehicles"
-          sublabel="requires attention"
+          value={totals.totalCancelled}
+          label="Shipment Cancelled"
+          sublabel="no longer being shipped"
         />
       </div>
 
@@ -134,7 +134,6 @@ export function DestinationReportPanel({
               subtitle={<p className="text-xs text-muted-foreground">Destination report</p>}
               vehicles={entry.vehicles}
               statusCounts={entry.statusCounts}
-              delayedCount={entry.delayedCount}
               onDownloadPdf={() => exportDestinationReportToPdf([entry])}
               extraColumns={["auctionHall", "customer"]}
             />

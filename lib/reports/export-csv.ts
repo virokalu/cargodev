@@ -27,7 +27,6 @@ function vehicleHeaders(columns: ReportVehicleColumnKey[]): string[] {
     "ETD",
     "ETA",
     "Status",
-    "Delayed",
   ];
 }
 
@@ -49,7 +48,6 @@ function vehicleRowCells(vehicle: ReportVehicleRow, columns: ReportVehicleColumn
     formatDate(vehicle.etd),
     formatDate(vehicle.eta),
     SHIPMENT_STATUS_META[vehicle.status].label,
-    vehicle.isDelayed ? "Yes" : "",
   ];
 }
 
