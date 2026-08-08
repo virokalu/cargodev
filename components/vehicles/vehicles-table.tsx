@@ -341,7 +341,7 @@ export function VehiclesTable({
                       <ClickableRow
                         key={row.id}
                         id={row.id}
-                        href={`/vehicles/${row.id}`}
+                        href={`/vehicles/${row.serial}`}
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >
@@ -381,7 +381,7 @@ export function VehiclesTable({
                               <div className="flex items-center gap-1">
                                 {canEditVehicle && (
                                   <Link
-                                    href={`/vehicles/${row.id}/edit`}
+                                    href={`/vehicles/${row.serial}/edit`}
                                     aria-label={`Edit ${row.serial}`}
                                     className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
                                   >
@@ -437,7 +437,7 @@ export function VehiclesTable({
                       <ClickableRow
                         key={row.id}
                         id={row.id}
-                        href={`/vehicles/${row.id}`}
+                        href={`/vehicles/${row.serial}`}
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >

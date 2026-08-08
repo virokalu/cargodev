@@ -56,15 +56,15 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
 export default async function EditVehiclePage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ serial: string }>;
 }) {
   // Operator's vehicle write access is table-level only (row colour, from
   // the list view) — the full edit form is Administrator/Manager only.
   const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
-  const { id } = await params;
+  const { serial } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([
-    getVehicleDetail(user.orgId, id),
+    getVehicleDetail(user.orgId, serial),
     listRowColourStatuses(user.orgId),
   ]);
 

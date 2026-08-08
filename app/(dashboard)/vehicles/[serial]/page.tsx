@@ -10,12 +10,12 @@ import { VehicleDetailView } from "@/components/vehicles/vehicle-detail-view";
 export default async function VehicleDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ serial: string }>;
 }) {
   const user = await requireUser();
-  const { id } = await params;
+  const { serial } = await params;
 
-  const vehicle = await getVehicleDetail(user.orgId, id);
+  const vehicle = await getVehicleDetail(user.orgId, serial);
   if (!vehicle) {
     notFound();
   }

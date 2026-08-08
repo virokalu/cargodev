@@ -5,6 +5,7 @@
 // shape the result — no business logic lives here (docs/implementation.md §2,
 // "the thin-wrapper rule").
 
+import type { VehicleDocumentType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/services/auth-guard";
 import { ServiceError, type ServiceErrorCode } from "@/lib/errors";
@@ -45,7 +46,11 @@ export async function updateVehicleAction(id: string, input: unknown): Promise<V
   try {
     const vehicle = await vehicleService.updateVehicle(user, id, input);
     revalidatePath("/vehicles");
-    revalidatePath(`/vehicles/${id}/edit`);
+    // Path pattern, not a resolved value — the route param is now the
+    // vehicle's serial, not this function's `id` (still the actual database
+    // id, used for the lookup/mutation itself), so there's no serial in
+    // scope to build the real path from without an extra query.
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true, id: vehicle.id, serial: vehicle.serial };
   } catch (error) {
     if (error instanceof ServiceError) {
@@ -283,7 +288,10 @@ export async function setAuctionSheetAction(vehicleId: string, url: string): Pro
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
     await fileService.setAuctionSheet(user, vehicleId, url);
-    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    // Path pattern, not a resolved value — see the comment in
+    // updateVehicleAction above (the route param is the vehicle's serial,
+    // not this vehicleId, which is the actual database id).
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
   } catch (error) {
     if (error instanceof ServiceError) return { ok: false, message: error.message };
@@ -295,7 +303,10 @@ export async function addVehiclePhotoAction(vehicleId: string, url: string): Pro
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
     await fileService.addVehiclePhoto(user, vehicleId, url);
-    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    // Path pattern, not a resolved value — see the comment in
+    // updateVehicleAction above (the route param is the vehicle's serial,
+    // not this vehicleId, which is the actual database id).
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
   } catch (error) {
     if (error instanceof ServiceError) return { ok: false, message: error.message };
@@ -307,7 +318,10 @@ export async function deleteVehiclePhotoAction(vehicleId: string, photoId: strin
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
     await fileService.deleteVehiclePhoto(user, vehicleId, photoId);
-    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    // Path pattern, not a resolved value — see the comment in
+    // updateVehicleAction above (the route param is the vehicle's serial,
+    // not this vehicleId, which is the actual database id).
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
   } catch (error) {
     if (error instanceof ServiceError) return { ok: false, message: error.message };
@@ -318,12 +332,16 @@ export async function deleteVehiclePhotoAction(vehicleId: string, photoId: strin
 export async function addVehicleDocumentAction(
   vehicleId: string,
   url: string,
-  name: string
+  name: string,
+  documentType: VehicleDocumentType
 ): Promise<FileMutationResult> {
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
-    await fileService.addVehicleDocument(user, vehicleId, url, name);
-    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    await fileService.addVehicleDocument(user, vehicleId, url, name, documentType);
+    // Path pattern, not a resolved value — see the comment in
+    // updateVehicleAction above (the route param is the vehicle's serial,
+    // not this vehicleId, which is the actual database id).
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
   } catch (error) {
     if (error instanceof ServiceError) return { ok: false, message: error.message };
@@ -338,7 +356,10 @@ export async function deleteVehicleDocumentAction(
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
     await fileService.deleteVehicleDocument(user, vehicleId, documentId);
-    revalidatePath(`/vehicles/${vehicleId}/edit`);
+    // Path pattern, not a resolved value — see the comment in
+    // updateVehicleAction above (the route param is the vehicle's serial,
+    // not this vehicleId, which is the actual database id).
+    revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
   } catch (error) {
     if (error instanceof ServiceError) return { ok: false, message: error.message };

@@ -6,7 +6,20 @@
 // screen is look-only for every role, including Viewer.
 
 import Link from "next/link";
-import { ArrowLeft, Car, Ban, Banknote, Truck, Landmark, CalendarCheck, Boxes, Ship, PackageCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Car,
+  Ban,
+  Banknote,
+  Truck,
+  FileCheck,
+  Landmark,
+  CalendarCheck,
+  Boxes,
+  Ship,
+  PackageCheck,
+  ImageIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -16,6 +29,7 @@ import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-documen
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
+import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
 import { isCancelShipmentRowColour } from "@/lib/shipment-status";
 import { buildShipmentMilestones, type ShipmentMilestoneKey } from "@/lib/shipment-milestones";
 import { cn, formatDate } from "@/lib/utils";
@@ -40,6 +54,7 @@ const MILESTONE_STYLE: Record<
 > = {
   AUCTION_BILL_PAID: { icon: Banknote, tone: "primary" },
   TRANSPORT_ASSIGNED: { icon: Truck, tone: "warning" },
+  EC_RECEIVED: { icon: FileCheck, tone: "warning" },
   LC_OPEN: { icon: Landmark, tone: "primary" },
   BOOKING_RECEIVED: { icon: CalendarCheck, tone: "warning" },
   LOADED: { icon: Boxes, tone: "info" },
@@ -103,6 +118,13 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
   const isFC = vehicle.track === "FC";
   const titleParts = [vehicle.brand?.name, vehicle.model?.name].filter(Boolean);
   const title = titleParts.length > 0 ? titleParts.join(" ") : vehicle.serial;
+  // EC Received completes the moment the first EC-type document is
+  // uploaded — there's no dedicated Vehicle column for it, so it's derived
+  // from files.documents instead (see ShipmentMilestoneInput.ecReceivedAt).
+  const ecDocuments = files.documents
+    .filter((document) => document.documentType === "EC")
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const ecReceivedAt = ecDocuments[0]?.createdAt ?? null;
   const milestones = buildShipmentMilestones({
     auctionBillPaid: vehicle.auctionBillPaid,
     transportBy: vehicle.transportBy,
@@ -110,6 +132,7 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
     etd: vehicle.etd,
     eta: vehicle.eta,
     destination: vehicle.destination,
+    ecReceivedAt,
   });
   const nextMilestoneIndex = milestones.findIndex((m) => !m.completed);
   // Unit Canceled / Resold in Auction (see CANCEL_SHIPMENT_ROW_COLOUR_NAMES
@@ -153,7 +176,47 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
 
       <div className={cn("grid gap-6", isFC && "lg:grid-cols-3")}>
         <div className={cn("space-y-6", isFC && "lg:col-span-2")}>
-          <VehiclePhotoHero photos={files.photos} />
+          <div className="rounded-lg border p-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Vehicle Photos</h3>
+                <VehiclePhotoHero photos={files.photos} />
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Auction Sheet</h3>
+                {files.auctionSheetUrl ? (
+                  <Dialog>
+                    <DialogTrigger
+                      render={<button type="button" className="block w-full" />}
+                      aria-label="View auction sheet full size"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
+                      <img
+                        src={files.auctionSheetUrl}
+                        alt="Auction sheet"
+                        className="aspect-video w-full rounded-lg border object-cover"
+                      />
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl sm:max-w-4xl">
+                      <DialogTitle>Auction Sheet</DialogTitle>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
+                      <img
+                        src={files.auctionSheetUrl}
+                        alt="Auction sheet, full size"
+                        className="max-h-[85vh] w-full object-contain"
+                      />
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-lg border bg-muted text-muted-foreground">
+                    <ImageIcon className="size-8" />
+                    <p className="text-sm">No auction sheet uploaded.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           <Tabs defaultValue="information">
             <TabsList>
@@ -221,36 +284,30 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
               </FieldGroup>
             </TabsContent>
 
-            <TabsContent value="documents" className="space-y-6 rounded-lg border p-4">
+            <TabsContent value="documents" className="space-y-4 rounded-lg border p-4">
+              {NAMED_DOCUMENT_TYPES.map((documentType) => (
+                <div key={documentType}>
+                  <h3 className="mb-3 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h3>
+                  <VehicleDocumentList
+                    mode="persist"
+                    vehicleId={vehicle.id}
+                    documentType={documentType}
+                    label={DOCUMENT_TYPE_META[documentType].label}
+                    documents={files.documents.filter((document) => document.documentType === documentType)}
+                    canEdit={false}
+                  />
+                </div>
+              ))}
               <div>
-                <h3 className="mb-3 text-sm font-semibold">Auction Sheet</h3>
-                {files.auctionSheetUrl ? (
-                  <Dialog>
-                    <DialogTrigger
-                      render={<button type="button" className="shrink-0 rounded-md border" />}
-                      aria-label="View auction sheet full size"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-                      <img src={files.auctionSheetUrl} alt="Auction sheet" className="size-20 rounded-md object-cover" />
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl">
-                      <DialogTitle>Auction Sheet</DialogTitle>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-                      <img
-                        src={files.auctionSheetUrl}
-                        alt="Auction sheet, full size"
-                        className="max-h-[80vh] w-full object-contain"
-                      />
-                    </DialogContent>
-                  </Dialog>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No auction sheet uploaded.</p>
-                )}
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">Documents</h3>
-                <VehicleDocumentList mode="persist" vehicleId={vehicle.id} documents={files.documents} canEdit={false} />
+                <h3 className="mb-3 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h3>
+                <VehicleDocumentList
+                  mode="persist"
+                  vehicleId={vehicle.id}
+                  documentType="OTHER"
+                  label={DOCUMENT_TYPE_META.OTHER.label}
+                  documents={files.documents.filter((document) => document.documentType === "OTHER")}
+                  canEdit={false}
+                />
               </div>
             </TabsContent>
 

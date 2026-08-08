@@ -225,7 +225,13 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     }
     for (const document of input.documents) {
       const createdDocument = await tx.vehicleDocument.create({
-        data: { vehicleId: created.id, url: document.url, name: document.name, uploadedById: user.id },
+        data: {
+          vehicleId: created.id,
+          url: document.url,
+          name: document.name,
+          documentType: document.documentType,
+          uploadedById: user.id,
+        },
       });
       await activityLog.record(tx, {
         orgId: user.orgId,
@@ -233,7 +239,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         action: "ADD_VEHICLE_DOCUMENT",
         entity: "VehicleDocument",
         entityId: createdDocument.id,
-        after: { url: document.url, name: document.name },
+        after: { url: document.url, name: document.name, documentType: document.documentType },
       });
     }
 
@@ -337,9 +343,12 @@ export interface VehicleDetailData {
  * inputs and the other as plain text. Returns null if it doesn't exist or
  * belongs to a different org (both callers treat that as 404 — never leak
  * which org a given id belongs to). */
-export async function getVehicleDetail(orgId: string, id: string): Promise<VehicleDetailData | null> {
+export async function getVehicleDetail(orgId: string, serial: string): Promise<VehicleDetailData | null> {
+  // Looked up by serial, not id — serial is unique per org, read-only after
+  // creation (CLAUDE.md), and human-readable, so it doubles as the vehicle
+  // detail/edit page's URL slug instead of the opaque database id.
   const vehicle = await prisma.vehicle.findUnique({
-    where: { id },
+    where: { org_id_serial: { org_id: orgId, serial } },
     select: {
       id: true,
       org_id: true,
@@ -383,7 +392,9 @@ export async function getVehicleDetail(orgId: string, id: string): Promise<Vehic
     },
   });
 
-  if (!vehicle || vehicle.org_id !== orgId || vehicle.deletedAt !== null) return null;
+  // org_id is already part of the lookup key above, so a match is
+  // guaranteed to belong to this org — only soft-delete needs checking here.
+  if (!vehicle || vehicle.deletedAt !== null) return null;
 
   return {
     id: vehicle.id,

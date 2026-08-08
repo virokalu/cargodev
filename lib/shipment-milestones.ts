@@ -16,6 +16,7 @@ import { todayAtMidnight } from "@/lib/shipment-status";
 export type ShipmentMilestoneKey =
   | "AUCTION_BILL_PAID"
   | "TRANSPORT_ASSIGNED"
+  | "EC_RECEIVED"
   | "LC_OPEN"
   | "BOOKING_RECEIVED"
   | "LOADED"
@@ -40,6 +41,11 @@ export interface ShipmentMilestoneInput {
   etd: Date | null;
   eta: Date | null;
   destination: string | null;
+  /** Unlike every other field here, this doesn't live on Vehicle directly —
+   * it's the earliest createdAt among the vehicle's EC-type VehicleDocument
+   * rows (documentType "EC"), resolved by the caller. Completed the moment
+   * an EC is uploaded, same shape as etd/eta: null = not yet, a Date = when. */
+  ecReceivedAt: Date | null;
 }
 
 // LC Open only applies when shipping to Sri Lanka or Bangladesh — matches
@@ -48,8 +54,8 @@ export interface ShipmentMilestoneInput {
 const LC_OPEN_DESTINATIONS = new Set(["Sri Lanka", "Bangladesh"]);
 
 /** EC Received sits between Transport Assigned and Booking Received in the
- * real physical process, but there's no field to catch it yet — deferred
- * until one exists rather than shown as a permanently-incomplete step. */
+ * real physical process — completed the moment an EC-type document is
+ * uploaded (see ShipmentMilestoneInput.ecReceivedAt). */
 export function buildShipmentMilestones(input: ShipmentMilestoneInput): ShipmentMilestone[] {
   const today = todayAtMidnight();
   const etdPassed = input.etd !== null && input.etd.getTime() < today.getTime();
@@ -58,6 +64,12 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
   const milestones: ShipmentMilestone[] = [
     { key: "AUCTION_BILL_PAID", label: "Auction Bill Paid", completed: input.auctionBillPaid === true, date: null },
     { key: "TRANSPORT_ASSIGNED", label: "Rikso Given", completed: input.transportBy !== null, date: null },
+    {
+      key: "EC_RECEIVED",
+      label: "EC Received",
+      completed: input.ecReceivedAt !== null,
+      date: input.ecReceivedAt,
+    },
   ];
 
   if (input.destination && LC_OPEN_DESTINATIONS.has(input.destination)) {

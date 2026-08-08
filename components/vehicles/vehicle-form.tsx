@@ -51,6 +51,8 @@ import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
+import type { VehicleDocumentType } from "@prisma/client";
+import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
 import {
   SHIPMENT_STATUS_META,
   STORABLE_SHIPMENT_STATUSES,
@@ -395,6 +397,20 @@ export function VehicleForm({
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setState((previous) => ({ ...previous, [key]: value }));
+  }
+
+  // stagedDocuments is one flat array holding every type together — these
+  // give each VehicleDocumentList instance (one per type) a filtered view
+  // plus an onChange that only ever touches its own slice, leaving the
+  // other types' staged documents untouched.
+  function stagedDocumentsForType(documentType: VehicleDocumentType) {
+    return state.stagedDocuments.filter((document) => document.documentType === documentType);
+  }
+  function updateStagedDocumentsForType(documentType: VehicleDocumentType, next: StagedDocument[]) {
+    setField("stagedDocuments", [
+      ...state.stagedDocuments.filter((document) => document.documentType !== documentType),
+      ...next,
+    ]);
   }
 
   const isFC = state.track === "FC";
@@ -1147,17 +1163,57 @@ export function VehicleForm({
           )}
 
           {mode === "create" && (
-            <SectionCard icon={Folder} title="Documents" contentClassName="">
-              <VehicleDocumentList
-                mode="stage"
-                documents={state.stagedDocuments}
-                onChange={(documents) => setField("stagedDocuments", documents)}
-              />
+            <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
+              {NAMED_DOCUMENT_TYPES.map((documentType) => (
+                <div key={documentType}>
+                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+                  <VehicleDocumentList
+                    mode="stage"
+                    documentType={documentType}
+                    label={DOCUMENT_TYPE_META[documentType].label}
+                    documents={stagedDocumentsForType(documentType)}
+                    onChange={(documents) => updateStagedDocumentsForType(documentType, documents)}
+                  />
+                </div>
+              ))}
+              <div>
+                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+                <VehicleDocumentList
+                  mode="stage"
+                  documentType="OTHER"
+                  label={DOCUMENT_TYPE_META.OTHER.label}
+                  documents={stagedDocumentsForType("OTHER")}
+                  onChange={(documents) => updateStagedDocumentsForType("OTHER", documents)}
+                />
+              </div>
             </SectionCard>
           )}
           {mode === "edit" && files && (
-            <SectionCard icon={Folder} title="Documents" contentClassName="">
-              <VehicleDocumentList mode="persist" vehicleId={vehicleId!} documents={files.documents} canEdit />
+            <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
+              {NAMED_DOCUMENT_TYPES.map((documentType) => (
+                <div key={documentType}>
+                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+                  <VehicleDocumentList
+                    mode="persist"
+                    vehicleId={vehicleId!}
+                    documentType={documentType}
+                    label={DOCUMENT_TYPE_META[documentType].label}
+                    documents={files.documents.filter((document) => document.documentType === documentType)}
+                    canEdit
+                  />
+                </div>
+              ))}
+              <div>
+                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+                <VehicleDocumentList
+                  mode="persist"
+                  vehicleId={vehicleId!}
+                  documentType="OTHER"
+                  label={DOCUMENT_TYPE_META.OTHER.label}
+                  documents={files.documents.filter((document) => document.documentType === "OTHER")}
+                  canEdit
+                />
+              </div>
             </SectionCard>
           )}
 
