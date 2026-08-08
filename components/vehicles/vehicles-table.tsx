@@ -26,9 +26,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cell";
+import { TriStateCell } from "@/components/shared/tri-state-cell";
+import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
+import { ClickableRow, RowHoverProvider } from "@/components/vehicles/clickable-row";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -105,24 +108,6 @@ function SortableHeader({
       {label}
       <Icon className={cn("size-3.5", isActive ? "text-foreground" : "text-muted-foreground/50")} />
     </Link>
-  );
-}
-
-function TriStateCell({ value }: { value: boolean | null }) {
-  if (value === null) return <span className="text-muted-foreground">—</span>;
-  return <Badge variant={value ? "success" : "secondary"}>{value ? "Yes" : "No"}</Badge>;
-}
-
-function RowColourCell({ status }: { status: VehicleListRow["rowColourStatus"] }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="inline-block size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: status.colour }}
-      />
-      {status.name}
-    </span>
   );
 }
 
@@ -324,6 +309,7 @@ export function VehiclesTable({
           No vehicles match your search and filters.
         </div>
       ) : (
+        <RowHoverProvider>
         <StatusScrollProvider>
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
@@ -352,30 +338,34 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <TableRow key={row.id} className={ROW_HEIGHT_CLASS} style={{ backgroundColor: rowBg }}>
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("font-mono font-medium", !rowBg && "bg-card")}
-                        >
-                          {row.serial}
-                        </TableCell>
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("font-mono text-xs", !rowBg && "bg-card")}
-                        >
-                          {row.chassisNo ?? "—"}
-                        </TableCell>
-                        <TableCell
-                          style={{ backgroundColor: rowBg }}
-                          className={cn("whitespace-normal", !rowBg && "bg-card")}
-                        >
+                      <ClickableRow
+                        key={row.id}
+                        id={row.id}
+                        href={`/vehicles/${row.serial}`}
+                        className={ROW_HEIGHT_CLASS}
+                        rowColour={rowBg}
+                      >
+                        <TableCell className="font-mono font-medium">{row.serial}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.chassisNo ?? "—"}</TableCell>
+                        <TableCell>
                           {row.brandName || row.modelName ? (
                             <>
-                              <div className="font-medium">
+                              {/* max-w-[206px] = the 220px column minus TableCell's own p-2
+                                  (14px at this app's 14px root) — width/min-width on the
+                                  <th> above is only an auto-layout *hint*, so truncate's
+                                  overflow:hidden needs a real width on the element itself
+                                  to actually have something to clip against. */}
+                              <div
+                                className="max-w-[206px] truncate font-medium"
+                                title={[row.brandName, row.modelName].filter(Boolean).join(" ")}
+                              >
                                 {[row.brandName, row.modelName].filter(Boolean).join(" ")}
                               </div>
                               {(row.gradeName || row.yom) && (
-                                <div className="text-xs text-muted-foreground">
+                                <div
+                                  className="max-w-[206px] truncate text-xs text-muted-foreground"
+                                  title={[row.gradeName, row.yom].filter(Boolean).join(" - ")}
+                                >
                                   {[row.gradeName, row.yom].filter(Boolean).join(" - ")}
                                 </div>
                               )}
@@ -384,14 +374,14 @@ export function VehiclesTable({
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell style={{ backgroundColor: rowBg }} className={cn(!rowBg && "bg-card")}>
+                        <TableCell>
                           <div className="flex items-center gap-1.5">
                             <StatusScrollDot status={row.effectiveShipmentStatus} />
                             {canEditVehicle || canDelete ? (
                               <div className="flex items-center gap-1">
                                 {canEditVehicle && (
                                   <Link
-                                    href={`/vehicles/${row.id}/edit`}
+                                    href={`/vehicles/${row.serial}/edit`}
                                     aria-label={`Edit ${row.serial}`}
                                     className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
                                   >
@@ -405,7 +395,7 @@ export function VehiclesTable({
                             )}
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </ClickableRow>
                     );
                   })}
                 </TableBody>
@@ -444,7 +434,13 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <TableRow key={row.id} className={ROW_HEIGHT_CLASS} style={{ backgroundColor: rowBg }}>
+                      <ClickableRow
+                        key={row.id}
+                        id={row.id}
+                        href={`/vehicles/${row.serial}`}
+                        className={ROW_HEIGHT_CLASS}
+                        rowColour={rowBg}
+                      >
                         {SCROLL_COLUMNS.map((column, i) => (
                           <TableCell
                             key={column.key}
@@ -454,7 +450,7 @@ export function VehiclesTable({
                             {column.render(row, columnContext)}
                           </TableCell>
                         ))}
-                      </TableRow>
+                      </ClickableRow>
                     );
                   })}
                 </TableBody>
@@ -462,6 +458,7 @@ export function VehiclesTable({
             </div>
           </div>
         </StatusScrollProvider>
+        </RowHoverProvider>
       )}
 
       <div className="flex items-center justify-between">

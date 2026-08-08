@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/services/auth-guard";
-import { getVehicleForEdit, type VehicleEditData } from "@/lib/services/vehicle.service";
+import { getVehicleDetail, type VehicleDetailData } from "@/lib/services/vehicle.service";
 import { listRowColourStatuses } from "@/lib/services/lookup.service";
+import { listVehicleFiles } from "@/lib/services/file.service";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { toDateInputValue } from "@/lib/utils";
 import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form";
@@ -10,7 +11,7 @@ import { VehicleForm, type FormState } from "@/components/vehicles/vehicle-form"
  * through as ComboboxOption ({id, name}), dates become "YYYY-MM-DD" strings
  * (what a native <input type="date"> produces/expects), everything else is
  * a direct field-for-field copy. */
-function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
+function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
   return {
     auctionItemNo: vehicle.auctionItemNo ?? "",
     chassisNo: vehicle.chassisNo ?? "",
@@ -43,7 +44,7 @@ function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
     logBook: vehicle.logBook,
     extraKey: vehicle.extraKey,
     nameChangeDeadline: toDateInputValue(vehicle.nameChangeDeadline),
-    rowColourStatusId: vehicle.rowColourStatusId ?? "",
+    rowColourStatusId: vehicle.rowColourStatus?.id ?? "",
     docSentDate: toDateInputValue(vehicle.docSentDate),
     docSentComment: vehicle.docSentComment ?? "",
     recycleDate: toDateInputValue(vehicle.recycleDate),
@@ -55,21 +56,26 @@ function toFormValues(vehicle: VehicleEditData): Partial<FormState> {
 export default async function EditVehiclePage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ serial: string }>;
 }) {
   // Operator's vehicle write access is table-level only (row colour, from
   // the list view) — the full edit form is Administrator/Manager only.
   const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
-  const { id } = await params;
+  const { serial } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([
-    getVehicleForEdit(user.orgId, id),
+    getVehicleDetail(user.orgId, serial),
     listRowColourStatuses(user.orgId),
   ]);
 
   if (!vehicle) {
     notFound();
   }
+
+  // Fetched after confirming the vehicle exists — listVehicleFiles does its
+  // own ownership check and would throw rather than gracefully 404 if run
+  // in parallel with a vehicle that turns out not to exist.
+  const files = await listVehicleFiles(user.orgId, vehicle.id);
 
   return (
     <VehicleForm
@@ -79,6 +85,7 @@ export default async function EditVehiclePage({
       existingTrack={vehicle.track}
       existingShipmentStatus={vehicle.shipmentStatus}
       initialValues={toFormValues(vehicle)}
+      files={files}
       rowColourStatuses={rowColourStatuses}
       countries={COUNTRIES}
     />

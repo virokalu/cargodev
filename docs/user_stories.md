@@ -49,7 +49,7 @@ AC: selecting a row-colour status (Name Change Needed, Faxed to Auction, Sold, R
 Tasks: CD-D3-12, CD-D1-04
 
 **US-10 · Vehicle detail** — *As a staff member, I want a full detail page per vehicle so that everything about it — fields, photos, documents, remarks, history — lives in one place.*
-AC: all 35 fields displayed grouped logically; photo gallery, document list and auction sheet visible; remarks thread and status timeline included; Edit available per role.
+AC: all 35 fields displayed grouped logically; photo gallery, document list and auction sheet visible; remarks and status timeline included; read-only for every role — Edit/Delete are reached from the vehicles table (row click opens this page; the pencil/trash icons open the edit form or delete confirmation directly, without a detour through here).
 Tasks: CD-D1-06, CD-D2-11
 
 **US-11 · Edit a vehicle** — *As an Operator, I want to update any editable vehicle field so that records stay accurate as the shipment progresses.*
@@ -60,8 +60,8 @@ Tasks: CD-D2-01, CD-D2-02, CD-D2-04–06
 AC: new vehicles show all three as blank; a three-segment control sets Yes/No or clears back to blank; dashboards and filters treat blank and No as distinct values.
 Tasks: CD-D3-14, CD-D2-01, CD-D2-06
 
-**US-13 · Append-only remarks** — *As a staff member, I want to add remarks to a vehicle without overwriting earlier ones so that the record keeps a trustworthy conversation history.*
-AC: new remark appends with my name and timestamp; existing remarks are never editable or deletable; thread shows newest context clearly.
+**US-13 · Vehicle remark** — *As a staff member, I want a free-text note on a vehicle so that context that doesn't fit another field still has somewhere to live.*
+AC: single overwritable text field (`vehicleRemark`) — later edits replace the note, no author/timestamp thread; visible as its own column in the table and on the detail page's Notes tab. Superseded the original append-only `RemarkEntry` thread design during implementation (table dropped, see prisma/migrations/…_replace_vehicle_remarks_thread_with_field) — a single note per vehicle covered the actual usage better than a growing conversation log.
 Tasks: CD-D1-08
 
 **US-14 · Doc sent to client** — *As an Operator, I want to record the date documents were sent to the client with an optional comment so that we can answer "when did you send it?" instantly.*

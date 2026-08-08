@@ -83,7 +83,7 @@ The colour value is data, not code — admins can adjust colours without a deplo
 | 26 | Bill Number | text | — |
 | 27 | LC No | text | — |
 | 28 | Tracking No | text | — |
-| 29 | Remarks | append-only thread | Textarea; new entries append with author + timestamp, existing entries preserved (§6) |
+| 29 | Vehicle Remark | free text | **Changed 2026-07-26** — superseded the original append-only `RemarkEntry` thread design; a single overwritable `vehicleRemark` textarea covered actual usage better than a growing conversation log. Later edits replace the note, no author/timestamp history (§6). |
 | 30 | Doc Sent to Client | date **+ optional comment** | Two columns: `doc_sent_date`, `doc_sent_comment` |
 | 31 | Recycle | date | Confirmed as a date field (`recycle_date DateTime?`) |
 | 32 | Jibaishake (自賠責) | free text | Confirmed as text for now (`jibaishake String?`); can be structured later without migration pain |
@@ -168,7 +168,7 @@ model User {
 
 ## 6. Remarks, files, and activity log
 
-- **Remarks:** an append-only `RemarkEntry` child table (vehicle_id, author, body, createdAt) rendered as a running thread under a textarea. Nothing is ever overwritten — you always know who said what, when.
+- **Vehicle Remark:** a single `vehicleRemark String?` column on `Vehicle` — free text, overwritable, shown as its own table column and on the detail page's Notes tab. Originally spec'd as an append-only `RemarkEntry` child table (vehicle_id, author, body, createdAt) rendered as a running thread; replaced during implementation (2026-07-26) once a single note per vehicle turned out to cover actual usage better than a growing conversation log — the `RemarkEntry` table was dropped.
 - **Files per vehicle:** one Auction Sheet image, multiple Photos, multiple Documents (PDF) — all via the shared R2 presigned-upload infrastructure, URLs only in the DB.
 - **Admin activity log (change-order):** every mutation writes an `ActivityLog` row (actor, action, entity, before/after metadata); Administrator-only viewer screen with filters. Scoped 30 hrs / Rs. 27,000 — approval still recommended before Week 3.
 
