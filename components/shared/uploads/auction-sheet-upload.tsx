@@ -62,10 +62,10 @@ export function AuctionSheetUpload(props: AuctionSheetUploadProps) {
               {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
               <img src={currentUrl} alt="Auction sheet" className="size-20 rounded-md object-cover" />
             </DialogTrigger>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-3xl sm:max-w-4xl">
               <DialogTitle>Auction Sheet</DialogTitle>
               {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-              <img src={currentUrl} alt="Auction sheet, full size" className="max-h-[80vh] w-full object-contain" />
+              <img src={currentUrl} alt="Auction sheet, full size" className="max-h-[85vh] w-full object-contain" />
             </DialogContent>
           </Dialog>
           <Button

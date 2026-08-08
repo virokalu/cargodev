@@ -25,6 +25,7 @@ import {
   deriveShipmentStatusFromEtd,
   isCancelShipmentRowColour,
   todayAtMidnight,
+  CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
 } from "@/lib/shipment-status";
 
 export async function createVehicle(user: SessionUser, rawInput: unknown): Promise<Vehicle> {
@@ -224,7 +225,13 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     }
     for (const document of input.documents) {
       const createdDocument = await tx.vehicleDocument.create({
-        data: { vehicleId: created.id, url: document.url, name: document.name, uploadedById: user.id },
+        data: {
+          vehicleId: created.id,
+          url: document.url,
+          name: document.name,
+          documentType: document.documentType,
+          uploadedById: user.id,
+        },
       });
       await activityLog.record(tx, {
         orgId: user.orgId,
@@ -232,7 +239,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         action: "ADD_VEHICLE_DOCUMENT",
         entity: "VehicleDocument",
         entityId: createdDocument.id,
-        after: { url: document.url, name: document.name },
+        after: { url: document.url, name: document.name, documentType: document.documentType },
       });
     }
 
@@ -286,7 +293,7 @@ interface LookupRef {
   name: string;
 }
 
-export interface VehicleEditData {
+export interface VehicleDetailData {
   id: string;
   serial: string;
   track: SerialPrefix;
@@ -323,7 +330,7 @@ export interface VehicleEditData {
   logBook: boolean | null;
   extraKey: boolean | null;
   nameChangeDeadline: Date | null;
-  rowColourStatusId: string | null;
+  rowColourStatus: { id: string; name: string; colour: string } | null;
   docSentDate: Date | null;
   docSentComment: string | null;
   recycleDate: Date | null;
@@ -331,12 +338,17 @@ export interface VehicleEditData {
   vehicleRemark: string | null;
 }
 
-/** Fetches a vehicle shaped for the edit form. Returns null if it doesn't
- * exist or belongs to a different org (the edit page treats both as 404 —
- * never leak which org a given id belongs to). */
-export async function getVehicleForEdit(orgId: string, id: string): Promise<VehicleEditData | null> {
+/** Fetches a vehicle shaped for display — the edit form and the read-only
+ * detail page (US-10) both need every field, just one renders them as
+ * inputs and the other as plain text. Returns null if it doesn't exist or
+ * belongs to a different org (both callers treat that as 404 — never leak
+ * which org a given id belongs to). */
+export async function getVehicleDetail(orgId: string, serial: string): Promise<VehicleDetailData | null> {
+  // Looked up by serial, not id — serial is unique per org, read-only after
+  // creation (CLAUDE.md), and human-readable, so it doubles as the vehicle
+  // detail/edit page's URL slug instead of the opaque database id.
   const vehicle = await prisma.vehicle.findUnique({
-    where: { id },
+    where: { org_id_serial: { org_id: orgId, serial } },
     select: {
       id: true,
       org_id: true,
@@ -363,7 +375,6 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       logBook: true,
       extraKey: true,
       nameChangeDeadline: true,
-      rowColourStatusId: true,
       docSentDate: true,
       docSentComment: true,
       recycleDate: true,
@@ -377,11 +388,13 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
       packingAgent: { select: { id: true, name: true } },
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
-      rowColourStatus: { select: { name: true } },
+      rowColourStatus: { select: { id: true, name: true, colour: true } },
     },
   });
 
-  if (!vehicle || vehicle.org_id !== orgId || vehicle.deletedAt !== null) return null;
+  // org_id is already part of the lookup key above, so a match is
+  // guaranteed to belong to this org — only soft-delete needs checking here.
+  if (!vehicle || vehicle.deletedAt !== null) return null;
 
   return {
     id: vehicle.id,
@@ -426,13 +439,72 @@ export async function getVehicleForEdit(orgId: string, id: string): Promise<Vehi
     logBook: vehicle.logBook,
     extraKey: vehicle.extraKey,
     nameChangeDeadline: vehicle.nameChangeDeadline,
-    rowColourStatusId: vehicle.rowColourStatusId,
+    rowColourStatus: vehicle.rowColourStatus,
     docSentDate: vehicle.docSentDate,
     docSentComment: vehicle.docSentComment,
     recycleDate: vehicle.recycleDate,
     jibaishake: vehicle.jibaishake,
     vehicleRemark: vehicle.vehicleRemark,
   };
+}
+
+const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
+  ETD_SAVED: "ETD saved",
+  ETD_CLEARED: "ETD cleared",
+  CRON_JOB: "Automatic — daily job",
+  COMPUTED_GUARD: "Computed on read",
+  LEGACY_ENTRY: "Entered manually (legacy)",
+};
+
+export interface StatusHistoryItem {
+  id: string;
+  fromStatus: ShipmentStatus | null;
+  toStatus: ShipmentStatus;
+  triggerLabel: string;
+  /** null = System (cron/computed guard, no staff action). */
+  triggeredByName: string | null;
+  createdAt: Date;
+}
+
+/** US-17: "every status change with who/what triggered it and when."
+ * Chronological (oldest first) so the timeline UI can just render top to
+ * bottom. FL vehicles never get StatusHistory rows (shipment status isn't
+ * tracked for FL at all — CLAUDE.md), so this naturally comes back empty
+ * for them; callers don't need a separate FC check to call it safely, just
+ * to decide whether to render the section at all.
+ *
+ * Not currently called — the detail page's Shipment Timeline moved to the
+ * operational milestone list in lib/shipment-milestones.ts (2026-08-07),
+ * which better matches how staff actually track a shipment (paid / transport
+ * assigned / LC open / booking received / loaded / shipped / delivered)
+ * than the narrow Pending→Booking Received→Shipped enum this reads. Kept
+ * for the planned "who changed it" audit view, since the underlying
+ * StatusHistory rows (actor + trigger + timestamp) are exactly what that
+ * needs and this query is already written for them. */
+export async function listVehicleStatusHistory(orgId: string, vehicleId: string): Promise<StatusHistoryItem[]> {
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { org_id: true } });
+  if (!vehicle || vehicle.org_id !== orgId) return [];
+
+  const rows = await prisma.statusHistory.findMany({
+    where: { vehicleId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, fromStatus: true, toStatus: true, trigger: true, triggeredBy: true, createdAt: true },
+  });
+
+  const actorIds = [...new Set(rows.map((r) => r.triggeredBy).filter((id): id is string => id !== null))];
+  const actors = actorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+    : [];
+  const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
+
+  return rows.map((row) => ({
+    id: row.id,
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    triggerLabel: STATUS_HISTORY_TRIGGER_LABEL[row.trigger] ?? row.trigger,
+    triggeredByName: row.triggeredBy ? (actorNameById.get(row.triggeredBy) ?? null) : null,
+    createdAt: row.createdAt,
+  }));
 }
 
 async function assertVehicleInOrg(orgId: string, id: string) {
@@ -691,7 +763,7 @@ export async function updateVehicleAuctionBillPaid(
 // CANCELLED branch below and an exclusion on the other three branches.
 const CANCELLED_WHERE: Prisma.VehicleWhereInput = {
   serialPrefix: "FC",
-  rowColourStatus: { name: "Unit Canceled" },
+  rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } },
 };
 
 /** Same effective-status guard as computeEffectiveShipmentStatus, expressed
@@ -1047,8 +1119,9 @@ export async function listVehicles(
   // Shipment Status can't be sorted with a DB-level ORDER BY: the column
   // only ever holds the 3 storable values, but the table displays (and
   // this sort has to match) the *effective* status — also dependent on ETD
-  // and the "Unit Canceled" row colour, a JS-computed value with no real
-  // column behind it (see lib/shipment-status.ts). So this one sort key
+  // and the cancel-triggering row colours (CANCEL_SHIPMENT_ROW_COLOUR_NAMES),
+  // a JS-computed value with no real column behind it (see
+  // lib/shipment-status.ts). So this one sort key
   // fetches every matching row instead of a single DB page, sorts by the
   // same computeEffectiveShipmentStatus the table renders, then paginates
   // in memory. Fine at this app's scale (Phase 1, single org, 6-8 staff);

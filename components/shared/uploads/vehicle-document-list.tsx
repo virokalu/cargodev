@@ -1,17 +1,25 @@
 "use client";
 
 // Documents — multiple PDFs per vehicle with a filename, uploader, and date
-// (US-26). Two modes, same reasoning as AuctionSheetUpload (see
+// (US-26). Each instance manages exactly one VehicleDocumentType — the
+// parent (vehicle-form.tsx / vehicle-detail-view.tsx) renders one instance
+// per type (LC, EC, ED, BL, Inspection Report, plus the pre-existing
+// generic "Other" bucket) and is responsible for pre-filtering the
+// `documents` it hands to each instance, so this component never needs to
+// know about the other five types.
+//
+// Two modes, same reasoning as AuctionSheetUpload (see
 // auction-sheet-upload.tsx):
 //  - "stage": Add Vehicle form — no vehicleId exists yet, each uploaded
-//    {url, name} pair is handed back via onChange and submitted with the
-//    rest of the create payload.
+//    {url, name, documentType} triple is handed back via onChange and
+//    submitted with the rest of the create payload.
 //  - "persist": Edit page's Files panel — writes straight to the DB via
 //    addVehicleDocumentAction the moment each upload finishes.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, Trash2, Upload } from "lucide-react";
+import type { VehicleDocumentType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
@@ -21,17 +29,19 @@ import type { VehicleDocumentListItem } from "@/lib/services/file.service";
 export interface StagedDocument {
   url: string;
   name: string;
+  documentType: VehicleDocumentType;
 }
 
 interface DocumentUploadRowProps {
   vehicleId?: string;
+  documentType: VehicleDocumentType;
   file: File;
   onSettled: () => void;
   /** Stage mode only — called with the R2 URL + original filename once the upload finishes. */
   onStaged?: (document: StagedDocument) => void;
 }
 
-function DocumentUploadRow({ vehicleId, file, onSettled, onStaged }: DocumentUploadRowProps) {
+function DocumentUploadRow({ vehicleId, documentType, file, onSettled, onStaged }: DocumentUploadRowProps) {
   const router = useRouter();
   const { progress, error, upload } = useFileUpload();
 
@@ -41,10 +51,10 @@ function DocumentUploadRow({ vehicleId, file, onSettled, onStaged }: DocumentUpl
       .then(async (url) => {
         if (cancelled) return;
         if (vehicleId) {
-          await addVehicleDocumentAction(vehicleId, url, file.name);
+          await addVehicleDocumentAction(vehicleId, url, file.name, documentType);
           router.refresh();
         } else {
-          onStaged?.({ url, name: file.name });
+          onStaged?.({ url, name: file.name, documentType });
         }
       })
       .catch(() => {})
@@ -55,7 +65,7 @@ function DocumentUploadRow({ vehicleId, file, onSettled, onStaged }: DocumentUpl
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally once per row — file/vehicleId are fixed for its lifetime
+  }, []); // intentionally once per row — file/vehicleId/documentType are fixed for its lifetime
 
   return (
     <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
@@ -72,9 +82,15 @@ function DocumentUploadRow({ vehicleId, file, onSettled, onStaged }: DocumentUpl
   );
 }
 
-type VehicleDocumentListProps =
+type VehicleDocumentListProps = {
+  documentType: VehicleDocumentType;
+  /** Used in the "Add {label}" button and "No {label} yet." empty state, so
+   * six near-identical-looking sections stay distinguishable at a glance. */
+  label: string;
+} & (
   | { mode: "persist"; vehicleId: string; documents: VehicleDocumentListItem[]; canEdit: boolean }
-  | { mode: "stage"; documents: StagedDocument[]; onChange: (documents: StagedDocument[]) => void };
+  | { mode: "stage"; documents: StagedDocument[]; onChange: (documents: StagedDocument[]) => void }
+);
 
 export function VehicleDocumentList(props: VehicleDocumentListProps) {
   const router = useRouter();
@@ -130,7 +146,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
       {canEdit && (
         <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
           <Upload className="size-4" />
-          Add Documents
+          Add {props.label}
         </Button>
       )}
       <input
@@ -148,6 +164,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
             <DocumentUploadRow
               key={`${file.name}-${i}`}
               vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
+              documentType={props.documentType}
               file={file}
               onSettled={() => handleRowSettled(file)}
               onStaged={
@@ -163,7 +180,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
       {items.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <FileText className="size-4" />
-          No documents yet.
+          No documents uploaded yet.
         </p>
       ) : (
         <div className="space-y-1.5">

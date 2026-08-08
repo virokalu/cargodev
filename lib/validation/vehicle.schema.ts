@@ -165,7 +165,13 @@ export const vehicleCreateSchema = z
     // panel's immediate-persist actions instead.
     photoUrls: z.array(z.string().max(2000)).max(50).optional().default([]),
     documents: z
-      .array(z.object({ url: z.string().max(2000), name: z.string().min(1).max(255) }))
+      .array(
+        z.object({
+          url: z.string().max(2000),
+          name: z.string().min(1).max(255),
+          documentType: z.enum(["LC", "EC", "ED", "BL", "INSPECTION_REPORT", "OTHER"]),
+        })
+      )
       .max(50)
       .optional()
       .default([]),
