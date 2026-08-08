@@ -23,7 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
@@ -179,41 +179,33 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
           <div className="rounded-lg border p-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="mb-3 text-sm font-semibold">Vehicle Photos</h3>
-                <VehiclePhotoHero photos={files.photos} />
-              </div>
-
-              <div>
                 <h3 className="mb-3 text-sm font-semibold">Auction Sheet</h3>
                 {files.auctionSheetUrl ? (
-                  <Dialog>
-                    <DialogTrigger
-                      render={<button type="button" className="block w-full" />}
-                      aria-label="View auction sheet full size"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-                      <img
-                        src={files.auctionSheetUrl}
-                        alt="Auction sheet"
-                        className="aspect-video w-full rounded-lg border object-cover"
-                      />
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl sm:max-w-4xl">
-                      <DialogTitle>Auction Sheet</DialogTitle>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-                      <img
-                        src={files.auctionSheetUrl}
-                        alt="Auction sheet, full size"
-                        className="max-h-[85vh] w-full object-contain"
-                      />
-                    </DialogContent>
-                  </Dialog>
+                  <ImagePreviewDialog
+                    title="Auction Sheet"
+                    src={files.auctionSheetUrl}
+                    alt="Auction sheet, full size"
+                    triggerAriaLabel="View auction sheet full size"
+                    triggerClassName="block w-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
+                    <img
+                      src={files.auctionSheetUrl}
+                      alt="Auction sheet"
+                      className="aspect-video w-full rounded-lg border object-cover"
+                    />
+                  </ImagePreviewDialog>
                 ) : (
                   <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-lg border bg-muted text-muted-foreground">
                     <ImageIcon className="size-8" />
                     <p className="text-sm">No auction sheet uploaded.</p>
                   </div>
                 )}
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Vehicle Photos</h3>
+                <VehiclePhotoHero photos={files.photos} />
               </div>
             </div>
           </div>

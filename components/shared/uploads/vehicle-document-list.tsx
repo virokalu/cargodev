@@ -22,9 +22,12 @@ import { FileText, Loader2, Trash2, Upload } from "lucide-react";
 import type { VehicleDocumentType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
+import { FileDropZone } from "@/components/shared/uploads/file-drop-zone";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
 import { addVehicleDocumentAction, deleteVehicleDocumentAction } from "@/app/(dashboard)/vehicles/actions";
 import type { VehicleDocumentListItem } from "@/lib/services/file.service";
+
+const ACCEPT = "application/pdf";
 
 export interface StagedDocument {
   url: string;
@@ -98,11 +101,15 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
   const [inFlight, setInFlight] = useState<File[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  function handleNewFiles(files: File[]) {
+    if (files.length === 0) return;
+    setInFlight((prev) => [...prev, ...files]);
+  }
+
   function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (files.length === 0) return;
-    setInFlight((prev) => [...prev, ...files]);
+    handleNewFiles(files);
   }
 
   function handleRowSettled(file: File) {
@@ -142,79 +149,77 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
         }));
 
   return (
-    <div className="space-y-3">
-      {canEdit && (
-        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-          <Upload className="size-4" />
-          Add {props.label}
-        </Button>
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="application/pdf"
-        className="hidden"
-        onChange={handleFilesSelected}
-      />
+    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canEdit}>
+      <div className="space-y-3">
+        {canEdit && (
+          <div className="space-y-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+              <Upload className="size-4" />
+              Add {props.label}
+            </Button>
+            <p className="text-xs text-muted-foreground">or drag and drop PDFs here</p>
+          </div>
+        )}
+        <input ref={inputRef} type="file" multiple accept={ACCEPT} className="hidden" onChange={handleFilesSelected} />
 
-      {inFlight.length > 0 && (
-        <div className="space-y-1.5">
-          {inFlight.map((file, i) => (
-            <DocumentUploadRow
-              key={`${file.name}-${i}`}
-              vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
-              documentType={props.documentType}
-              file={file}
-              onSettled={() => handleRowSettled(file)}
-              onStaged={
-                props.mode === "stage"
-                  ? (document) => props.onChange([...props.documents, document])
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
+        {inFlight.length > 0 && (
+          <div className="space-y-1.5">
+            {inFlight.map((file, i) => (
+              <DocumentUploadRow
+                key={`${file.name}-${i}`}
+                vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
+                documentType={props.documentType}
+                file={file}
+                onSettled={() => handleRowSettled(file)}
+                onStaged={
+                  props.mode === "stage"
+                    ? (document) => props.onChange([...props.documents, document])
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
 
-      {items.length === 0 ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FileText className="size-4" />
-          No documents uploaded yet.
-        </p>
-      ) : (
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div key={item.key} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 truncate font-medium hover:underline"
-              >
-                {item.name}
-              </a>
-              {item.meta && <span className="shrink-0 text-xs text-muted-foreground">{item.meta}</span>}
-              {item.onDelete && (
-                <button
-                  type="button"
-                  aria-label="Delete document"
-                  disabled={deletingId === item.key}
-                  onClick={item.onDelete}
-                  className="shrink-0 text-destructive"
+        {items.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <FileText className="size-4" />
+            No documents uploaded yet.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {items.map((item) => (
+              <div key={item.key} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 truncate font-medium hover:underline"
                 >
-                  {deletingId === item.key ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+                  {item.name}
+                </a>
+                {item.meta && <span className="shrink-0 text-xs text-muted-foreground">{item.meta}</span>}
+                {item.onDelete && (
+                  <button
+                    type="button"
+                    aria-label="Delete document"
+                    disabled={deletingId === item.key}
+                    onClick={item.onDelete}
+                    className="shrink-0 text-destructive"
+                  >
+                    {deletingId === item.key ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </FileDropZone>
   );
 }
