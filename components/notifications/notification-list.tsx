@@ -54,8 +54,8 @@ export function NotificationList({ userId, initialNotifications }: NotificationL
       await markNotificationReadAction(notification.id);
       router.refresh();
     }
-    if (notification.vehicleId) {
-      router.push(`/vehicles/${notification.vehicleId}/edit`);
+    if (notification.vehicleSerial) {
+      router.push(`/vehicles/${notification.vehicleSerial}`);
     }
   }
 

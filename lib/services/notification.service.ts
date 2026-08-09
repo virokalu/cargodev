@@ -94,6 +94,12 @@ export interface NotificationListItem {
   body: string;
   isRead: boolean;
   vehicleId: string | null;
+  // The read-only detail page is routed by serial, not id (/vehicles/[serial])
+  // — resolved here, not via a Prisma relation, since Notification.vehicleId
+  // has none (same reasoning/shape as vehicle.service.ts's
+  // listVehicleStatusHistory resolving StatusHistory.triggeredBy to a name).
+  // Null when there's no linked vehicle, or it's since been deleted.
+  vehicleSerial: string | null;
   createdAt: Date;
 }
 
@@ -102,7 +108,7 @@ export async function listNotifications(
   userId: string,
   limit = 50
 ): Promise<NotificationListItem[]> {
-  return prisma.notification.findMany({
+  const rows = await prisma.notification.findMany({
     where: { org_id: orgId, userId },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -116,6 +122,17 @@ export async function listNotifications(
       createdAt: true,
     },
   });
+
+  const vehicleIds = [...new Set(rows.map((r) => r.vehicleId).filter((id): id is string => id !== null))];
+  const vehicles = vehicleIds.length
+    ? await prisma.vehicle.findMany({ where: { id: { in: vehicleIds } }, select: { id: true, serial: true } })
+    : [];
+  const serialById = new Map(vehicles.map((v) => [v.id, v.serial]));
+
+  return rows.map((row) => ({
+    ...row,
+    vehicleSerial: row.vehicleId ? (serialById.get(row.vehicleId) ?? null) : null,
+  }));
 }
 
 export async function countUnread(orgId: string, userId: string): Promise<number> {
