@@ -100,6 +100,13 @@ import {
 
 type RowColourStatusOption = LookupOption & { colour: string; transportCellOnly: boolean };
 
+// Year of Manufacture — same bounds the old NumberField enforced (min 1980,
+// max next calendar year), just as a picklist instead of free typing.
+// Descending so the most likely (recent) years sort first.
+const YOM_MAX_YEAR = new Date().getFullYear() + 1;
+const YOM_MIN_YEAR = 1980;
+const YOM_OPTIONS = Array.from({ length: YOM_MAX_YEAR - YOM_MIN_YEAR + 1 }, (_, i) => YOM_MAX_YEAR - i);
+
 interface VehicleFormProps {
   mode: "create" | "edit";
   /** Required when mode === "edit". */
@@ -786,15 +793,24 @@ export function VehicleForm({
               disabledHint="Select a model first"
               error={fieldErrors.gradeId}
             />
-            <NumberField
-              id="yom"
-              label="Year of Manufacture"
-              value={state.yomText}
-              onChange={(value) => setField("yomText", value)}
-              error={fieldErrors.yom}
-              min={1980}
-              max={new Date().getFullYear() + 1}
-            />
+            <div>
+              <Label htmlFor="yom" className="mb-1.5">
+                Year of Manufacture
+              </Label>
+              <Select value={state.yomText} onValueChange={(value) => setField("yomText", value ?? "")}>
+                <SelectTrigger id="yom" className="w-full" aria-invalid={!!fieldErrors.yom}>
+                  <SelectValue placeholder="Select year">{(itemValue: string) => itemValue || "Select year"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {YOM_OPTIONS.map((year) => (
+                    <SelectItem key={year} value={String(year)} label={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.yom && <p className="mt-1 text-xs text-destructive">{fieldErrors.yom}</p>}
+            </div>
 
             <ComboboxCreate
               id="auctionHall"
