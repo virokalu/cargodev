@@ -18,6 +18,7 @@ import type {
   AuctionHallReportGroup,
   CustomerReportGroup,
   DestinationReportGroup,
+  FreightAgentReportGroup,
   ReportVehicleRow,
 } from "@/lib/services/reports.service";
 
@@ -159,4 +160,18 @@ export function exportDestinationReportToPdf(destinations: DestinationReportGrou
     ["auctionHall", "customer"]
   );
   doc.save(isSingle ? `${slugify(sections[0].title)}-destination-report.pdf` : "destination-report.pdf");
+}
+
+export function exportFreightAgentReportToPdf(freightAgents: FreightAgentReportGroup[]): void {
+  const sections: ReportPdfSection[] = freightAgents.map((a) => ({
+    title: a.freightAgentName,
+    vehicles: a.vehicles,
+  }));
+  const isSingle = sections.length === 1;
+  const doc = buildReportPdf(
+    sections,
+    isSingle ? `Freight Agent Report — ${sections[0].title}` : "Freight Agent Report",
+    ["customer", "shippingMethod"]
+  );
+  doc.save(isSingle ? `${slugify(sections[0].title)}-freight-agent-report.pdf` : "freight-agent-report.pdf");
 }

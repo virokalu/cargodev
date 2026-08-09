@@ -19,7 +19,7 @@
 // anywhere in the Vehicle model, so unlike some reference mockups these
 // reports don't show a price/purchase-value figure.
 
-import type { Prisma, SerialPrefix } from "@prisma/client";
+import type { Prisma, SerialPrefix, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
@@ -36,6 +36,8 @@ export interface ReportVehicleRow {
   auctionHallName: string | null;
   destination: string | null;
   customerName: string | null;
+  freightAgentName: string | null;
+  shippingMethod: ShippingMethod | null;
   etd: Date | null;
   eta: Date | null;
   status: ReportVehicleStatus;
@@ -63,12 +65,22 @@ export interface DestinationReportGroup extends ReportGroupStats {
   destination: string;
 }
 
+export interface FreightAgentReportGroup extends ReportGroupStats {
+  freightAgentId: string;
+  freightAgentName: string;
+}
+
 export interface CustomerOption {
   id: string;
   name: string;
 }
 
 export interface AuctionHallOption {
+  id: string;
+  name: string;
+}
+
+export interface FreightAgentOption {
   id: string;
   name: string;
 }
@@ -88,6 +100,11 @@ export interface AuctionHallVehicleReportData {
 export interface DestinationVehicleReportData {
   destinations: DestinationReportGroup[];
   destinationOptions: string[];
+}
+
+export interface FreightAgentVehicleReportData {
+  freightAgents: FreightAgentReportGroup[];
+  freightAgentOptions: FreightAgentOption[];
 }
 
 function emptyStatusCounts(): Record<ReportVehicleStatus, number> {
@@ -110,8 +127,10 @@ const REPORT_VEHICLE_SELECT = {
   eta: true,
   yom: true,
   shipmentStatus: true,
+  shippingMethod: true,
   model: { select: { name: true, brand: { select: { name: true } } } },
   auctionHall: { select: { id: true, name: true } },
+  freightAgent: { select: { id: true, name: true } },
   rowColourStatus: { select: { name: true } },
   customer: { select: { id: true, name: true, email: true, phone: true, country: true } },
 } satisfies Prisma.VehicleSelect;
@@ -136,6 +155,8 @@ function toReportVehicleRow(v: RawReportVehicle, track: ReportTrack): ReportVehi
     auctionHallName: v.auctionHall?.name ?? null,
     destination: v.destination,
     customerName: v.customer?.name ?? null,
+    freightAgentName: v.freightAgent?.name ?? null,
+    shippingMethod: v.shippingMethod,
     etd: v.etd,
     eta: v.eta,
     status,
@@ -269,4 +290,47 @@ export async function getDestinationVehicleReport(
   const destinationOptions = destinations.map((d) => d.destination);
 
   return { destinations, destinationOptions };
+}
+
+// Freight agents are only ever assigned to FC vehicles — freightAgentId is
+// one of the fields vehicle.service.ts nulls out for FL on both create and
+// update — so, unlike the three reports above, this one has no track
+// parameter and is always scoped to FC.
+export async function getFreightAgentVehicleReport(orgId: string): Promise<FreightAgentVehicleReportData> {
+  const vehicles = await prisma.vehicle.findMany({
+    where: { org_id: orgId, deletedAt: null, serialPrefix: "FC", freightAgentId: { not: null } },
+    select: REPORT_VEHICLE_SELECT,
+    orderBy: [{ serialNumber: "asc" }],
+  });
+
+  const groups = new Map<string, FreightAgentReportGroup>();
+
+  for (const v of vehicles) {
+    if (!v.freightAgent) continue;
+    const row = toReportVehicleRow(v, "FC");
+
+    let group = groups.get(v.freightAgent.id);
+    if (!group) {
+      group = {
+        freightAgentId: v.freightAgent.id,
+        freightAgentName: v.freightAgent.name,
+        vehicles: [],
+        statusCounts: emptyStatusCounts(),
+      };
+      groups.set(v.freightAgent.id, group);
+    }
+
+    group.vehicles.push(row);
+    group.statusCounts[row.status]++;
+  }
+
+  const freightAgents = Array.from(groups.values()).sort((a, b) =>
+    a.freightAgentName.localeCompare(b.freightAgentName)
+  );
+  const freightAgentOptions: FreightAgentOption[] = freightAgents.map((a) => ({
+    id: a.freightAgentId,
+    name: a.freightAgentName,
+  }));
+
+  return { freightAgents, freightAgentOptions };
 }

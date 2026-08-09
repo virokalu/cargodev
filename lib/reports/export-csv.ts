@@ -14,6 +14,7 @@ import type {
   AuctionHallReportGroup,
   CustomerReportGroup,
   DestinationReportGroup,
+  FreightAgentReportGroup,
   ReportVehicleRow,
 } from "@/lib/services/reports.service";
 
@@ -65,6 +66,7 @@ function downloadCsv(headers: string[], rows: string[][], filename: string): voi
 const CUSTOMER_REPORT_COLUMNS: ReportVehicleColumnKey[] = ["auctionHall", "destination"];
 const AUCTION_HALL_REPORT_COLUMNS: ReportVehicleColumnKey[] = ["customer", "destination"];
 const DESTINATION_REPORT_COLUMNS: ReportVehicleColumnKey[] = ["auctionHall", "customer"];
+const FREIGHT_AGENT_REPORT_COLUMNS: ReportVehicleColumnKey[] = ["customer", "shippingMethod"];
 
 export function exportCustomerReportToCsv(customers: CustomerReportGroup[]): void {
   const headers = ["Customer", "Email", "Phone", "Country", ...vehicleHeaders(CUSTOMER_REPORT_COLUMNS)];
@@ -92,4 +94,11 @@ export function exportDestinationReportToCsv(destinations: DestinationReportGrou
     destination.vehicles.map((vehicle) => vehicleRowCells(vehicle, DESTINATION_REPORT_COLUMNS))
   );
   downloadCsv(vehicleHeaders(DESTINATION_REPORT_COLUMNS), rows, "destination-report.csv");
+}
+
+export function exportFreightAgentReportToCsv(freightAgents: FreightAgentReportGroup[]): void {
+  const rows = freightAgents.flatMap((agent) =>
+    agent.vehicles.map((vehicle) => vehicleRowCells(vehicle, FREIGHT_AGENT_REPORT_COLUMNS))
+  );
+  downloadCsv(vehicleHeaders(FREIGHT_AGENT_REPORT_COLUMNS), rows, "freight-agent-report.csv");
 }

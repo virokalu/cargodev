@@ -10,12 +10,13 @@
 
 import { cn } from "@/lib/utils";
 
-export type ReportTab = "customer" | "auctionHall" | "destination";
+export type ReportTab = "customer" | "auctionHall" | "destination" | "freightAgent";
 
 const TABS: { value: ReportTab; label: string }[] = [
   { value: "customer", label: "Customer Vehicle" },
   { value: "auctionHall", label: "Auction Hall" },
   { value: "destination", label: "Destination" },
+  { value: "freightAgent", label: "Freight Agent" },
 ];
 
 interface ReportTabsProps {
