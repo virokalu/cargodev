@@ -3,6 +3,7 @@
 // Cloudflare R2 rule). Every mutator re-checks vehicle ownership and writes
 // an ActivityLog entry in the same transaction, same shape as vehicle.service.ts.
 
+import type { VehicleDocumentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/services/auth-guard";
@@ -30,6 +31,7 @@ export interface VehicleDocumentListItem {
   id: string;
   url: string;
   name: string;
+  documentType: VehicleDocumentType;
   uploaderName: string;
   createdAt: Date;
 }
@@ -51,7 +53,14 @@ export async function listVehicleFiles(orgId: string, vehicleId: string): Promis
         orderBy: { createdAt: "desc" },
       },
       documents: {
-        select: { id: true, url: true, name: true, createdAt: true, uploadedBy: { select: { name: true } } },
+        select: {
+          id: true,
+          url: true,
+          name: true,
+          documentType: true,
+          createdAt: true,
+          uploadedBy: { select: { name: true } },
+        },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -69,6 +78,7 @@ export async function listVehicleFiles(orgId: string, vehicleId: string): Promis
       id: d.id,
       url: d.url,
       name: d.name,
+      documentType: d.documentType,
       uploaderName: d.uploadedBy.name,
       createdAt: d.createdAt,
     })),
@@ -158,13 +168,14 @@ export async function addVehicleDocument(
   actor: SessionUser,
   vehicleId: string,
   url: string,
-  name: string
+  name: string,
+  documentType: VehicleDocumentType
 ): Promise<VehicleDocumentListItem> {
   await getOwnedVehicle(actor.orgId, vehicleId);
 
   return prisma.$transaction(async (tx) => {
     const document = await tx.vehicleDocument.create({
-      data: { vehicleId, url, name, uploadedById: actor.id },
+      data: { vehicleId, url, name, documentType, uploadedById: actor.id },
       include: { uploadedBy: { select: { name: true } } },
     });
     await activityLog.record(tx, {
@@ -173,12 +184,13 @@ export async function addVehicleDocument(
       action: "ADD_VEHICLE_DOCUMENT",
       entity: "VehicleDocument",
       entityId: document.id,
-      after: { url, name },
+      after: { url, name, documentType },
     });
     return {
       id: document.id,
       url: document.url,
       name: document.name,
+      documentType: document.documentType,
       uploaderName: document.uploadedBy.name,
       createdAt: document.createdAt,
     };

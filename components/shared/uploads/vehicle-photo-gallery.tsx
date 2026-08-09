@@ -13,9 +13,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Images, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FileDropZone } from "@/components/shared/uploads/file-drop-zone";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
 import { addVehiclePhotoAction, deleteVehiclePhotoAction } from "@/app/(dashboard)/vehicles/actions";
 import type { VehiclePhotoListItem } from "@/lib/services/file.service";
+
+const ACCEPT = "image/jpeg,image/png,image/webp";
 
 interface PhotoUploadRowProps {
   vehicleId?: string;
@@ -80,11 +83,15 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
   const [inFlight, setInFlight] = useState<File[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  function handleNewFiles(files: File[]) {
+    if (files.length === 0) return;
+    setInFlight((prev) => [...prev, ...files]);
+  }
+
   function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (files.length === 0) return;
-    setInFlight((prev) => [...prev, ...files]);
+    handleNewFiles(files);
   }
 
   function handleRowSettled(file: File) {
@@ -120,72 +127,70 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
         }));
 
   return (
-    <div className="space-y-3">
-      {canEdit && (
-        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-          <Upload className="size-4" />
-          Add Photos
-        </Button>
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={handleFilesSelected}
-      />
+    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canEdit}>
+      <div className="space-y-3">
+        {canEdit && (
+          <div className="space-y-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+              <Upload className="size-4" />
+              Add Photos
+            </Button>
+            <p className="text-xs text-muted-foreground">or drag and drop images here</p>
+          </div>
+        )}
+        <input ref={inputRef} type="file" multiple accept={ACCEPT} className="hidden" onChange={handleFilesSelected} />
 
-      {inFlight.length > 0 && (
-        <div className="space-y-1.5">
-          {inFlight.map((file, i) => (
-            <PhotoUploadRow
-              key={`${file.name}-${i}`}
-              vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
-              file={file}
-              onSettled={() => handleRowSettled(file)}
-              onStaged={
-                props.mode === "stage" ? (url) => props.onChange([...props.photos, url]) : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
-
-      {items.length === 0 ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Images className="size-4" />
-          No photos yet.
-        </p>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-          {items.map((item) => (
-            <div key={item.key} className="group relative">
-              {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-              <img
-                src={item.url}
-                alt=""
-                className="aspect-square w-full rounded-md border border-border object-cover"
+        {inFlight.length > 0 && (
+          <div className="space-y-1.5">
+            {inFlight.map((file, i) => (
+              <PhotoUploadRow
+                key={`${file.name}-${i}`}
+                vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
+                file={file}
+                onSettled={() => handleRowSettled(file)}
+                onStaged={
+                  props.mode === "stage" ? (url) => props.onChange([...props.photos, url]) : undefined
+                }
               />
-              {item.onDelete && (
-                <button
-                  type="button"
-                  aria-label="Delete photo"
-                  disabled={deletingId === item.key}
-                  onClick={item.onDelete}
-                  className="absolute top-1 right-1 rounded-md bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  {deletingId === item.key ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-3.5" />
-                  )}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+
+        {items.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Images className="size-4" />
+            No photos yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            {items.map((item) => (
+              <div key={item.key} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
+                <img
+                  src={item.url}
+                  alt=""
+                  className="aspect-square w-full rounded-md border border-border object-cover"
+                />
+                {item.onDelete && (
+                  <button
+                    type="button"
+                    aria-label="Delete photo"
+                    disabled={deletingId === item.key}
+                    onClick={item.onDelete}
+                    className="absolute top-1 right-1 rounded-md bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    {deletingId === item.key ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-3.5" />
+                    )}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </FileDropZone>
   );
 }

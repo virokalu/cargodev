@@ -35,6 +35,18 @@ enum ShippingMethod {
   CONTAINER
 }
 
+// Categorizes uploaded VehicleDocument rows. OTHER is the pre-existing
+// generic "Add Documents" bucket — kept as the default so every document
+// uploaded before this enum existed reads as OTHER, not as a data gap.
+enum VehicleDocumentType {
+  LC                 // Letter of Credit
+  EC                 // Export Certificate — completing this is the EC_RECEIVED shipment milestone (lib/shipment-milestones.ts)
+  ED                 // Export Declaration
+  BL                 // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
+  INSPECTION_REPORT
+  OTHER
+}
+
 enum UserType {
   STAFF
   CUSTOMER
@@ -385,12 +397,13 @@ model VehiclePhoto {
 
 // Multiple documents per vehicle (B/L, export cert, invoices, etc.)
 model VehicleDocument {
-  id           String   @id @default(cuid())
+  id           String              @id @default(cuid())
   vehicleId    String
   url          String
-  name         String   // Original filename shown in the UI
+  name         String              // Original filename shown in the UI
+  documentType VehicleDocumentType @default(OTHER)
   uploadedById String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime            @default(now())
 
   vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   uploadedBy   User     @relation(fields: [uploadedById], references: [id])

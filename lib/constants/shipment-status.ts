@@ -5,7 +5,8 @@
 // CANCELLED is not a real stored value (the underlying Vehicle.shipmentStatus
 // column, and the DB enum backing it, only ever hold the three statuses
 // below) — it's a computed display-only status shown whenever an FC
-// vehicle's row colour is set to "Unit Canceled", exactly like the existing
+// vehicle's row colour is one of CANCEL_SHIPMENT_ROW_COLOUR_NAMES ("Unit
+// Canceled", "Resold in Auction"), exactly like the existing
 // BOOKING_RECEIVED -> SHIPPED "computed guard on read" never writes to the
 // column either. See lib/shipment-status.ts.
 
