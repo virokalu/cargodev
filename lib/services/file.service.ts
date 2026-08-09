@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/services/auth-guard";
 import * as activityLog from "@/lib/services/activity-log.service";
+import * as notificationService from "@/lib/services/notification.service";
 import { deleteObject, keyFromPublicUrl } from "@/lib/r2";
 
 /** Same shape as the deleted remark.service.ts's helper — exported because
@@ -122,9 +123,9 @@ export async function addVehiclePhoto(
   vehicleId: string,
   url: string
 ): Promise<VehiclePhotoListItem> {
-  await getOwnedVehicle(actor.orgId, vehicleId);
+  const vehicle = await getOwnedVehicle(actor.orgId, vehicleId);
 
-  return prisma.$transaction(async (tx) => {
+  const { photo, notification } = await prisma.$transaction(async (tx) => {
     const photo = await tx.vehiclePhoto.create({
       data: { vehicleId, url, uploadedById: actor.id },
       include: { uploadedBy: { select: { name: true } } },
@@ -137,8 +138,23 @@ export async function addVehiclePhoto(
       entityId: photo.id,
       after: { url },
     });
-    return { id: photo.id, url: photo.url, uploaderName: photo.uploadedBy.name, createdAt: photo.createdAt };
+
+    const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, actor.orgId, actor.id);
+    const notification: notificationService.EmitParams = {
+      orgId: actor.orgId,
+      event: "DOCUMENT_UPLOADED",
+      title: "Photo added",
+      body: `${actor.name} added a photo to ${vehicle.serial}.`,
+      vehicleId,
+      recipientUserIds,
+    };
+    await notificationService.emit(tx, notification);
+
+    return { photo, notification };
   });
+
+  notificationService.notifyRealtime(notification);
+  return { id: photo.id, url: photo.url, uploaderName: photo.uploadedBy.name, createdAt: photo.createdAt };
 }
 
 export async function deleteVehiclePhoto(actor: SessionUser, vehicleId: string, photoId: string): Promise<void> {
@@ -171,9 +187,9 @@ export async function addVehicleDocument(
   name: string,
   documentType: VehicleDocumentType
 ): Promise<VehicleDocumentListItem> {
-  await getOwnedVehicle(actor.orgId, vehicleId);
+  const vehicle = await getOwnedVehicle(actor.orgId, vehicleId);
 
-  return prisma.$transaction(async (tx) => {
+  const { document, notification } = await prisma.$transaction(async (tx) => {
     const document = await tx.vehicleDocument.create({
       data: { vehicleId, url, name, documentType, uploadedById: actor.id },
       include: { uploadedBy: { select: { name: true } } },
@@ -186,15 +202,30 @@ export async function addVehicleDocument(
       entityId: document.id,
       after: { url, name, documentType },
     });
-    return {
-      id: document.id,
-      url: document.url,
-      name: document.name,
-      documentType: document.documentType,
-      uploaderName: document.uploadedBy.name,
-      createdAt: document.createdAt,
+
+    const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, actor.orgId, actor.id);
+    const notification: notificationService.EmitParams = {
+      orgId: actor.orgId,
+      event: "DOCUMENT_UPLOADED",
+      title: "Document added",
+      body: `${actor.name} added "${name}" to ${vehicle.serial}.`,
+      vehicleId,
+      recipientUserIds,
     };
+    await notificationService.emit(tx, notification);
+
+    return { document, notification };
   });
+
+  notificationService.notifyRealtime(notification);
+  return {
+    id: document.id,
+    url: document.url,
+    name: document.name,
+    documentType: document.documentType,
+    uploaderName: document.uploadedBy.name,
+    createdAt: document.createdAt,
+  };
 }
 
 export async function deleteVehicleDocument(

@@ -6,11 +6,18 @@ import { Menu, Bell, LogOut, User, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { StaffRole } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getPusherClient, userChannelName } from "@/lib/pusher-client";
 
 interface HeaderProps {
   onMenuOpen: () => void;
+  userId: string;
   userName: string;
   userRole: StaffRole;
+  /** From the dashboard layout's server-side count — Header only tracks live
+   * increments on top of this; a full resync happens whenever the layout
+   * re-renders with a fresh value (e.g. after router.refresh() following a
+   * mark-read action on the notifications page). */
+  initialUnreadCount: number;
 }
 
 /** Derive up to 2 uppercase initials from a display name. */
@@ -30,11 +37,29 @@ function roleBadgeLabel(role: StaffRole): string {
   return map[role];
 }
 
-export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) {
+export default function Header({
+  onMenuOpen,
+  userId,
+  userName,
+  userRole,
+  initialUnreadCount,
+}: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [isNavigatingToProfile, startProfileNavigation] = useTransition();
+  const [notificationCount, setNotificationCount] = useState(initialUnreadCount);
+  // Adjust-during-render resync (react.dev "Adjusting state when a prop
+  // changes") rather than a useEffect — avoids the extra render pass and
+  // the "setState synchronously in an effect" lint error. Fires whenever the
+  // server-provided count changes, e.g. after router.refresh() following a
+  // mark-read/mark-all-read action on the notifications page. Live
+  // increments between resyncs come from the Pusher effect below.
+  const [syncedUnreadCount, setSyncedUnreadCount] = useState(initialUnreadCount);
+  if (initialUnreadCount !== syncedUnreadCount) {
+    setSyncedUnreadCount(initialUnreadCount);
+    setNotificationCount(initialUnreadCount);
+  }
 
   // Close the user menu when clicking outside
   useEffect(() => {
@@ -47,8 +72,22 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Notification count — placeholder until real data is wired in CD-D1-17/18
-  const notificationCount = 0;
+  // Real-time badge — no-ops quietly if Pusher isn't configured
+  // (getPusherClient() returns null, see lib/pusher-client.ts).
+  useEffect(() => {
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel = pusher.subscribe(userChannelName(userId));
+    const handleNewNotification = () => setNotificationCount((count) => count + 1);
+    channel.bind("notification", handleNewNotification);
+
+    return () => {
+      channel.unbind("notification", handleNewNotification);
+      pusher.unsubscribe(userChannelName(userId));
+    };
+  }, [userId]);
+
   const initials = getInitials(userName);
 
   return (
@@ -71,6 +110,7 @@ export default function Header({ onMenuOpen, userName, userRole }: HeaderProps) 
 
         {/* Notification bell */}
         <button
+          onClick={() => router.push("/notifications")}
           className="relative w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           aria-label={`Notifications${notificationCount > 0 ? ` (${notificationCount} unread)` : ""}`}
         >

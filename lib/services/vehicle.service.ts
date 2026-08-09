@@ -19,6 +19,7 @@ import {
 } from "@/lib/validation/vehicle.schema";
 import { assignNextSerial, assignLegacySerial } from "@/lib/services/serial.service";
 import * as activityLog from "@/lib/services/activity-log.service";
+import * as notificationService from "@/lib/services/notification.service";
 import {
   computeEffectiveShipmentStatus,
   computeShipmentStatusAfterEtdChange,
@@ -185,6 +186,12 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
       },
     });
 
+    // Admin/Manager, minus the person doing the creating — resolved once and
+    // reused for both notification kinds below (same recipients either way).
+    const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, user.orgId, user.id);
+    let bookingReceivedNotification: notificationService.EmitParams | null = null;
+    let documentUploadedNotification: notificationService.EmitParams | null = null;
+
     if (legacyStatus && legacyStatus !== "PENDING") {
       await tx.statusHistory.create({
         data: {
@@ -205,6 +212,15 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
           triggeredBy: user.id,
         },
       });
+      bookingReceivedNotification = {
+        orgId: user.orgId,
+        event: "BOOKING_RECEIVED",
+        title: "Booking Received",
+        body: `${serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
+        vehicleId: created.id,
+        recipientUserIds,
+      };
+      await notificationService.emit(tx, bookingReceivedNotification);
     }
 
     // Photos/Documents staged via the presigned-upload flow before the
@@ -212,8 +228,10 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     // created.id exists, still inside this transaction. Logged with the same
     // action names file.service.ts uses for the post-creation path, so the
     // audit trail reads the same either way.
+    let attachedFileCount = 0;
     for (const url of input.photoUrls) {
       const photo = await tx.vehiclePhoto.create({ data: { vehicleId: created.id, url, uploadedById: user.id } });
+      attachedFileCount += 1;
       await activityLog.record(tx, {
         orgId: user.orgId,
         actorId: user.id,
@@ -233,6 +251,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
           uploadedById: user.id,
         },
       });
+      attachedFileCount += 1;
       await activityLog.record(tx, {
         orgId: user.orgId,
         actorId: user.id,
@@ -241,6 +260,20 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         entityId: createdDocument.id,
         after: { url: document.url, name: document.name, documentType: document.documentType },
       });
+    }
+
+    // One combined notification for the whole creation, not one per file —
+    // a 5-photo staged upload shouldn't burst 5 separate bell entries.
+    if (attachedFileCount > 0) {
+      documentUploadedNotification = {
+        orgId: user.orgId,
+        event: "DOCUMENT_UPLOADED",
+        title: "Files attached",
+        body: `${user.name} attached ${attachedFileCount} file${attachedFileCount === 1 ? "" : "s"} to ${serial}.`,
+        vehicleId: created.id,
+        recipientUserIds,
+      };
+      await notificationService.emit(tx, documentUploadedNotification);
     }
 
     await activityLog.record(tx, {
@@ -254,10 +287,16 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
       after: JSON.parse(JSON.stringify(created)),
     });
 
-    return created;
+    return { created, bookingReceivedNotification, documentUploadedNotification };
   });
 
-  return vehicle;
+  // Real-time push happens after the transaction has actually committed —
+  // Pusher is an external network call and has no place inside a DB
+  // transaction (see notification.service.ts's notifyRealtime).
+  if (vehicle.bookingReceivedNotification) notificationService.notifyRealtime(vehicle.bookingReceivedNotification);
+  if (vehicle.documentUploadedNotification) notificationService.notifyRealtime(vehicle.documentUploadedNotification);
+
+  return vehicle.created;
 }
 
 /** Soft-warn only — legacy data may have real duplicate chassis numbers, so
@@ -646,6 +685,8 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
       },
     });
 
+    let bookingReceivedNotification: notificationService.EmitParams | null = null;
+
     if (statusTransition) {
       await tx.statusHistory.create({
         data: {
@@ -656,6 +697,22 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
           triggeredBy: user.id,
         },
       });
+
+      // Only the Pending -> Booking Received direction is notify-worthy —
+      // clearing an ETD (ETD_CLEARED, reverting to Pending) isn't an event
+      // staff need alerted about.
+      if (statusTransition.trigger === "ETD_SAVED") {
+        const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, user.orgId, user.id);
+        bookingReceivedNotification = {
+          orgId: user.orgId,
+          event: "BOOKING_RECEIVED",
+          title: "Booking Received",
+          body: `${existing.serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
+          vehicleId: id,
+          recipientUserIds,
+        };
+        await notificationService.emit(tx, bookingReceivedNotification);
+      }
     }
 
     await activityLog.record(tx, {
@@ -668,10 +725,12 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
       after: JSON.parse(JSON.stringify(result)),
     });
 
-    return result;
+    return { result, bookingReceivedNotification };
   });
 
-  return updated;
+  if (updated.bookingReceivedNotification) notificationService.notifyRealtime(updated.bookingReceivedNotification);
+
+  return updated.result;
 }
 
 /** Soft delete — sets deletedAt instead of removing the row, so the serial

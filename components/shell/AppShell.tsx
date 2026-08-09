@@ -6,6 +6,7 @@ import Header from "./Header";
 import type { StaffRole } from "@prisma/client";
 
 interface AppShellUser {
+  id: string;
   name: string;
   role: StaffRole;
 }
@@ -13,9 +14,10 @@ interface AppShellUser {
 interface AppShellProps {
   children: React.ReactNode;
   user: AppShellUser;
+  unreadCount: number;
 }
 
-export default function AppShell({ children, user }: AppShellProps) {
+export default function AppShell({ children, user, unreadCount }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -32,8 +34,10 @@ export default function AppShell({ children, user }: AppShellProps) {
       <div className="flex flex-col flex-1 min-w-0">
         <Header
           onMenuOpen={() => setMobileOpen(true)}
+          userId={user.id}
           userName={user.name}
           userRole={user.role}
+          initialUnreadCount={unreadCount}
         />
         <main className="flex-1 overflow-auto bg-background p-3">
           {children}
