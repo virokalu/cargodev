@@ -79,11 +79,11 @@ export default function LoginForm({ orgName }: LoginFormProps) {
             </h1>
             <p className="login-body-text text-base leading-relaxed max-w-sm">
               Track imported vehicles from overseas auction win to customer
-              handover — all from one dashboard.
+              handover, all from one dashboard.
             </p>
 
             {/* Stats row */}
-            <div className="flex gap-10 mt-10">
+            {/* <div className="flex gap-10 mt-10">
               <div>
                 <p className="login-stat-glow text-3xl font-bold text-white">
                   FC / FL
@@ -98,7 +98,7 @@ export default function LoginForm({ orgName }: LoginFormProps) {
                 <p className="login-stat-glow text-3xl font-bold text-white">6–8</p>
                 <p className="login-label-text text-sm mt-0.5">Staff users</p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Footer */}
