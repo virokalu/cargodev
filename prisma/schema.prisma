@@ -44,6 +44,7 @@ enum VehicleDocumentType {
   ED                 // Export Declaration
   BL                 // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
   INSPECTION_REPORT
+  SHAKEN_SHO         // Japanese vehicle inspection certificate (車検証)
   OTHER
 }
 

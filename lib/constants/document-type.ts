@@ -12,9 +12,17 @@ export const DOCUMENT_TYPE_META: Record<VehicleDocumentType, { label: string }> 
   ED: { label: "Export Declaration (ED)" },
   BL: { label: "Bill of Lading (BL)" },
   INSPECTION_REPORT: { label: "Inspection Report" },
+  SHAKEN_SHO: { label: "Shaken-sho (車検証)" },
   OTHER: { label: "Other Documents" },
 };
 
-/** The five named types, in the order they're shown — OTHER is rendered
+/** The six named types, in the order they're shown — OTHER is rendered
  * separately by callers since it's the catch-all, not one of "the" types. */
-export const NAMED_DOCUMENT_TYPES: VehicleDocumentType[] = ["LC", "EC", "ED", "BL", "INSPECTION_REPORT"];
+export const NAMED_DOCUMENT_TYPES: VehicleDocumentType[] = [
+  "LC",
+  "EC",
+  "ED",
+  "BL",
+  "INSPECTION_REPORT",
+  "SHAKEN_SHO",
+];
