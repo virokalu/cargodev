@@ -110,6 +110,7 @@ export default function Sidebar({
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
                 collapsed && "justify-center px-2",

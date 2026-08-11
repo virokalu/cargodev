@@ -98,3 +98,40 @@ export function FormSectionSkeleton({ fields = 4 }: { fields?: number }) {
     </Card>
   );
 }
+
+/** A label+value field grid without FormSectionSkeleton's card+icon header —
+ * mirrors components/vehicles/vehicle-detail-view.tsx's FieldGroup, a plain
+ * titled group of read-only fields (not an editable form section). */
+export function FieldGroupSkeleton({ fields = 4 }: { fields?: number }) {
+  return (
+    <div>
+      <Skeleton className="mb-3 h-4 w-36" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {Array.from({ length: fields }).map((_, i) => (
+          <div key={i} className="space-y-1.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A vertical connector-line list of icon-in-circle steps — mirrors the
+ * vehicle detail page's Shipment Timeline. */
+export function TimelineSkeleton({ steps = 6 }: { steps?: number }) {
+  return (
+    <ol className="space-y-5">
+      {Array.from({ length: steps }).map((_, i) => (
+        <li key={i} className="relative pl-11">
+          {i < steps - 1 && (
+            <span className="absolute top-8 -bottom-5 left-4 w-px bg-border" aria-hidden="true" />
+          )}
+          <Skeleton className="absolute top-0 left-0 size-8 rounded-full" />
+          <Skeleton className="mt-1.5 h-4 w-28" />
+        </li>
+      ))}
+    </ol>
+  );
+}
