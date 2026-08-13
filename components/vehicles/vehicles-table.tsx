@@ -18,7 +18,6 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Pencil } fr
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -31,6 +30,7 @@ import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
+import { VerticalScrollSyncProvider, IdentityPaneTable } from "@/components/vehicles/vertical-scroll-context";
 import { ClickableRow, RowHoverProvider } from "@/components/vehicles/clickable-row";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
@@ -311,23 +311,24 @@ export function VehiclesTable({
       ) : (
         <RowHoverProvider>
         <StatusScrollProvider>
+        <VerticalScrollSyncProvider>
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
                 full desktop size always, its own independent horizontal scroll. */}
             <div className="w-[50vw] shrink-0 border-r sm:w-[570px]">
-              <Table>
+              <IdentityPaneTable>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
-                    <TableHead className="w-[116px] min-w-[116px] bg-muted font-semibold">
+                    <TableHead className="sticky top-0 z-10 w-[116px] min-w-[116px] bg-muted font-semibold">
                       <SortableHeader label="Serial No" sortKey="serial" params={params} />
                     </TableHead>
-                    <TableHead className="w-[150px] min-w-[150px] bg-muted font-semibold">
+                    <TableHead className="sticky top-0 z-10 w-[150px] min-w-[150px] bg-muted font-semibold">
                       <SortableHeader label="Chassis No" sortKey="chassisNo" params={params} />
                     </TableHead>
-                    <TableHead className="w-[220px] min-w-[220px] bg-muted font-semibold">
+                    <TableHead className="sticky top-0 z-10 w-[220px] min-w-[220px] bg-muted font-semibold">
                       <SortableHeader label="Model / Grade" sortKey="model" params={params} />
                     </TableHead>
-                    <TableHead className="w-[84px] min-w-[84px] bg-muted font-semibold">Actions</TableHead>
+                    <TableHead className="sticky top-0 z-10 w-[84px] min-w-[84px] bg-muted font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -399,7 +400,7 @@ export function VehiclesTable({
                     );
                   })}
                 </TableBody>
-              </Table>
+              </IdentityPaneTable>
             </div>
 
             {/* Detail pane — the ~28 remaining columns, its own independent
@@ -412,7 +413,7 @@ export function VehiclesTable({
                       <TableHead
                         key={column.key}
                         className={cn(
-                          "font-semibold",
+                          "sticky top-0 z-10 bg-muted font-semibold",
                           column.center && "text-center",
                           i < SCROLL_COLUMNS.length - 1 && "border-r"
                         )}
@@ -457,6 +458,7 @@ export function VehiclesTable({
               </DetailPaneTable>
             </div>
           </div>
+        </VerticalScrollSyncProvider>
         </StatusScrollProvider>
         </RowHoverProvider>
       )}

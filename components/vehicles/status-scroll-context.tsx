@@ -15,6 +15,7 @@
 
 import { createContext, useContext, useState, useCallback } from "react";
 import { Table } from "@/components/ui/table";
+import { PANE_SCROLL_CLASS, useVerticalScrollSync } from "@/components/vehicles/vertical-scroll-context";
 import { cn } from "@/lib/utils";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 
@@ -48,10 +49,25 @@ export function StatusScrollProvider({ children }: { children: React.ReactNode }
 }
 
 /** The detail pane's table — reports its own scroll position up to the
- * provider so the dot in the identity pane knows when to appear. */
+ * provider so the dot in the identity pane knows when to appear, and (via
+ * useVerticalScrollSync) keeps its vertical scroll in lockstep with the
+ * identity pane now that each pane scrolls vertically on its own — see
+ * vertical-scroll-context.tsx for why that's now necessary. */
 export function DetailPaneTable({ children }: { children: React.ReactNode }) {
-  const { onScroll } = useContext(StatusScrollContext);
-  return <Table onScroll={onScroll}>{children}</Table>;
+  const { onScroll: statusOnScroll } = useContext(StatusScrollContext);
+  const { ref, onScroll: verticalOnScroll } = useVerticalScrollSync("detail");
+  return (
+    <Table
+      ref={ref}
+      containerClassName={PANE_SCROLL_CLASS}
+      onScroll={(event) => {
+        statusOnScroll(event);
+        verticalOnScroll(event);
+      }}
+    >
+      {children}
+    </Table>
+  );
 }
 
 const DOT_COLOR: Record<"warning" | "info" | "success" | "destructive", string> = {

@@ -6,18 +6,28 @@ import { cn } from "@/lib/utils"
 
 function Table({
   className,
+  containerClassName,
   onScroll,
+  ref,
   ...props
-}: React.ComponentProps<"table"> & {
+}: Omit<React.ComponentProps<"table">, "ref"> & {
   // The scrollable element is the wrapper div, not the <table> itself — this
   // overrides the (wrongly-typed-for-a-table) inherited onScroll so callers
   // that actually want to know about the horizontal scroll position get it.
   onScroll?: React.UIEventHandler<HTMLDivElement>
+  // Extra classes for the wrapper div (e.g. a bounded max-height +
+  // overflow-y-auto for a sticky header) — kept separate from `className`,
+  // which applies to the <table> itself, not its scroll container.
+  containerClassName?: string
+  // Also targets the wrapper div, not the <table> — same reasoning as
+  // onScroll/containerClassName above.
+  ref?: React.Ref<HTMLDivElement>
 }) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      ref={ref}
+      className={cn("relative w-full overflow-x-auto", containerClassName)}
       onScroll={onScroll}
     >
       <table

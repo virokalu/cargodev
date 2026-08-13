@@ -5,9 +5,7 @@
 // here by design — those live on the table row and the edit page; this
 // screen is look-only for every role, including Viewer.
 
-import Link from "next/link";
 import {
-  ArrowLeft,
   Car,
   Ban,
   Banknote,
@@ -21,11 +19,11 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
+import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -149,13 +147,7 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link
-            href="/vehicles"
-            aria-label="Back to vehicles"
-            className={cn(buttonVariants({ variant: "outline", size: "icon" }))}
-          >
-            <ArrowLeft className="size-4" />
-          </Link>
+          <BackToVehiclesButton />
           <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Car className="size-5" />
           </div>
