@@ -5,9 +5,7 @@
 // here by design — those live on the table row and the edit page; this
 // screen is look-only for every role, including Viewer.
 
-import Link from "next/link";
 import {
-  ArrowLeft,
   Car,
   Ban,
   Banknote,
@@ -21,11 +19,11 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
+import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -108,7 +106,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+      <h3 className="mb-3 border-l-2 border-primary pl-2 text-base font-semibold text-foreground">{title}</h3>
       <dl className="grid gap-4 sm:grid-cols-2">{children}</dl>
     </div>
   );
@@ -149,13 +147,7 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link
-            href="/vehicles"
-            aria-label="Back to vehicles"
-            className={cn(buttonVariants({ variant: "outline", size: "icon" }))}
-          >
-            <ArrowLeft className="size-4" />
-          </Link>
+          <BackToVehiclesButton />
           <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Car className="size-5" />
           </div>
@@ -229,6 +221,7 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                 <Field label="Auction Lot No" value={vehicle.auctionLotNo} />
                 <Field label="Customer" value={vehicle.customer?.name} />
                 <Field label="Destination" value={vehicle.destination} />
+                <Field label="Auction Bill Paid" value={<TriStateCell value={vehicle.auctionBillPaid} />} />
               </FieldGroup>
 
               {isFC && (
@@ -251,26 +244,24 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                     <Field label="Packing Agent" value={vehicle.packingAgent?.name} />
                   )}
                   <Field label="Tracking No" value={vehicle.trackingNo} />
+                  <Field label="LC No" value={vehicle.lcNo} />
                 </FieldGroup>
               )}
 
               <FieldGroup title="Transport & Logistics">
                 <Field label="Transport By" value={vehicle.transportBy?.name} />
                 <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
-                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
-                <Field label="Bill Number" value={vehicle.billNumber} />
-                <Field label="LC No" value={vehicle.lcNo} />
                 <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
+                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
+                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
+                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
+                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
+                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
+                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
               </FieldGroup>
 
               <FieldGroup title="Statuses & Flags">
-                <Field label="Auction Bill Paid" value={<TriStateCell value={vehicle.auctionBillPaid} />} />
-                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
-                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
-                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
                 <Field label="Row Colour Status" value={<RowColourCell status={vehicle.rowColourStatus} />} />
-                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
-                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
                 <Field label="Recycle Date" value={formatDate(vehicle.recycleDate)} />
                 <Field label="Jibaishake (自賠責)" value={vehicle.jibaishake} />
               </FieldGroup>
