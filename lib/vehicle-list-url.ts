@@ -14,7 +14,7 @@ import type { ShippingMethod } from "@prisma/client";
 
 export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   page: 1,
-  pageSize: 25,
+  pageSize: 50,
   // FC (export) is the default view — there's no "All tracks" option in the
   // UI toggle anymore, just FC/FL.
   track: "FC",

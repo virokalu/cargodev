@@ -47,6 +47,7 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { AuctionSheetUpload } from "@/components/shared/uploads/auction-sheet-upload";
 import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-gallery";
 import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
+import { useBackToVehicles } from "@/components/vehicles/use-back-to-vehicles";
 import { cn } from "@/lib/utils";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
@@ -392,6 +393,7 @@ export function VehicleForm({
   countries,
 }: VehicleFormProps) {
   const router = useRouter();
+  const backToVehicles = useBackToVehicles();
   const [state, setState] = useState<FormState>(() => ({
     ...INITIAL_STATE,
     ...(mode === "edit" ? { track: existingTrack ?? INITIAL_STATE.track } : {}),
@@ -1276,7 +1278,7 @@ export function VehicleForm({
             <Button
               variant="outline"
               nativeButton={false}
-              render={<Link href="/vehicles" />}
+              render={<Link href={backToVehicles.href} onClick={backToVehicles.onClick} />}
               className="w-full"
             >
               Cancel
