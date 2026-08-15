@@ -14,15 +14,29 @@ import { triggerUserEvent } from "@/lib/pusher-server";
 
 type TxClient = Prisma.TransactionClient;
 
-// Full set per prisma/schema.prisma:447 — only BOOKING_RECEIVED and
-// DOCUMENT_UPLOADED are actually emitted today; SHIPPED/NAME_CHANGE_DEADLINE
-// are wired to nothing yet (they need a cron that doesn't exist), kept here
-// so this type doesn't have to change when that lands later.
+// Full set per prisma/schema.prisma:447. `event` is deliberately a plain
+// String column, not a Prisma enum — new values here never need a migration.
+//
+// Event-driven (fired synchronously from vehicle.service.ts mutations):
+//   BOOKING_RECEIVED, SHIPMENT_REVERTED_TO_PENDING, SHIPPED,
+//   VEHICLE_PURCHASED, AUCTION_BILL_PAID, DOCUMENT_UPLOADED
+// Cron-driven (lib/services/reminder.service.ts, app/api/cron/daily-vehicle-
+// checks): PAYMENT_REMINDER, RIKSO_REMINDER, LC_REMINDER, ETD_APPROACHING,
+// MISSING_DOCUMENTS
+// Reserved, not emitted by anything yet: NAME_CHANGE_DEADLINE
 export type NotificationEvent =
   | "BOOKING_RECEIVED"
+  | "SHIPMENT_REVERTED_TO_PENDING"
   | "SHIPPED"
   | "NAME_CHANGE_DEADLINE"
-  | "DOCUMENT_UPLOADED";
+  | "DOCUMENT_UPLOADED"
+  | "VEHICLE_PURCHASED"
+  | "AUCTION_BILL_PAID"
+  | "PAYMENT_REMINDER"
+  | "RIKSO_REMINDER"
+  | "LC_REMINDER"
+  | "ETD_APPROACHING"
+  | "MISSING_DOCUMENTS";
 
 export interface EmitParams {
   orgId: string;

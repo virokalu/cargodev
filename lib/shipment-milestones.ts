@@ -50,8 +50,10 @@ export interface ShipmentMilestoneInput {
 
 // LC Open only applies when shipping to Sri Lanka or Bangladesh — matches
 // world-countries' common names, the same strings the Destination field's
-// CountrySelect stores (see lib/constants/countries.ts).
-const LC_OPEN_DESTINATIONS = new Set(["Sri Lanka", "Bangladesh"]);
+// CountrySelect stores (see lib/constants/countries.ts). Exported so other
+// LC-aware logic (lib/services/reminder.service.ts's LC reminder + missing-
+// document check) reuses this exact set instead of re-declaring it.
+export const LC_OPEN_DESTINATIONS = new Set(["Sri Lanka", "Bangladesh"]);
 
 /** EC Received sits between Transport Assigned and Booking Received in the
  * real physical process — completed the moment an EC-type document is

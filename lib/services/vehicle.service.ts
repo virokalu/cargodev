@@ -29,6 +29,20 @@ import {
   CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
 } from "@/lib/shipment-status";
 
+type TxClient = Prisma.TransactionClient;
+
+/** No notification of any kind (event-driven or cron) fires for a vehicle
+ * whose row colour status is a cancel status — a fallen-through deal doesn't
+ * need staff chasing payment/transport/LC for it anymore. Checked against
+ * the vehicle's row colour *after* whatever mutation is in flight, so an
+ * edit that cancels the vehicle in the same request also suppresses that
+ * request's other notifications. */
+async function isCancelledRowColour(tx: TxClient, rowColourStatusId: string | null): Promise<boolean> {
+  if (!rowColourStatusId) return false;
+  const status = await tx.rowColourStatus.findUnique({ where: { id: rowColourStatusId }, select: { name: true } });
+  return isCancelShipmentRowColour(status?.name);
+}
+
 export async function createVehicle(user: SessionUser, rawInput: unknown): Promise<Vehicle> {
   const parsed = vehicleCreateSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -187,10 +201,15 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     });
 
     // Admin/Manager, minus the person doing the creating — resolved once and
-    // reused for both notification kinds below (same recipients either way).
+    // reused for every notification kind below (same recipients either way).
     const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, user.orgId, user.id);
+    // A vehicle can in principle be created already cancelled (row colour set
+    // at creation time) — nothing about its creation needs chasing then.
+    const cancelled = await isCancelledRowColour(tx, input.rowColourStatusId);
     let bookingReceivedNotification: notificationService.EmitParams | null = null;
     let documentUploadedNotification: notificationService.EmitParams | null = null;
+    let vehiclePurchasedNotification: notificationService.EmitParams | null = null;
+    let auctionBillPaidNotification: notificationService.EmitParams | null = null;
 
     if (legacyStatus && legacyStatus !== "PENDING") {
       await tx.statusHistory.create({
@@ -212,15 +231,41 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
           triggeredBy: user.id,
         },
       });
-      bookingReceivedNotification = {
+      if (!cancelled) {
+        bookingReceivedNotification = {
+          orgId: user.orgId,
+          event: "BOOKING_RECEIVED",
+          title: "Booking Received",
+          body: `${serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
+          vehicleId: created.id,
+          recipientUserIds,
+        };
+        await notificationService.emit(tx, bookingReceivedNotification);
+      }
+    }
+
+    if (input.purchaseDate !== null && !cancelled) {
+      vehiclePurchasedNotification = {
         orgId: user.orgId,
-        event: "BOOKING_RECEIVED",
-        title: "Booking Received",
-        body: `${serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
+        event: "VEHICLE_PURCHASED",
+        title: "Vehicle Purchased",
+        body: `${serial} was purchased on ${input.purchaseDate.toISOString().slice(0, 10)}.`,
         vehicleId: created.id,
         recipientUserIds,
       };
-      await notificationService.emit(tx, bookingReceivedNotification);
+      await notificationService.emit(tx, vehiclePurchasedNotification);
+    }
+
+    if (input.auctionBillPaid === true && !cancelled) {
+      auctionBillPaidNotification = {
+        orgId: user.orgId,
+        event: "AUCTION_BILL_PAID",
+        title: "Auction Bill Paid",
+        body: `${serial}'s auction bill has been paid.`,
+        vehicleId: created.id,
+        recipientUserIds,
+      };
+      await notificationService.emit(tx, auctionBillPaidNotification);
     }
 
     // Photos/Documents staged via the presigned-upload flow before the
@@ -287,7 +332,13 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
       after: JSON.parse(JSON.stringify(created)),
     });
 
-    return { created, bookingReceivedNotification, documentUploadedNotification };
+    return {
+      created,
+      bookingReceivedNotification,
+      documentUploadedNotification,
+      vehiclePurchasedNotification,
+      auctionBillPaidNotification,
+    };
   });
 
   // Real-time push happens after the transaction has actually committed —
@@ -295,6 +346,8 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   // transaction (see notification.service.ts's notifyRealtime).
   if (vehicle.bookingReceivedNotification) notificationService.notifyRealtime(vehicle.bookingReceivedNotification);
   if (vehicle.documentUploadedNotification) notificationService.notifyRealtime(vehicle.documentUploadedNotification);
+  if (vehicle.vehiclePurchasedNotification) notificationService.notifyRealtime(vehicle.vehiclePurchasedNotification);
+  if (vehicle.auctionBillPaidNotification) notificationService.notifyRealtime(vehicle.auctionBillPaidNotification);
 
   return vehicle.created;
 }
@@ -640,6 +693,14 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
     }
   }
 
+  // Most fields below are written unconditionally regardless of whether they
+  // actually changed (same as always) — these two are the exceptions that
+  // need an explicit before/after diff purely to decide whether to notify.
+  const purchaseDateChanged =
+    input.purchaseDate !== null &&
+    (existing.purchaseDate === null || existing.purchaseDate.getTime() !== input.purchaseDate.getTime());
+  const auctionBillNewlyPaid = input.auctionBillPaid === true && existing.auctionBillPaid !== true;
+
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.vehicle.update({
       where: { id },
@@ -686,6 +747,9 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
     });
 
     let bookingReceivedNotification: notificationService.EmitParams | null = null;
+    let revertedToPendingNotification: notificationService.EmitParams | null = null;
+    let vehiclePurchasedNotification: notificationService.EmitParams | null = null;
+    let auctionBillPaidNotification: notificationService.EmitParams | null = null;
 
     if (statusTransition) {
       await tx.statusHistory.create({
@@ -697,21 +761,63 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
           triggeredBy: user.id,
         },
       });
+    }
 
-      // Only the Pending -> Booking Received direction is notify-worthy —
-      // clearing an ETD (ETD_CLEARED, reverting to Pending) isn't an event
-      // staff need alerted about.
-      if (statusTransition.trigger === "ETD_SAVED") {
+    // Resolved once and reused below — every notification this update might
+    // fire shares the same recipients (CLAUDE.md: no notification of any
+    // kind fires for a vehicle the edit itself just cancelled).
+    const needsNotification =
+      statusTransition !== null || purchaseDateChanged || auctionBillNewlyPaid;
+    if (needsNotification) {
+      const cancelled = await isCancelledRowColour(tx, result.rowColourStatusId);
+      if (!cancelled) {
         const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, user.orgId, user.id);
-        bookingReceivedNotification = {
-          orgId: user.orgId,
-          event: "BOOKING_RECEIVED",
-          title: "Booking Received",
-          body: `${existing.serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
-          vehicleId: id,
-          recipientUserIds,
-        };
-        await notificationService.emit(tx, bookingReceivedNotification);
+
+        if (statusTransition?.trigger === "ETD_SAVED") {
+          bookingReceivedNotification = {
+            orgId: user.orgId,
+            event: "BOOKING_RECEIVED",
+            title: "Booking Received",
+            body: `${existing.serial} moved to Booking Received (ETD ${etd!.toISOString().slice(0, 10)}).`,
+            vehicleId: id,
+            recipientUserIds,
+          };
+          await notificationService.emit(tx, bookingReceivedNotification);
+        } else if (statusTransition?.trigger === "ETD_CLEARED") {
+          revertedToPendingNotification = {
+            orgId: user.orgId,
+            event: "SHIPMENT_REVERTED_TO_PENDING",
+            title: "Reverted to Pending",
+            body: `${existing.serial} reverted to Pending (ETD cleared).`,
+            vehicleId: id,
+            recipientUserIds,
+          };
+          await notificationService.emit(tx, revertedToPendingNotification);
+        }
+
+        if (purchaseDateChanged) {
+          vehiclePurchasedNotification = {
+            orgId: user.orgId,
+            event: "VEHICLE_PURCHASED",
+            title: "Vehicle Purchased",
+            body: `${existing.serial} was purchased on ${input.purchaseDate!.toISOString().slice(0, 10)}.`,
+            vehicleId: id,
+            recipientUserIds,
+          };
+          await notificationService.emit(tx, vehiclePurchasedNotification);
+        }
+
+        if (auctionBillNewlyPaid) {
+          auctionBillPaidNotification = {
+            orgId: user.orgId,
+            event: "AUCTION_BILL_PAID",
+            title: "Auction Bill Paid",
+            body: `${existing.serial}'s auction bill has been paid.`,
+            vehicleId: id,
+            recipientUserIds,
+          };
+          await notificationService.emit(tx, auctionBillPaidNotification);
+        }
       }
     }
 
@@ -725,10 +831,19 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
       after: JSON.parse(JSON.stringify(result)),
     });
 
-    return { result, bookingReceivedNotification };
+    return {
+      result,
+      bookingReceivedNotification,
+      revertedToPendingNotification,
+      vehiclePurchasedNotification,
+      auctionBillPaidNotification,
+    };
   });
 
   if (updated.bookingReceivedNotification) notificationService.notifyRealtime(updated.bookingReceivedNotification);
+  if (updated.revertedToPendingNotification) notificationService.notifyRealtime(updated.revertedToPendingNotification);
+  if (updated.vehiclePurchasedNotification) notificationService.notifyRealtime(updated.vehiclePurchasedNotification);
+  if (updated.auctionBillPaidNotification) notificationService.notifyRealtime(updated.auctionBillPaidNotification);
 
   return updated.result;
 }
@@ -796,8 +911,9 @@ export async function updateVehicleAuctionBillPaid(
   auctionBillPaid: boolean | null
 ): Promise<void> {
   const existing = await assertVehicleInOrg(orgId, id);
+  const auctionBillNewlyPaid = auctionBillPaid === true && existing.auctionBillPaid !== true;
 
-  await prisma.$transaction(async (tx) => {
+  const notification = await prisma.$transaction(async (tx) => {
     await tx.vehicle.update({ where: { id }, data: { auctionBillPaid } });
     await activityLog.record(tx, {
       orgId,
@@ -808,7 +924,91 @@ export async function updateVehicleAuctionBillPaid(
       before: { auctionBillPaid: existing.auctionBillPaid },
       after: { auctionBillPaid },
     });
+
+    if (!auctionBillNewlyPaid) return null;
+    // This quick-edit doesn't touch row colour, so "cancelled" is just
+    // whatever the vehicle's row colour already was.
+    if (await isCancelledRowColour(tx, existing.rowColourStatusId)) return null;
+
+    const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, orgId, actorId);
+    const params: notificationService.EmitParams = {
+      orgId,
+      event: "AUCTION_BILL_PAID",
+      title: "Auction Bill Paid",
+      body: `${existing.serial}'s auction bill has been paid.`,
+      vehicleId: id,
+      recipientUserIds,
+    };
+    await notificationService.emit(tx, params);
+    return params;
   });
+
+  if (notification) notificationService.notifyRealtime(notification);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Daily shipment-status transition (Tech Doc §1: "daily Vercel Cron once
+// today > ETD") — called once a day from app/api/cron/daily-vehicle-checks
+// via lib/services/reminder.service.ts. Until this function existed,
+// "Shipped" was only ever a display-time guard (computeEffectiveShipment
+// Status), never actually written — this is the real transition.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Flips every FC vehicle whose ETD has passed from Booking Received to
+ * Shipped for real, writes the StatusHistory row (trigger "CRON_JOB",
+ * triggeredBy null — no human actor, so this can't go through activityLog
+ * .record, which requires a real User; StatusHistory is the one audit trail
+ * already designed to hold system-triggered transitions), and notifies.
+ * Idempotent for free: once a vehicle is SHIPPED it no longer matches this
+ * query's shipmentStatus filter, so re-running the same day (or any day
+ * after) never reprocesses it. One vehicle failing doesn't stop the rest. */
+export async function runDailyShipmentStatusTransitions(orgId: string): Promise<number> {
+  const today = todayAtMidnight();
+  const candidates = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      serialPrefix: "FC",
+      shipmentStatus: "BOOKING_RECEIVED",
+      etd: { lt: today },
+    },
+    select: { id: true, serial: true, etd: true, rowColourStatus: { select: { name: true } } },
+  });
+
+  let transitioned = 0;
+  for (const vehicle of candidates) {
+    if (isCancelShipmentRowColour(vehicle.rowColourStatus?.name)) continue;
+    try {
+      const notification = await prisma.$transaction(async (tx) => {
+        await tx.vehicle.update({ where: { id: vehicle.id }, data: { shipmentStatus: "SHIPPED" } });
+        await tx.statusHistory.create({
+          data: {
+            vehicleId: vehicle.id,
+            fromStatus: "BOOKING_RECEIVED",
+            toStatus: "SHIPPED",
+            trigger: "CRON_JOB",
+            triggeredBy: null,
+          },
+        });
+        const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, orgId);
+        const params: notificationService.EmitParams = {
+          orgId,
+          event: "SHIPPED",
+          title: "Shipped",
+          body: `${vehicle.serial} has been marked Shipped (ETD ${vehicle.etd!.toISOString().slice(0, 10)} has passed).`,
+          vehicleId: vehicle.id,
+          recipientUserIds,
+        };
+        await notificationService.emit(tx, params);
+        return params;
+      });
+      notificationService.notifyRealtime(notification);
+      transitioned++;
+    } catch (error) {
+      console.error(`Shipped transition failed for vehicle ${vehicle.id}`, error);
+    }
+  }
+  return transitioned;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
