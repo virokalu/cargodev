@@ -140,26 +140,29 @@ export function ComboboxCreate({
     setQuery("");
   }
 
+  const canClear = !!value && !disabled;
+
   return (
     <div>
       <Label htmlFor={id} className="mb-1.5">
         {label}
         {required && <span className="text-destructive">*</span>}
       </Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          id={id}
-          disabled={disabled}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "h-8 w-full justify-between px-2.5 font-normal",
-            !value && "text-muted-foreground",
-            error && "border-destructive"
-          )}
-        >
-          <span className="truncate">{value?.name ?? placeholder}</span>
-          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-        </PopoverTrigger>
+      <div className="flex items-center gap-1">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            id={id}
+            disabled={disabled}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-8 min-w-0 flex-1 justify-between px-2.5 font-normal",
+              !value && "text-muted-foreground",
+              error && "border-destructive"
+            )}
+          >
+            <span className="truncate">{value?.name ?? placeholder}</span>
+            <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+          </PopoverTrigger>
         <PopoverContent className="w-72 p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
@@ -274,7 +277,18 @@ export function ComboboxCreate({
             </CommandList>
           </Command>
         </PopoverContent>
-      </Popover>
+        </Popover>
+        {canClear && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={`Clear ${label}`}
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
       {disabled && disabledHint && <p className="mt-1 text-xs text-muted-foreground">{disabledHint}</p>}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
