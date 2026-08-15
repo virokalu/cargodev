@@ -366,3 +366,10 @@ export async function deleteVehicleDocumentAction(
     throw error;
   }
 }
+
+// Read-only, same as the detail page it feeds (US-10) — every role can
+// export the PDF, including Viewer, so no role whitelist here.
+export async function fetchVehiclePdfImagesAction(vehicleId: string): Promise<fileService.VehiclePdfImages> {
+  const user = await requireUser();
+  return fileService.getVehiclePdfImages(user.orgId, vehicleId);
+}
