@@ -9,9 +9,23 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Ship, FileText, AlertTriangle, CheckCheck } from "lucide-react";
+import {
+  Bell,
+  Ship,
+  FileText,
+  FileWarning,
+  AlertTriangle,
+  CheckCheck,
+  Car,
+  Banknote,
+  CircleDollarSign,
+  Truck,
+  Landmark,
+  CalendarClock,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { getPusherClient, userChannelName } from "@/lib/pusher-client";
 import {
   markNotificationReadAction,
@@ -19,11 +33,38 @@ import {
 } from "@/app/(dashboard)/notifications/actions";
 import type { NotificationListItem } from "@/lib/services/notification.service";
 
-const EVENT_ICON: Record<string, typeof Bell> = {
-  BOOKING_RECEIVED: Ship,
-  SHIPPED: Ship,
-  NAME_CHANGE_DEADLINE: AlertTriangle,
-  DOCUMENT_UPLOADED: FileText,
+// Priority/color is derived purely from the event type, same place the icon
+// already comes from — no stored priority column, matching how every other
+// derived-display concept in this app works (e.g. shipment-status badges).
+type EventTone = "destructive" | "warning" | "info" | "success" | "secondary";
+
+const EVENT_STYLE: Record<string, { icon: typeof Bell; tone: EventTone }> = {
+  // Missing paperwork right before a shipment leaves — the one thing that
+  // actually blocks something, so it's the only red/destructive tone.
+  MISSING_DOCUMENTS: { icon: FileWarning, tone: "destructive" },
+  // Outstanding follow-ups — nothing's blocked yet, but staff need to act.
+  PAYMENT_REMINDER: { icon: CircleDollarSign, tone: "warning" },
+  RIKSO_REMINDER: { icon: Truck, tone: "warning" },
+  LC_REMINDER: { icon: Landmark, tone: "warning" },
+  ETD_APPROACHING: { icon: CalendarClock, tone: "warning" },
+  NAME_CHANGE_DEADLINE: { icon: AlertTriangle, tone: "warning" },
+  // Informational lifecycle progress.
+  BOOKING_RECEIVED: { icon: Ship, tone: "info" },
+  SHIPMENT_REVERTED_TO_PENDING: { icon: RotateCcw, tone: "info" },
+  // Good news / completed milestones.
+  SHIPPED: { icon: Ship, tone: "success" },
+  AUCTION_BILL_PAID: { icon: Banknote, tone: "success" },
+  // Neutral, informational-only.
+  VEHICLE_PURCHASED: { icon: Car, tone: "secondary" },
+  DOCUMENT_UPLOADED: { icon: FileText, tone: "secondary" },
+};
+
+const TONE_CLASSES: Record<EventTone, { icon: string; bg: string }> = {
+  destructive: { icon: "text-destructive", bg: "bg-destructive/10" },
+  warning: { icon: "text-warning", bg: "bg-warning/10" },
+  info: { icon: "text-info", bg: "bg-info/10" },
+  success: { icon: "text-success", bg: "bg-success/10" },
+  secondary: { icon: "text-muted-foreground", bg: "bg-muted" },
 };
 
 interface NotificationListProps {
@@ -81,7 +122,9 @@ export function NotificationList({ userId, initialNotifications }: NotificationL
       ) : (
         <div className="space-y-1.5">
           {initialNotifications.map((notification) => {
-            const Icon = EVENT_ICON[notification.event] ?? Bell;
+            const style = EVENT_STYLE[notification.event];
+            const Icon = style?.icon ?? Bell;
+            const tone = TONE_CLASSES[style?.tone ?? "secondary"];
             return (
               <button
                 key={notification.id}
@@ -91,7 +134,9 @@ export function NotificationList({ userId, initialNotifications }: NotificationL
                   notification.isRead ? "" : "bg-accent/50"
                 }`}
               >
-                <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", tone.bg)}>
+                  <Icon className={cn("size-4", tone.icon)} />
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{notification.title}</span>

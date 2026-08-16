@@ -1,0 +1,346 @@
+// Daily reminder checks — called once a day from
+// app/api/cron/daily-vehicle-checks, which is a thin wrapper (CLAUDE.md rule
+// 2): every query/decision lives here. `runDailyVehicleChecks` is the single
+// entry point the route calls; everything else in this file is private.
+//
+// Every check excludes soft-deleted vehicles and vehicles whose row colour
+// status is a cancel status ("Unit Canceled" / "Resold in Auction") — a
+// fallen-through deal doesn't need staff chasing payment/transport/LC/docs
+// for it anymore.
+//
+// Idempotency: the Notification table has no unique/dedup constraint, so
+// every reminder below is guarded by an in-memory check against "was this
+// exact vehicle+event combination already sent today" — loaded once per run
+// (loadAlreadySentToday), not once per check, so a retry or a second
+// same-day trigger of the whole cron never double-sends.
+
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import * as notificationService from "@/lib/services/notification.service";
+import type { NotificationEvent } from "@/lib/services/notification.service";
+import * as vehicleService from "@/lib/services/vehicle.service";
+import { todayAtMidnight, CANCEL_SHIPMENT_ROW_COLOUR_NAMES } from "@/lib/shipment-status";
+import { LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
+
+const NOT_CANCELLED: Prisma.VehicleWhereInput = {
+  NOT: { rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } } },
+};
+
+const CRON_EVENTS: NotificationEvent[] = [
+  "PAYMENT_REMINDER",
+  "RIKSO_REMINDER",
+  "LC_REMINDER",
+  "ETD_APPROACHING",
+  "MISSING_DOCUMENTS",
+];
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+/** One query per run instead of one per check — every cron-emitted
+ * notification already sent today for this org, keyed "vehicleId:event". */
+async function loadAlreadySentToday(orgId: string): Promise<Set<string>> {
+  const rows = await prisma.notification.findMany({
+    where: {
+      org_id: orgId,
+      event: { in: CRON_EVENTS },
+      createdAt: { gte: todayAtMidnight() },
+      vehicleId: { not: null },
+    },
+    select: { vehicleId: true, event: true },
+  });
+  return new Set(rows.map((row) => `${row.vehicleId}:${row.event}`));
+}
+
+/** Shared by every check below — skips (and doesn't even write) a
+ * reminder already sent today, then marks it sent in `alreadySent` so a
+ * second candidate resolving to the same key within *this* run (e.g. a
+ * container-group notification revisited) doesn't double-send either. */
+async function emitReminder(
+  orgId: string,
+  recipientUserIds: string[],
+  vehicleId: string,
+  event: NotificationEvent,
+  title: string,
+  body: string,
+  alreadySent: Set<string>
+): Promise<boolean> {
+  const key = `${vehicleId}:${event}`;
+  if (alreadySent.has(key)) return false;
+  const params: notificationService.EmitParams = { orgId, event, title, body, vehicleId, recipientUserIds };
+  await notificationService.emit(prisma, params);
+  notificationService.notifyRealtime(params);
+  alreadySent.add(key);
+  return true;
+}
+
+const PAYMENT_REMINDER_DAYS = new Set([2, 4, 6]);
+
+/** "Pay within a week" — every 2 days across the first week (days 2/4/6
+ * after purchase), then every day once a week has passed without payment. */
+async function runPaymentReminders(
+  orgId: string,
+  recipientUserIds: string[],
+  alreadySent: Set<string>
+): Promise<number> {
+  const today = todayAtMidnight();
+  const vehicles = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      purchaseDate: { not: null },
+      OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }],
+      ...NOT_CANCELLED,
+    },
+    select: { id: true, serial: true, purchaseDate: true },
+  });
+
+  let sent = 0;
+  for (const vehicle of vehicles) {
+    const daysSincePurchase = daysBetween(vehicle.purchaseDate!, today);
+    const due = daysSincePurchase > 7 || PAYMENT_REMINDER_DAYS.has(daysSincePurchase);
+    if (!due) continue;
+    const body =
+      daysSincePurchase > 7
+        ? `${vehicle.serial}'s auction bill is still unpaid, ${daysSincePurchase} days after purchase.`
+        : `${vehicle.serial}'s auction bill is due within the week — ${daysSincePurchase} day${daysSincePurchase === 1 ? "" : "s"} since purchase.`;
+    if (await emitReminder(orgId, recipientUserIds, vehicle.id, "PAYMENT_REMINDER", "Payment Reminder", body, alreadySent)) {
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** Once the bill's paid, remind daily until a transport company ("Rikso")
+ * is assigned. */
+async function runRiksoReminders(
+  orgId: string,
+  recipientUserIds: string[],
+  alreadySent: Set<string>
+): Promise<number> {
+  const vehicles = await prisma.vehicle.findMany({
+    where: { org_id: orgId, deletedAt: null, auctionBillPaid: true, transportById: null, ...NOT_CANCELLED },
+    select: { id: true, serial: true },
+  });
+
+  let sent = 0;
+  for (const vehicle of vehicles) {
+    const body = `${vehicle.serial} still needs a transport company (Rikso) assigned.`;
+    if (await emitReminder(orgId, recipientUserIds, vehicle.id, "RIKSO_REMINDER", "Rikso Reminder", body, alreadySent)) {
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** FC vehicles shipping to Sri Lanka/Bangladesh need an LC opened — remind
+ * daily until an LC document is uploaded. */
+async function runLcReminders(
+  orgId: string,
+  recipientUserIds: string[],
+  alreadySent: Set<string>
+): Promise<number> {
+  const vehicles = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      serialPrefix: "FC",
+      etd: { not: null },
+      destination: { in: [...LC_OPEN_DESTINATIONS] },
+      ...NOT_CANCELLED,
+    },
+    select: {
+      id: true,
+      serial: true,
+      documents: { where: { documentType: "LC" }, select: { id: true }, take: 1 },
+    },
+  });
+
+  let sent = 0;
+  for (const vehicle of vehicles) {
+    if (vehicle.documents.length > 0) continue;
+    const body = `${vehicle.serial} needs its LC (Letter of Credit) opened.`;
+    if (await emitReminder(orgId, recipientUserIds, vehicle.id, "LC_REMINDER", "LC Reminder", body, alreadySent)) {
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** 3 days before ETD: RORO vehicles get their own notification each;
+ * Container vehicles sharing the same Tracking No + ETD are on the same
+ * container, so they share one notification instead of one each. */
+async function runEtdApproachingReminders(
+  orgId: string,
+  recipientUserIds: string[],
+  alreadySent: Set<string>
+): Promise<number> {
+  const target = addDays(todayAtMidnight(), 3);
+  const dayAfterTarget = addDays(target, 1);
+  const vehicles = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      serialPrefix: "FC",
+      etd: { gte: target, lt: dayAfterTarget },
+      ...NOT_CANCELLED,
+    },
+    select: { id: true, serial: true, shippingMethod: true, trackingNo: true, etd: true },
+  });
+
+  const containerGroups = new Map<string, (typeof vehicles)[number][]>();
+  const singles: (typeof vehicles)[number][] = [];
+  for (const vehicle of vehicles) {
+    if (vehicle.shippingMethod === "CONTAINER" && vehicle.trackingNo) {
+      const key = `${vehicle.trackingNo}:${vehicle.etd!.toISOString()}`;
+      const group = containerGroups.get(key) ?? [];
+      group.push(vehicle);
+      containerGroups.set(key, group);
+    } else {
+      singles.push(vehicle);
+    }
+  }
+
+  let sent = 0;
+  for (const vehicle of singles) {
+    const body = `${vehicle.serial}'s ETD is in 3 days (${vehicle.etd!.toISOString().slice(0, 10)}).`;
+    if (await emitReminder(orgId, recipientUserIds, vehicle.id, "ETD_APPROACHING", "ETD Approaching", body, alreadySent)) {
+      sent++;
+    }
+  }
+  for (const group of containerGroups.values()) {
+    const [first, ...rest] = group;
+    const body =
+      rest.length > 0
+        ? `${group.map((v) => v.serial).join(", ")} are on the same container (ETD ${first.etd!.toISOString().slice(0, 10)}, in 3 days).`
+        : `${first.serial}'s ETD is in 3 days (${first.etd!.toISOString().slice(0, 10)}).`;
+    // Linked to the first vehicle in the group — a notification can only
+    // point at one vehicle, so clicking it opens one of the container-mates.
+    if (await emitReminder(orgId, recipientUserIds, first.id, "ETD_APPROACHING", "ETD Approaching", body, alreadySent)) {
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** Same 3-days-before-ETD trigger as the check above, but always
+ * per-vehicle — a container-mate's document status can differ from its
+ * neighbours', so this one is never grouped. Checks EC (all FC), LC
+ * (Sri Lanka/Bangladesh only), and Inspection Report (all FC). */
+async function runMissingDocumentReminders(
+  orgId: string,
+  recipientUserIds: string[],
+  alreadySent: Set<string>
+): Promise<number> {
+  const target = addDays(todayAtMidnight(), 3);
+  const dayAfterTarget = addDays(target, 1);
+  const vehicles = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      serialPrefix: "FC",
+      etd: { gte: target, lt: dayAfterTarget },
+      ...NOT_CANCELLED,
+    },
+    select: {
+      id: true,
+      serial: true,
+      destination: true,
+      documents: { select: { documentType: true } },
+    },
+  });
+
+  let sent = 0;
+  for (const vehicle of vehicles) {
+    const uploadedTypes = new Set(vehicle.documents.map((doc) => doc.documentType));
+    const missing: string[] = [];
+    if (!uploadedTypes.has("EC")) missing.push("EC document");
+    if (vehicle.destination && LC_OPEN_DESTINATIONS.has(vehicle.destination) && !uploadedTypes.has("LC")) {
+      missing.push("LC document");
+    }
+    if (!uploadedTypes.has("INSPECTION_REPORT")) missing.push("Inspection report");
+    if (missing.length === 0) continue;
+
+    const body = `${vehicle.serial}'s ETD is in 3 days — still missing: ${missing.join(", ")}.`;
+    if (
+      await emitReminder(orgId, recipientUserIds, vehicle.id, "MISSING_DOCUMENTS", "Missing Documents", body, alreadySent)
+    ) {
+      sent++;
+    }
+  }
+  return sent;
+}
+
+export interface DailyCheckSummary {
+  shippedTransitions: number;
+  paymentReminders: number;
+  riksoReminders: number;
+  lcReminders: number;
+  etdApproachingReminders: number;
+  missingDocumentReminders: number;
+  errors: string[];
+}
+
+/** The cron route's single entry point. Each check is isolated in its own
+ * try/catch so one failing check (a bad row, a transient DB hiccup) never
+ * blocks the rest — the summary's `errors` array reports what happened. */
+export async function runDailyVehicleChecks(orgId: string): Promise<DailyCheckSummary> {
+  const errors: string[] = [];
+  const summary: DailyCheckSummary = {
+    shippedTransitions: 0,
+    paymentReminders: 0,
+    riksoReminders: 0,
+    lcReminders: 0,
+    etdApproachingReminders: 0,
+    missingDocumentReminders: 0,
+    errors,
+  };
+
+  // Runs first — a vehicle that flips to Shipped this run shouldn't also
+  // pick up an ETD-approaching reminder a moment later in the same run.
+  try {
+    summary.shippedTransitions = await vehicleService.runDailyShipmentStatusTransitions(orgId);
+  } catch (error) {
+    errors.push(`shippedTransitions: ${String(error)}`);
+  }
+
+  const recipientUserIds = await notificationService.listNotifiableStaffIds(prisma, orgId);
+  const alreadySent = await loadAlreadySentToday(orgId);
+
+  try {
+    summary.paymentReminders = await runPaymentReminders(orgId, recipientUserIds, alreadySent);
+  } catch (error) {
+    errors.push(`paymentReminders: ${String(error)}`);
+  }
+
+  try {
+    summary.riksoReminders = await runRiksoReminders(orgId, recipientUserIds, alreadySent);
+  } catch (error) {
+    errors.push(`riksoReminders: ${String(error)}`);
+  }
+
+  try {
+    summary.lcReminders = await runLcReminders(orgId, recipientUserIds, alreadySent);
+  } catch (error) {
+    errors.push(`lcReminders: ${String(error)}`);
+  }
+
+  try {
+    summary.etdApproachingReminders = await runEtdApproachingReminders(orgId, recipientUserIds, alreadySent);
+  } catch (error) {
+    errors.push(`etdApproachingReminders: ${String(error)}`);
+  }
+
+  try {
+    summary.missingDocumentReminders = await runMissingDocumentReminders(orgId, recipientUserIds, alreadySent);
+  } catch (error) {
+    errors.push(`missingDocumentReminders: ${String(error)}`);
+  }
+
+  return summary;
+}

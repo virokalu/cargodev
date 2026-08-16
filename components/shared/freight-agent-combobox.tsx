@@ -183,33 +183,36 @@ export function FreightAgentCombobox({
     setQuery("");
   }
 
+  const canClear = !!value;
+
   return (
     <div>
       <Label htmlFor={id} className="mb-1.5">
         {label}
       </Label>
-      <Popover
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) {
-            setDrafting(false);
-            setEditingId(null);
-          }
-        }}
-      >
-        <PopoverTrigger
-          id={id}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "h-8 w-full justify-between px-2.5 font-normal",
-            !value && "text-muted-foreground",
-            error && "border-destructive"
-          )}
+      <div className="flex items-center gap-1">
+        <Popover
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) {
+              setDrafting(false);
+              setEditingId(null);
+            }
+          }}
         >
-          <span className="truncate">{value?.name ?? placeholder}</span>
-          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-        </PopoverTrigger>
+          <PopoverTrigger
+            id={id}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-8 min-w-0 flex-1 justify-between px-2.5 font-normal",
+              !value && "text-muted-foreground",
+              error && "border-destructive"
+            )}
+          >
+            <span className="truncate">{value?.name ?? placeholder}</span>
+            <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+          </PopoverTrigger>
         <PopoverContent className="w-80 p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
@@ -368,7 +371,18 @@ export function FreightAgentCombobox({
             </CommandList>
           </Command>
         </PopoverContent>
-      </Popover>
+        </Popover>
+        {canClear && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={`Clear ${label}`}
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );

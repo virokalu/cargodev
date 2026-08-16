@@ -4,7 +4,11 @@
 
 import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
+import {
+  computeEffectiveShipmentStatus,
+  isCancelShipmentRowColour,
+  CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
+} from "@/lib/shipment-status";
 
 /** Every lookup-based distribution below carries an id alongside the display
  * name — the dashboard charts link each slice/bar straight to that exact
@@ -121,7 +125,16 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
       select: { model: { select: { brand: { select: { id: true, name: true } } } } },
     }),
     prisma.vehicle.findMany({
-      where: { ...baseWhere, OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }] },
+      where: {
+        ...baseWhere,
+        OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }],
+        // A cancelled deal's unpaid bill isn't something staff need chasing
+        // anymore — excluded at the query level (not filtered afterwards)
+        // since this list is capped by `take` below, and filtering afterward
+        // would silently under-fill a capped page instead of backfilling it
+        // with the next genuinely-unpaid vehicle.
+        NOT: { rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } } },
+      },
       select: {
         id: true,
         serial: true,

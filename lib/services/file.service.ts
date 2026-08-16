@@ -86,6 +86,45 @@ export async function listVehicleFiles(orgId: string, vehicleId: string): Promis
   };
 }
 
+/** Fetches the auction sheet + every photo's bytes server-side and returns
+ * them as base64 data URLs, for the client-side PDF export (lib/vehicle-pdf
+ * .ts). Deliberately does NOT take a raw URL from the caller — it re-derives
+ * every URL itself from this vehicle's own files (already ownership-checked
+ * via listVehicleFiles) so there's no way to trick this into fetching an
+ * arbitrary attacker-supplied URL server-side (SSRF). A single failed fetch
+ * (network hiccup, deleted R2 object) returns null for that one image rather
+ * than failing the whole export — a partial PDF beats none. */
+export interface VehiclePdfImages {
+  auctionSheetDataUrl: string | null;
+  photoDataUrls: string[];
+}
+
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType};base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function getVehiclePdfImages(orgId: string, vehicleId: string): Promise<VehiclePdfImages> {
+  const files = await listVehicleFiles(orgId, vehicleId);
+
+  const [auctionSheetDataUrl, photoDataUrls] = await Promise.all([
+    files.auctionSheetUrl ? fetchAsDataUrl(files.auctionSheetUrl) : Promise.resolve(null),
+    Promise.all(files.photos.map((photo) => fetchAsDataUrl(photo.url))),
+  ]);
+
+  return {
+    auctionSheetDataUrl,
+    photoDataUrls: photoDataUrls.filter((url): url is string => url !== null),
+  };
+}
+
 export async function setAuctionSheet(
   actor: SessionUser,
   vehicleId: string,
