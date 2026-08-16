@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SectionCard } from "@/components/shared/section-card";
+import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
 import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobox-create";
@@ -573,15 +574,18 @@ export function VehicleForm({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {mode === "edit" ? "Edit Vehicle" : "Add Vehicle"}
-          </h1>
-          <p className="text-muted-foreground">
-            {mode === "edit"
-              ? `Update ${existingSerial}'s record.`
-              : "Register a new vehicle record."}
-          </p>
+        <div className="flex items-center gap-3">
+          {mode === "edit" && <BackToVehiclesButton />}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {mode === "edit" ? "Edit Vehicle" : "Add Vehicle"}
+            </h1>
+            <p className="text-muted-foreground">
+              {mode === "edit"
+                ? `Update ${existingSerial}'s record.`
+                : "Register a new vehicle record."}
+            </p>
+          </div>
         </div>
       </div>
 
