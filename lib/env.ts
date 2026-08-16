@@ -50,4 +50,11 @@ export const env = {
 
   // Resend — optional until email notifications are wired up
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
+
+  // Vercel Cron — the daily reminder job (app/api/cron/daily-vehicle-checks)
+  // rejects every request outright while this is unset, same "optional
+  // until wired up" fallback as the integrations above, but the empty
+  // string is deliberately never a valid Authorization header value so an
+  // unconfigured deployment fails closed instead of open.
+  CRON_SECRET: process.env.CRON_SECRET ?? "",
 } as const;

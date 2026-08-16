@@ -4,7 +4,11 @@
 
 import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { computeEffectiveShipmentStatus, isCancelShipmentRowColour } from "@/lib/shipment-status";
+import {
+  computeEffectiveShipmentStatus,
+  isCancelShipmentRowColour,
+  CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
+} from "@/lib/shipment-status";
 
 /** Every lookup-based distribution below carries an id alongside the display
  * name — the dashboard charts link each slice/bar straight to that exact
@@ -121,7 +125,14 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
       select: { model: { select: { brand: { select: { id: true, name: true } } } } },
     }),
     prisma.vehicle.findMany({
-      where: { ...baseWhere, OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }] },
+      where: {
+        ...baseWhere,
+        OR: [{ auctionBillPaid: null }, { auctionBillPaid: false }],
+        // A cancelled deal's unpaid bill isn't something staff need chasing
+        // anymore — excluded at the query level so it's reflected in both
+        // the KPI count and the popup list.
+        NOT: { rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } } },
+      },
       select: {
         id: true,
         serial: true,
@@ -130,7 +141,12 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
         customer: { select: { name: true } },
       },
       orderBy: { serial: "asc" },
-      take: 15,
+      // No `take` here (same as the Pending Shipping query above) — this
+      // powers both the KPI card's count (unpaidAuctionBills.length) and
+      // its popup list, so capping it would silently undercount the badge
+      // and truncate the list with no "+N more" indicator once the real
+      // total passed the cap. Confirmed bug: it was previously capped at
+      // 15, so the card stuck at "15" forever regardless of the real count.
     }),
   ]);
 

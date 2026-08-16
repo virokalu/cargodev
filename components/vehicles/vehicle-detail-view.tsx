@@ -24,6 +24,7 @@ import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-di
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
+import { ExportVehiclePdfButton } from "@/components/vehicles/export-vehicle-pdf-button";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -159,11 +160,14 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
             </p>
           </div>
         </div>
-        {isFC && (
-          <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
-            {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {isFC && (
+            <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
+              {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
+            </Badge>
+          )}
+          <ExportVehiclePdfButton vehicle={vehicle} ecReceivedAt={ecReceivedAt} />
+        </div>
       </div>
 
       <div className={cn("grid gap-6", isFC && "lg:grid-cols-3")}>
