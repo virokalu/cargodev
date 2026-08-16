@@ -48,11 +48,15 @@ function DocumentUploadRow({ vehicleId, documentType, file, onSettled, onStaged 
   const router = useRouter();
   const { progress, error, upload } = useFileUpload();
 
+  // AbortController (not a boolean flag) so React Strict Mode's dev-only
+  // mount→cleanup→remount actually cancels the phantom first run's
+  // fetch/XHR instead of just ignoring its result — otherwise every
+  // selected file ships to R2 twice. See vehicle-photo-gallery.tsx's
+  // PhotoUploadRow for the same pattern.
   useEffect(() => {
-    let cancelled = false;
-    upload(file, { kind: "VEHICLE_DOCUMENT", vehicleId })
+    const controller = new AbortController();
+    upload(file, { kind: "VEHICLE_DOCUMENT", vehicleId }, controller.signal)
       .then(async (url) => {
-        if (cancelled) return;
         if (vehicleId) {
           await addVehicleDocumentAction(vehicleId, url, file.name, documentType);
           router.refresh();
@@ -62,10 +66,10 @@ function DocumentUploadRow({ vehicleId, documentType, file, onSettled, onStaged 
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) onSettled();
+        if (!controller.signal.aborted) onSettled();
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally once per row — file/vehicleId/documentType are fixed for its lifetime
@@ -95,15 +99,40 @@ type VehicleDocumentListProps = {
   | { mode: "stage"; documents: StagedDocument[]; onChange: (documents: StagedDocument[]) => void }
 );
 
+interface InFlightFile {
+  id: string;
+  file: File;
+}
+
 export function VehicleDocumentList(props: VehicleDocumentListProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [inFlight, setInFlight] = useState<File[]>([]);
+  const [inFlight, setInFlight] = useState<InFlightFile[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Mirrors props.documents, but readable synchronously inside handleStaged —
+  // see the comment there for why an onChange callback can't read
+  // props.documents directly without dropping uploads that finish close together.
+  // Synced in an effect (not during render) since writing ref.current during
+  // render is disallowed — the effect still runs well before any later
+  // handleStaged call, which only fires from an async upload callback.
+  const stagedDocuments = props.mode === "stage" ? props.documents : null;
+  const stagedDocsRef = useRef<StagedDocument[]>(stagedDocuments ?? []);
+  useEffect(() => {
+    if (stagedDocuments) {
+      stagedDocsRef.current = stagedDocuments;
+    }
+  }, [stagedDocuments]);
 
   function handleNewFiles(files: File[]) {
     if (files.length === 0) return;
-    setInFlight((prev) => [...prev, ...files]);
+    // A stable id (independent of array position) keeps each row's React key
+    // fixed for its whole lifetime. Keying by index instead would make every
+    // still-uploading row's key shift down each time an earlier file finishes
+    // and is spliced out of inFlight — React would then unmount+remount the
+    // shifted rows, aborting their real upload mid-flight and restarting it
+    // from scratch, which is what caused the repeated/duplicate uploads.
+    setInFlight((prev) => [...prev, ...files.map((file) => ({ id: crypto.randomUUID(), file }))]);
   }
 
   function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -112,8 +141,22 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
     handleNewFiles(files);
   }
 
-  function handleRowSettled(file: File) {
-    setInFlight((prev) => prev.filter((f) => f !== file));
+  function handleRowSettled(id: string) {
+    setInFlight((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  // Reads/writes stagedDocsRef instead of appending to props.documents
+  // directly: props.documents only reflects the latest committed render, so
+  // if two uploads (each mounted with the same stale props.documents
+  // snapshot) finish close together, the second onChange call would
+  // overwrite the first's addition instead of building on it. The ref is
+  // updated the instant a document is staged, so the next call always builds
+  // on top of it.
+  function handleStaged(document: StagedDocument) {
+    if (props.mode !== "stage") return;
+    const next = [...stagedDocsRef.current, document];
+    stagedDocsRef.current = next;
+    props.onChange(next);
   }
 
   async function handleDelete(vehicleId: string, documentId: string) {
@@ -164,18 +207,14 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
 
         {inFlight.length > 0 && (
           <div className="space-y-1.5">
-            {inFlight.map((file, i) => (
+            {inFlight.map(({ id, file }) => (
               <DocumentUploadRow
-                key={`${file.name}-${i}`}
+                key={id}
                 vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
                 documentType={props.documentType}
                 file={file}
-                onSettled={() => handleRowSettled(file)}
-                onStaged={
-                  props.mode === "stage"
-                    ? (document) => props.onChange([...props.documents, document])
-                    : undefined
-                }
+                onSettled={() => handleRowSettled(id)}
+                onStaged={props.mode === "stage" ? handleStaged : undefined}
               />
             ))}
           </div>
