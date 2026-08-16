@@ -113,10 +113,16 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
   // Mirrors props.documents, but readable synchronously inside handleStaged —
   // see the comment there for why an onChange callback can't read
   // props.documents directly without dropping uploads that finish close together.
-  const stagedDocsRef = useRef<StagedDocument[]>(props.mode === "stage" ? props.documents : []);
-  if (props.mode === "stage") {
-    stagedDocsRef.current = props.documents;
-  }
+  // Synced in an effect (not during render) since writing ref.current during
+  // render is disallowed — the effect still runs well before any later
+  // handleStaged call, which only fires from an async upload callback.
+  const stagedDocuments = props.mode === "stage" ? props.documents : null;
+  const stagedDocsRef = useRef<StagedDocument[]>(stagedDocuments ?? []);
+  useEffect(() => {
+    if (stagedDocuments) {
+      stagedDocsRef.current = stagedDocuments;
+    }
+  }, [stagedDocuments]);
 
   function handleNewFiles(files: File[]) {
     if (files.length === 0) return;

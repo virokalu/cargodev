@@ -95,10 +95,16 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
   // Mirrors props.photos, but readable synchronously inside handleStaged —
   // see the comment there for why an onChange callback can't read
   // props.photos directly without dropping uploads that finish close together.
-  const stagedPhotosRef = useRef<string[]>(props.mode === "stage" ? props.photos : []);
-  if (props.mode === "stage") {
-    stagedPhotosRef.current = props.photos;
-  }
+  // Synced in an effect (not during render) since writing ref.current during
+  // render is disallowed — the effect still runs well before any later
+  // handleStaged call, which only fires from an async upload callback.
+  const stagedPhotos = props.mode === "stage" ? props.photos : null;
+  const stagedPhotosRef = useRef<string[]>(stagedPhotos ?? []);
+  useEffect(() => {
+    if (stagedPhotos) {
+      stagedPhotosRef.current = stagedPhotos;
+    }
+  }, [stagedPhotos]);
 
   function handleNewFiles(files: File[]) {
     if (files.length === 0) return;
