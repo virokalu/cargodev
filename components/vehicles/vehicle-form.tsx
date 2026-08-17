@@ -48,6 +48,7 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { AuctionSheetUpload } from "@/components/shared/uploads/auction-sheet-upload";
 import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-gallery";
 import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
+import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { useBackToVehicles } from "@/components/vehicles/use-back-to-vehicles";
 import { cn } from "@/lib/utils";
 import { LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
@@ -1233,9 +1234,12 @@ export function VehicleForm({
 
           {mode === "create" && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
-              {NAMED_DOCUMENT_TYPES.map((documentType) => (
-                <div key={documentType}>
-                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+              {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
+               * shipments — same gating as the LC No field above. */}
+              {NAMED_DOCUMENT_TYPES.filter(
+                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+              ).map((documentType) => (
+                <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="stage"
                     documentType={documentType}
@@ -1243,10 +1247,9 @@ export function VehicleForm({
                     documents={stagedDocumentsForType(documentType)}
                     onChange={(documents) => updateStagedDocumentsForType(documentType, documents)}
                   />
-                </div>
+                </DocumentTypeSection>
               ))}
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+              <DocumentTypeSection label={DOCUMENT_TYPE_META.OTHER.label}>
                 <VehicleDocumentList
                   mode="stage"
                   documentType="OTHER"
@@ -1254,14 +1257,17 @@ export function VehicleForm({
                   documents={stagedDocumentsForType("OTHER")}
                   onChange={(documents) => updateStagedDocumentsForType("OTHER", documents)}
                 />
-              </div>
+              </DocumentTypeSection>
             </SectionCard>
           )}
           {mode === "edit" && files && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
-              {NAMED_DOCUMENT_TYPES.map((documentType) => (
-                <div key={documentType}>
-                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+              {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
+               * shipments — same gating as the LC No field above. */}
+              {NAMED_DOCUMENT_TYPES.filter(
+                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+              ).map((documentType) => (
+                <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="persist"
                     vehicleId={vehicleId!}
@@ -1270,10 +1276,9 @@ export function VehicleForm({
                     documents={files.documents.filter((document) => document.documentType === documentType)}
                     canEdit
                   />
-                </div>
+                </DocumentTypeSection>
               ))}
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+              <DocumentTypeSection label={DOCUMENT_TYPE_META.OTHER.label}>
                 <VehicleDocumentList
                   mode="persist"
                   vehicleId={vehicleId!}
@@ -1282,7 +1287,7 @@ export function VehicleForm({
                   documents={files.documents.filter((document) => document.documentType === "OTHER")}
                   canEdit
                 />
-              </div>
+              </DocumentTypeSection>
             </SectionCard>
           )}
 
