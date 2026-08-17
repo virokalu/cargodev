@@ -317,6 +317,8 @@ model Vehicle {
   // Only meaningful when shippingMethod = CONTAINER — service layer nulls
   // this out otherwise, same treatment as the FC-only shipping fields above.
   packingAgentId      String?
+  vanningDate         DateTime? // Container only — when the vehicle was loaded into its container; drives the Loaded shipment milestone
+  containerNumber     String?   // Container only
 
   massoDate   DateTime? // Deregistration (抹消) date
   billNumber  String?

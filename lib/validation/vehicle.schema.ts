@@ -92,6 +92,8 @@ const vehicleSharedFields = {
   // Only meaningful when shippingMethod = CONTAINER — vehicle.service nulls
   // it out otherwise, same treatment as the other FC-only shipping fields.
   packingAgentId: optionalId,
+  vanningDate: optionalDate,
+  containerNumber: optionalText(100),
 
   transportById: optionalId,
   vehicleLocationId: optionalId,

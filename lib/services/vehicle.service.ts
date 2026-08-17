@@ -70,9 +70,12 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
-  // Packing agent only ever applies to Container shipments — same
-  // strip-regardless-of-what-was-posted treatment as the fields above.
+  // Packing agent, vanning date, and container number only ever apply to
+  // Container shipments — same strip-regardless-of-what-was-posted
+  // treatment as the fields above.
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
+  const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
+  const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
 
   // Freight agent capability re-check — server never trusts the client alone
   // to have filtered the RORO/Container options (CLAUDE.md rule 4).
@@ -178,6 +181,8 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         freightAgentId,
         shippingMethod,
         packingAgentId,
+        vanningDate,
+        containerNumber,
         trackingNo,
 
         transportById: input.transportById,
@@ -409,6 +414,8 @@ export interface VehicleDetailData {
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
   shippingMethod: ShippingMethod | null;
   packingAgent: LookupRef | null;
+  vanningDate: Date | null;
+  containerNumber: string | null;
   trackingNo: string | null;
 
   transportBy: LookupRef | null;
@@ -458,6 +465,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       eta: true,
       blNo: true,
       shippingMethod: true,
+      vanningDate: true,
+      containerNumber: true,
       trackingNo: true,
       massoDate: true,
       billNumber: true,
@@ -520,6 +529,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     freightAgent: vehicle.freightAgent,
     shippingMethod: vehicle.shippingMethod,
     packingAgent: vehicle.packingAgent,
+    vanningDate: vehicle.vanningDate,
+    containerNumber: vehicle.containerNumber,
     trackingNo: vehicle.trackingNo,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
@@ -633,6 +644,8 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
+  const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
+  const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
 
   if (shippingMethod && freightAgentId) {
     const agent = await prisma.freightAgent.findUnique({ where: { id: freightAgentId } });
@@ -722,6 +735,8 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         freightAgentId,
         shippingMethod,
         packingAgentId,
+        vanningDate,
+        containerNumber,
         trackingNo,
 
         transportById: input.transportById,

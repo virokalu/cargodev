@@ -30,7 +30,11 @@ import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
 import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
 import { isCancelShipmentRowColour } from "@/lib/shipment-status";
-import { buildShipmentMilestones, type ShipmentMilestoneKey } from "@/lib/shipment-milestones";
+import {
+  buildShipmentMilestones,
+  LC_OPEN_DESTINATIONS,
+  type ShipmentMilestoneKey,
+} from "@/lib/shipment-milestones";
 import { cn, formatDate } from "@/lib/utils";
 import type { VehicleDetailData } from "@/lib/services/vehicle.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
@@ -132,6 +136,8 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
     eta: vehicle.eta,
     destination: vehicle.destination,
     ecReceivedAt,
+    shippingMethod: vehicle.shippingMethod,
+    vanningDate: vehicle.vanningDate,
   });
   const nextMilestoneIndex = milestones.findIndex((m) => !m.completed);
   // Unit Canceled / Resold in Auction (see CANCEL_SHIPMENT_ROW_COLOUR_NAMES
@@ -245,16 +251,24 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                     }
                   />
                   {vehicle.shippingMethod === "CONTAINER" && (
+                    <Field label="Container Number" value={vehicle.containerNumber} />
+                  )}
+                  {vehicle.shippingMethod === "CONTAINER" && (
                     <Field label="Packing Agent" value={vehicle.packingAgent?.name} />
                   )}
-                  <Field label="Tracking No" value={vehicle.trackingNo} />
-                  <Field label="LC No" value={vehicle.lcNo} />
+                  {vehicle.shippingMethod === "CONTAINER" && (
+                    <Field label="Vanning Date" value={formatDate(vehicle.vanningDate)} />
+                  )}
+                  {LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "") && (
+                    <Field label="LC No" value={vehicle.lcNo} />
+                  )}
                 </FieldGroup>
               )}
 
               <FieldGroup title="Transport & Logistics">
                 <Field label="Transport By" value={vehicle.transportBy?.name} />
                 <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
+                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
                 <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
                 <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
                 <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
