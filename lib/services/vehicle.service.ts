@@ -1159,6 +1159,8 @@ export interface VehicleListRow {
   freightAgentName: string | null;
   shippingMethod: ShippingMethod | null;
   packingAgentName: string | null;
+  vanningDate: Date | null;
+  containerNumber: string | null;
   trackingNo: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
@@ -1307,6 +1309,8 @@ const VEHICLE_LIST_SELECT = {
   eta: true,
   blNo: true,
   shippingMethod: true,
+  vanningDate: true,
+  containerNumber: true,
   trackingNo: true,
   auctionBillPaid: true,
   logBook: true,
@@ -1357,6 +1361,8 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     freightAgentName: v.freightAgent?.name ?? null,
     shippingMethod: v.shippingMethod,
     packingAgentName: v.packingAgent?.name ?? null,
+    vanningDate: v.vanningDate,
+    containerNumber: v.containerNumber,
     trackingNo: v.trackingNo,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,

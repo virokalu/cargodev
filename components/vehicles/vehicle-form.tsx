@@ -103,6 +103,11 @@ import {
 
 type RowColourStatusOption = LookupOption & { colour: string; transportCellOnly: boolean };
 
+// Radix Select has no built-in "clear" affordance — same sentinel-value
+// pattern the table's inline editor uses (row-colour-status-cell.tsx) to
+// offer a "—" option that maps back to empty.
+const NO_ROW_COLOUR_STATUS = "__NONE__";
+
 // Year of Manufacture — same bounds the old NumberField enforced (min 1980,
 // max next calendar year), just as a picklist instead of free typing.
 // Descending so the most likely (recent) years sort first.
@@ -1103,8 +1108,10 @@ export function VehicleForm({
                 Row Colour Status
               </Label>
               <Select
-                value={state.rowColourStatusId}
-                onValueChange={(value) => setField("rowColourStatusId", value ?? "")}
+                value={state.rowColourStatusId || NO_ROW_COLOUR_STATUS}
+                onValueChange={(value) =>
+                  setField("rowColourStatusId", !value || value === NO_ROW_COLOUR_STATUS ? "" : value)
+                }
               >
                 <SelectTrigger id="rowColourStatusId" className="w-full">
                   {/* Select.Value doesn't read a SelectItem's rendered
@@ -1117,6 +1124,14 @@ export function VehicleForm({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="min-w-56">
+                  <SelectItem
+                    value={NO_ROW_COLOUR_STATUS}
+                    label="—"
+                    hideIndicator
+                    className={cn(!state.rowColourStatusId && "bg-muted")}
+                  >
+                    —
+                  </SelectItem>
                   {rowColourStatuses.map((status) => (
                     <SelectItem
                       key={status.id}

@@ -224,9 +224,12 @@ const SCROLL_COLUMNS: {
     render: (row) =>
       row.shippingMethod === "RORO" ? "RORO" : row.shippingMethod === "CONTAINER" ? "Container" : "—",
   },
+  { key: "containerNumber", header: "Container Number", render: (row) => row.containerNumber ?? "—" },
   { key: "packingAgent", header: "Packing Agent", render: (row) => row.packingAgentName ?? "—" },
+  { key: "vanningDate", header: "Vanning Date", render: (row) => formatDate(row.vanningDate) },
   { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
   { key: "etd", header: "ETD", sortKey: "etd", render: (row) => formatDate(row.etd) },
+  { key: "eta", header: "ETA", sortKey: "eta", render: (row) => formatDate(row.eta) },
   { key: "blNo", header: "BL No", render: (row) => row.blNo ?? "—" },
   { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
   { key: "trackingNo", header: "Tracking No", render: (row) => row.trackingNo ?? "—" },
