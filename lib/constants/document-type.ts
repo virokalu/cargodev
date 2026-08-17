@@ -1,7 +1,7 @@
 // Shared VehicleDocumentType display metadata — one source of truth for the
 // labels shown next to each typed document section (Add/Edit form's Files
 // panel, the read-only detail page). OTHER is the pre-existing generic
-// "Add Documents" bucket, kept for anything that doesn't fit the five named
+// "Add Documents" bucket, kept for anything that doesn't fit the seven named
 // types below.
 
 import type { VehicleDocumentType } from "@prisma/client";
@@ -13,10 +13,11 @@ export const DOCUMENT_TYPE_META: Record<VehicleDocumentType, { label: string }> 
   BL: { label: "Bill of Lading (BL)" },
   INSPECTION_REPORT: { label: "Inspection Report" },
   SHAKEN_SHO: { label: "Shaken-sho (車検証)" },
+  FREIGHT_INVOICE: { label: "Freight Invoice" },
   OTHER: { label: "Other Documents" },
 };
 
-/** The six named types, in the order they're shown — OTHER is rendered
+/** The seven named types, in the order they're shown — OTHER is rendered
  * separately by callers since it's the catch-all, not one of "the" types. */
 export const NAMED_DOCUMENT_TYPES: VehicleDocumentType[] = [
   "LC",
@@ -25,4 +26,5 @@ export const NAMED_DOCUMENT_TYPES: VehicleDocumentType[] = [
   "BL",
   "INSPECTION_REPORT",
   "SHAKEN_SHO",
+  "FREIGHT_INVOICE",
 ];

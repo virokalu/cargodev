@@ -92,6 +92,8 @@ const vehicleSharedFields = {
   // Only meaningful when shippingMethod = CONTAINER — vehicle.service nulls
   // it out otherwise, same treatment as the other FC-only shipping fields.
   packingAgentId: optionalId,
+  vanningDate: optionalDate,
+  containerNumber: optionalText(100),
 
   transportById: optionalId,
   vehicleLocationId: optionalId,
@@ -169,7 +171,16 @@ export const vehicleCreateSchema = z
         z.object({
           url: z.string().max(2000),
           name: z.string().min(1).max(255),
-          documentType: z.enum(["LC", "EC", "ED", "BL", "INSPECTION_REPORT", "OTHER"]),
+          documentType: z.enum([
+            "LC",
+            "EC",
+            "ED",
+            "BL",
+            "INSPECTION_REPORT",
+            "SHAKEN_SHO",
+            "FREIGHT_INVOICE",
+            "OTHER",
+          ]),
         })
       )
       .max(50)

@@ -12,7 +12,7 @@ import autoTable from "jspdf-autotable";
 import { formatDate } from "@/lib/utils";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
 import { isCancelShipmentRowColour } from "@/lib/shipment-status";
-import { buildShipmentMilestones } from "@/lib/shipment-milestones";
+import { buildShipmentMilestones, LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
 import type { VehicleDetailData } from "@/lib/services/vehicle.service";
 import type { VehiclePdfImages } from "@/lib/services/file.service";
 
@@ -216,10 +216,17 @@ export function buildVehicleDetailPdf(
           vehicle.shippingMethod === "RORO" ? "RORO" : vehicle.shippingMethod === "CONTAINER" ? "Container" : null
         ),
         ...(vehicle.shippingMethod === "CONTAINER"
+          ? ([field("Container Number", vehicle.containerNumber)] as [string, string][])
+          : []),
+        ...(vehicle.shippingMethod === "CONTAINER"
           ? ([field("Packing Agent", vehicle.packingAgent?.name)] as [string, string][])
           : []),
-        field("Tracking No", vehicle.trackingNo),
-        field("LC No", vehicle.lcNo),
+        ...(vehicle.shippingMethod === "CONTAINER"
+          ? ([field("Vanning Date", formatDate(vehicle.vanningDate))] as [string, string][])
+          : []),
+        ...(LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
+          ? ([field("LC No", vehicle.lcNo)] as [string, string][])
+          : []),
       ],
       y,
       pageHeight
@@ -233,6 +240,7 @@ export function buildVehicleDetailPdf(
     [
       field("Transport By", vehicle.transportBy?.name),
       field("Vehicle Location", vehicle.vehicleLocation?.name),
+      ...(isFC ? ([field("Tracking No", vehicle.trackingNo)] as [string, string][]) : []),
       field("Docs Arrived Date", formatDate(vehicle.docsArrivedDate)),
       field("Name Change Deadline", formatDate(vehicle.nameChangeDeadline)),
       field("Extra Key", triState(vehicle.extraKey)),
@@ -288,6 +296,8 @@ export function buildVehicleDetailPdf(
         eta: vehicle.eta,
         destination: vehicle.destination,
         ecReceivedAt,
+        shippingMethod: vehicle.shippingMethod,
+        vanningDate: vehicle.vanningDate,
       });
       autoTable(doc, {
         startY: y + 8,
