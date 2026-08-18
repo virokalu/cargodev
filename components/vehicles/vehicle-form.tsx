@@ -8,7 +8,6 @@
 // fields, per CLAUDE.md.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Fingerprint,
@@ -406,7 +405,6 @@ export function VehicleForm({
   rowColourStatuses,
   countries,
 }: VehicleFormProps) {
-  const router = useRouter();
   const backToVehicles = useBackToVehicles();
   const [state, setState] = useState<FormState>(() => ({
     ...INITIAL_STATE,
@@ -583,7 +581,7 @@ export function VehicleForm({
       return;
     }
 
-    router.push("/vehicles");
+    backToVehicles.navigate();
   }
 
   return (
