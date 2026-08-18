@@ -36,7 +36,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   logBook: "ALL",
   extraKey: "ALL",
   sortBy: "serial",
-  sortDir: "asc",
+  sortDir: "desc",
 };
 
 const SORT_KEYS: VehicleListSortKey[] = [
@@ -111,7 +111,8 @@ export function parseVehicleListParams(
     sortBy: SORT_KEYS.includes(sortBy as VehicleListSortKey)
       ? (sortBy as VehicleListSortKey)
       : VEHICLE_LIST_DEFAULTS.sortBy,
-    sortDir: sortDir === "desc" ? "desc" : "asc",
+    sortDir:
+      sortDir === "desc" ? "desc" : sortDir === "asc" ? "asc" : VEHICLE_LIST_DEFAULTS.sortDir,
   };
 }
 
