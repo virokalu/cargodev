@@ -45,6 +45,7 @@ enum VehicleDocumentType {
   BL                 // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
   INSPECTION_REPORT
   SHAKEN_SHO         // Japanese vehicle inspection certificate (車検証)
+  FREIGHT_INVOICE
   OTHER
 }
 
@@ -317,6 +318,8 @@ model Vehicle {
   // Only meaningful when shippingMethod = CONTAINER — service layer nulls
   // this out otherwise, same treatment as the FC-only shipping fields above.
   packingAgentId      String?
+  vanningDate         DateTime? // Container only — when the vehicle was loaded into its container; drives the Loaded shipment milestone
+  containerNumber     String?   // Container only
 
   massoDate   DateTime? // Deregistration (抹消) date
   billNumber  String?

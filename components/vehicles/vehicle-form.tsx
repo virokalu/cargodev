@@ -48,8 +48,10 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { AuctionSheetUpload } from "@/components/shared/uploads/auction-sheet-upload";
 import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-gallery";
 import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
+import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { useBackToVehicles } from "@/components/vehicles/use-back-to-vehicles";
 import { cn } from "@/lib/utils";
+import { LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
@@ -101,6 +103,11 @@ import {
 } from "@/app/(dashboard)/vehicles/actions";
 
 type RowColourStatusOption = LookupOption & { colour: string; transportCellOnly: boolean };
+
+// Radix Select has no built-in "clear" affordance — same sentinel-value
+// pattern the table's inline editor uses (row-colour-status-cell.tsx) to
+// offer a "—" option that maps back to empty.
+const NO_ROW_COLOUR_STATUS = "__NONE__";
 
 // Year of Manufacture — same bounds the old NumberField enforced (min 1980,
 // max next calendar year), just as a picklist instead of free typing.
@@ -169,6 +176,8 @@ export interface FormState {
   shippingMethod: "" | "RORO" | "CONTAINER";
   // Only meaningful (and only shown) when shippingMethod === "CONTAINER".
   packingAgent: ComboboxOption | null;
+  vanningDate: string | null;
+  containerNumber: string;
   trackingNo: string;
 
   transportBy: ComboboxOption | null;
@@ -217,6 +226,8 @@ const INITIAL_STATE: FormState = {
   freightAgent: null,
   shippingMethod: "",
   packingAgent: null,
+  vanningDate: null,
+  containerNumber: "",
   trackingNo: "",
 
   transportBy: null,
@@ -279,6 +290,8 @@ function buildPayload(state: FormState) {
     freightAgentId: state.freightAgent?.id ?? null,
     shippingMethod: state.shippingMethod || null,
     packingAgentId: state.packingAgent?.id ?? null,
+    vanningDate: state.vanningDate,
+    containerNumber: state.containerNumber,
     trackingNo: state.trackingNo,
 
     transportById: state.transportBy?.id ?? null,
@@ -543,10 +556,12 @@ export function VehicleForm({
         ...previous,
         shippingMethod: method,
         freightAgent: agentStillValid ? previous.freightAgent : null,
-        // Packing agent only applies to Container — drop it the moment the
-        // method changes to anything else, same reasoning as the freight
-        // agent reset above.
+        // Packing agent, vanning date, and container number only apply to
+        // Container — drop them the moment the method changes to anything
+        // else, same reasoning as the freight agent reset above.
         packingAgent: method === "CONTAINER" ? previous.packingAgent : null,
+        vanningDate: method === "CONTAINER" ? previous.vanningDate : null,
+        containerNumber: method === "CONTAINER" ? previous.containerNumber : "",
       };
     });
   }
@@ -862,6 +877,11 @@ export function VehicleForm({
               value={state.destination}
               onChange={(name) => setField("destination", name)}
             />
+            <TriStateToggle
+              label="Auction Bill Paid"
+              value={state.auctionBillPaid}
+              onChange={(value) => setField("auctionBillPaid", value)}
+            />
           </SectionCard>
 
           {/* ── Shipment Details (FC only) ─────────────────────────── */}
@@ -939,6 +959,16 @@ export function VehicleForm({
                 )}
               </div>
               {state.shippingMethod === "CONTAINER" && (
+                <TextField
+                  id="containerNumber"
+                  label="Container Number"
+                  value={state.containerNumber}
+                  onChange={(value) => setField("containerNumber", value)}
+                  maxLength={100}
+                  error={fieldErrors.containerNumber}
+                />
+              )}
+              {state.shippingMethod === "CONTAINER" && (
                 <ComboboxCreate
                   id="packingAgentId"
                   label="Packing Agent"
@@ -952,14 +982,25 @@ export function VehicleForm({
                   error={fieldErrors.packingAgentId}
                 />
               )}
-              <TextField
-                id="trackingNo"
-                label="Tracking No"
-                value={state.trackingNo}
-                onChange={(value) => setField("trackingNo", value)}
-                maxLength={100}
-                error={fieldErrors.trackingNo}
-              />
+              {state.shippingMethod === "CONTAINER" && (
+                <DateField
+                  id="vanningDate"
+                  label="Vanning Date"
+                  value={state.vanningDate}
+                  onChange={(value) => setField("vanningDate", value)}
+                  error={fieldErrors.vanningDate}
+                />
+              )}
+              {LC_OPEN_DESTINATIONS.has(state.destination) && (
+                <TextField
+                  id="lcNo"
+                  label="LC No"
+                  value={state.lcNo}
+                  onChange={(value) => setField("lcNo", value)}
+                  maxLength={100}
+                  error={fieldErrors.lcNo}
+                />
+              )}
             </SectionCard>
           )}
 
@@ -987,12 +1028,53 @@ export function VehicleForm({
               onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
               error={fieldErrors.vehicleLocationId}
             />
+            {isFC && (
+              <TextField
+                id="trackingNo"
+                label="Tracking No"
+                value={state.trackingNo}
+                onChange={(value) => setField("trackingNo", value)}
+                maxLength={100}
+                error={fieldErrors.trackingNo}
+              />
+            )}
+            <DateField
+              id="docsArrivedDate"
+              label="Docs Arrived Date"
+              value={state.docsArrivedDate}
+              onChange={(value) => setField("docsArrivedDate", value)}
+              error={fieldErrors.docsArrivedDate}
+            />
+            <DateField
+              id="nameChangeDeadline"
+              label="Name Change Deadline"
+              value={state.nameChangeDeadline}
+              onChange={(value) => setField("nameChangeDeadline", value)}
+              error={fieldErrors.nameChangeDeadline}
+            />
+            <TriStateToggle
+              label="Extra Key"
+              value={state.extraKey}
+              onChange={(value) => setField("extraKey", value)}
+            />
+            <TriStateToggle
+              label="Log Book"
+              value={state.logBook}
+              onChange={(value) => setField("logBook", value)}
+            />
             <DateField
               id="massoDate"
               label="Masso Date"
               value={state.massoDate}
               onChange={(value) => setField("massoDate", value)}
               error={fieldErrors.massoDate}
+            />
+            <DateField
+              id="docSentDate"
+              label="Doc Sent to Client"
+              value={state.docSentDate}
+              onChange={(value) => setField("docSentDate", value)}
+              error={fieldErrors.docSentDate}
             />
             <TextField
               id="billNumber"
@@ -1002,54 +1084,35 @@ export function VehicleForm({
               maxLength={100}
               error={fieldErrors.billNumber}
             />
-            <TextField
-              id="lcNo"
-              label="LC No"
-              value={state.lcNo}
-              onChange={(value) => setField("lcNo", value)}
-              maxLength={100}
-              error={fieldErrors.lcNo}
-            />
-            <DateField
-              id="docsArrivedDate"
-              label="Docs Arrived Date"
-              value={state.docsArrivedDate}
-              onChange={(value) => setField("docsArrivedDate", value)}
-              error={fieldErrors.docsArrivedDate}
-            />
+            <div className="sm:col-span-2">
+              <Label htmlFor="docSentComment" className="mb-1.5">
+                Doc Sent Remark
+              </Label>
+              <Textarea
+                id="docSentComment"
+                value={state.docSentComment}
+                onChange={(event) => setField("docSentComment", event.target.value)}
+                maxLength={500}
+                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.docSentComment}
+              />
+              {fieldErrors.docSentComment && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
+              )}
+            </div>
           </SectionCard>
 
           {/* ── Statuses & Flags ───────────────────────────────────── */}
           <SectionCard icon={ClipboardList} title="Statuses & Flags">
-            <TriStateToggle
-              label="Auction Bill Paid"
-              value={state.auctionBillPaid}
-              onChange={(value) => setField("auctionBillPaid", value)}
-            />
-            <TriStateToggle
-              label="Log Book"
-              value={state.logBook}
-              onChange={(value) => setField("logBook", value)}
-            />
-            <TriStateToggle
-              label="Extra Key"
-              value={state.extraKey}
-              onChange={(value) => setField("extraKey", value)}
-            />
-            <DateField
-              id="nameChangeDeadline"
-              label="Name Change Deadline"
-              value={state.nameChangeDeadline}
-              onChange={(value) => setField("nameChangeDeadline", value)}
-              error={fieldErrors.nameChangeDeadline}
-            />
             <div>
               <Label htmlFor="rowColourStatusId" className="mb-1.5">
                 Row Colour Status
               </Label>
               <Select
-                value={state.rowColourStatusId}
-                onValueChange={(value) => setField("rowColourStatusId", value ?? "")}
+                value={state.rowColourStatusId || NO_ROW_COLOUR_STATUS}
+                onValueChange={(value) =>
+                  setField("rowColourStatusId", !value || value === NO_ROW_COLOUR_STATUS ? "" : value)
+                }
               >
                 <SelectTrigger id="rowColourStatusId" className="w-full">
                   {/* Select.Value doesn't read a SelectItem's rendered
@@ -1062,6 +1125,14 @@ export function VehicleForm({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="min-w-56">
+                  <SelectItem
+                    value={NO_ROW_COLOUR_STATUS}
+                    label="—"
+                    hideIndicator
+                    className={cn(!state.rowColourStatusId && "bg-muted")}
+                  >
+                    —
+                  </SelectItem>
                   {rowColourStatuses.map((status) => (
                     <SelectItem
                       key={status.id}
@@ -1085,29 +1156,6 @@ export function VehicleForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <DateField
-              id="docSentDate"
-              label="Doc Sent to Client"
-              value={state.docSentDate}
-              onChange={(value) => setField("docSentDate", value)}
-              error={fieldErrors.docSentDate}
-            />
-            <div className="sm:col-span-2">
-              <Label htmlFor="docSentComment" className="mb-1.5">
-                Doc Sent Remark
-              </Label>
-              <Textarea
-                id="docSentComment"
-                value={state.docSentComment}
-                onChange={(event) => setField("docSentComment", event.target.value)}
-                maxLength={500}
-                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
-                aria-invalid={!!fieldErrors.docSentComment}
-              />
-              {fieldErrors.docSentComment && (
-                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
-              )}
             </div>
             <DateField
               id="recycleDate"
@@ -1186,9 +1234,12 @@ export function VehicleForm({
 
           {mode === "create" && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
-              {NAMED_DOCUMENT_TYPES.map((documentType) => (
-                <div key={documentType}>
-                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+              {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
+               * shipments — same gating as the LC No field above. */}
+              {NAMED_DOCUMENT_TYPES.filter(
+                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+              ).map((documentType) => (
+                <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="stage"
                     documentType={documentType}
@@ -1196,10 +1247,9 @@ export function VehicleForm({
                     documents={stagedDocumentsForType(documentType)}
                     onChange={(documents) => updateStagedDocumentsForType(documentType, documents)}
                   />
-                </div>
+                </DocumentTypeSection>
               ))}
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+              <DocumentTypeSection label={DOCUMENT_TYPE_META.OTHER.label}>
                 <VehicleDocumentList
                   mode="stage"
                   documentType="OTHER"
@@ -1207,14 +1257,17 @@ export function VehicleForm({
                   documents={stagedDocumentsForType("OTHER")}
                   onChange={(documents) => updateStagedDocumentsForType("OTHER", documents)}
                 />
-              </div>
+              </DocumentTypeSection>
             </SectionCard>
           )}
           {mode === "edit" && files && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
-              {NAMED_DOCUMENT_TYPES.map((documentType) => (
-                <div key={documentType}>
-                  <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h4>
+              {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
+               * shipments — same gating as the LC No field above. */}
+              {NAMED_DOCUMENT_TYPES.filter(
+                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+              ).map((documentType) => (
+                <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="persist"
                     vehicleId={vehicleId!}
@@ -1223,10 +1276,9 @@ export function VehicleForm({
                     documents={files.documents.filter((document) => document.documentType === documentType)}
                     canEdit
                   />
-                </div>
+                </DocumentTypeSection>
               ))}
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h4>
+              <DocumentTypeSection label={DOCUMENT_TYPE_META.OTHER.label}>
                 <VehicleDocumentList
                   mode="persist"
                   vehicleId={vehicleId!}
@@ -1235,7 +1287,7 @@ export function VehicleForm({
                   documents={files.documents.filter((document) => document.documentType === "OTHER")}
                   canEdit
                 />
-              </div>
+              </DocumentTypeSection>
             </SectionCard>
           )}
 

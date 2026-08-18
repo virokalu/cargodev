@@ -46,6 +46,11 @@ export interface ShipmentMilestoneInput {
    * rows (documentType "EC"), resolved by the caller. Completed the moment
    * an EC is uploaded, same shape as etd/eta: null = not yet, a Date = when. */
   ecReceivedAt: Date | null;
+  /** Loaded only applies to Container shipments — RORO has no loaded step. */
+  shippingMethod: "RORO" | "CONTAINER" | null;
+  /** Container only — when the vehicle was loaded into its container. Drives
+   * the Loaded milestone the same way etd drives Booking Received. */
+  vanningDate: Date | null;
 }
 
 // LC Open only applies when shipping to Sri Lanka or Bangladesh — matches
@@ -62,6 +67,7 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
   const today = todayAtMidnight();
   const etdPassed = input.etd !== null && input.etd.getTime() < today.getTime();
   const etaPassed = input.eta !== null && input.eta.getTime() < today.getTime();
+  const vanningDatePassed = input.vanningDate !== null && input.vanningDate.getTime() < today.getTime();
 
   const milestones: ShipmentMilestone[] = [
     { key: "AUCTION_BILL_PAID", label: "Auction Bill Paid", completed: input.auctionBillPaid === true, date: null },
@@ -78,12 +84,27 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
     milestones.push({ key: "LC_OPEN", label: "LC Open", completed: !!input.lcNo, date: null });
   }
 
+  milestones.push({
+    key: "BOOKING_RECEIVED",
+    label: "Booking Received",
+    completed: input.etd !== null,
+    date: input.etd,
+  });
+
+  // Loaded only applies to Container shipments — RORO vehicles never get
+  // vanned into a container, so they skip straight from Booking Received to
+  // Shipped. Driven by vanningDate passing, same "date passing" trigger
+  // Shipped/Delivered already use below (not just "vanningDate is set").
+  if (input.shippingMethod === "CONTAINER") {
+    milestones.push({
+      key: "LOADED",
+      label: "Loaded",
+      completed: vanningDatePassed,
+      date: vanningDatePassed ? input.vanningDate : null,
+    });
+  }
+
   milestones.push(
-    { key: "BOOKING_RECEIVED", label: "Booking Received", completed: input.etd !== null, date: input.etd },
-    // Loaded and Shipped share the same trigger (ETD passing) — there's no
-    // separate "loaded" date field yet to tell the two apart, so both
-    // complete at once until one exists.
-    { key: "LOADED", label: "Loaded", completed: etdPassed, date: etdPassed ? input.etd : null },
     { key: "SHIPPED", label: "Shipped", completed: etdPassed, date: etdPassed ? input.etd : null },
     { key: "DELIVERED", label: "Delivered", completed: etaPassed, date: etaPassed ? input.eta : null }
   );

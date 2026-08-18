@@ -23,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
+import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { ExportVehiclePdfButton } from "@/components/vehicles/export-vehicle-pdf-button";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
@@ -30,7 +31,11 @@ import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
 import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
 import { isCancelShipmentRowColour } from "@/lib/shipment-status";
-import { buildShipmentMilestones, type ShipmentMilestoneKey } from "@/lib/shipment-milestones";
+import {
+  buildShipmentMilestones,
+  LC_OPEN_DESTINATIONS,
+  type ShipmentMilestoneKey,
+} from "@/lib/shipment-milestones";
 import { cn, formatDate } from "@/lib/utils";
 import type { VehicleDetailData } from "@/lib/services/vehicle.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
@@ -132,6 +137,8 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
     eta: vehicle.eta,
     destination: vehicle.destination,
     ecReceivedAt,
+    shippingMethod: vehicle.shippingMethod,
+    vanningDate: vehicle.vanningDate,
   });
   const nextMilestoneIndex = milestones.findIndex((m) => !m.completed);
   // Unit Canceled / Resold in Auction (see CANCEL_SHIPMENT_ROW_COLOUR_NAMES
@@ -245,16 +252,24 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                     }
                   />
                   {vehicle.shippingMethod === "CONTAINER" && (
+                    <Field label="Container Number" value={vehicle.containerNumber} />
+                  )}
+                  {vehicle.shippingMethod === "CONTAINER" && (
                     <Field label="Packing Agent" value={vehicle.packingAgent?.name} />
                   )}
-                  <Field label="Tracking No" value={vehicle.trackingNo} />
-                  <Field label="LC No" value={vehicle.lcNo} />
+                  {vehicle.shippingMethod === "CONTAINER" && (
+                    <Field label="Vanning Date" value={formatDate(vehicle.vanningDate)} />
+                  )}
+                  {LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "") && (
+                    <Field label="LC No" value={vehicle.lcNo} />
+                  )}
                 </FieldGroup>
               )}
 
               <FieldGroup title="Transport & Logistics">
                 <Field label="Transport By" value={vehicle.transportBy?.name} />
                 <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
+                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
                 <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
                 <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
                 <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
@@ -272,9 +287,12 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
             </TabsContent>
 
             <TabsContent value="documents" className="space-y-4 rounded-lg border p-4">
-              {NAMED_DOCUMENT_TYPES.map((documentType) => (
-                <div key={documentType}>
-                  <h3 className="mb-3 text-sm font-semibold">{DOCUMENT_TYPE_META[documentType].label}</h3>
+              {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
+               * shipments — same gating as the LC No field. */}
+              {NAMED_DOCUMENT_TYPES.filter(
+                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
+              ).map((documentType) => (
+                <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="persist"
                     vehicleId={vehicle.id}
@@ -283,10 +301,9 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                     documents={files.documents.filter((document) => document.documentType === documentType)}
                     canEdit={false}
                   />
-                </div>
+                </DocumentTypeSection>
               ))}
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">{DOCUMENT_TYPE_META.OTHER.label}</h3>
+              <DocumentTypeSection label={DOCUMENT_TYPE_META.OTHER.label}>
                 <VehicleDocumentList
                   mode="persist"
                   vehicleId={vehicle.id}
@@ -295,7 +312,7 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                   documents={files.documents.filter((document) => document.documentType === "OTHER")}
                   canEdit={false}
                 />
-              </div>
+              </DocumentTypeSection>
             </TabsContent>
 
             <TabsContent value="notes" className="rounded-lg border p-4">

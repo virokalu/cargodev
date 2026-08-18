@@ -173,7 +173,7 @@ async function runLcReminders(
 }
 
 /** 3 days before ETD: RORO vehicles get their own notification each;
- * Container vehicles sharing the same Tracking No + ETD are on the same
+ * Container vehicles sharing the same Container Number + ETD are on the same
  * container, so they share one notification instead of one each. */
 async function runEtdApproachingReminders(
   orgId: string,
@@ -190,14 +190,14 @@ async function runEtdApproachingReminders(
       etd: { gte: target, lt: dayAfterTarget },
       ...NOT_CANCELLED,
     },
-    select: { id: true, serial: true, shippingMethod: true, trackingNo: true, etd: true },
+    select: { id: true, serial: true, shippingMethod: true, containerNumber: true, etd: true },
   });
 
   const containerGroups = new Map<string, (typeof vehicles)[number][]>();
   const singles: (typeof vehicles)[number][] = [];
   for (const vehicle of vehicles) {
-    if (vehicle.shippingMethod === "CONTAINER" && vehicle.trackingNo) {
-      const key = `${vehicle.trackingNo}:${vehicle.etd!.toISOString()}`;
+    if (vehicle.shippingMethod === "CONTAINER" && vehicle.containerNumber) {
+      const key = `${vehicle.containerNumber}:${vehicle.etd!.toISOString()}`;
       const group = containerGroups.get(key) ?? [];
       group.push(vehicle);
       containerGroups.set(key, group);
