@@ -1,6 +1,6 @@
 // Dashboard — Tech Doc §7/§7.1, US-31 through US-35, US-43, US-45. Server
 // Component: fetches real stats via dashboard.service.ts and renders. Only
-// the Recharts widgets and the KPI row (which owns 2 popups) need a client
+// the Recharts widgets and the KPI row (which owns 3 popups) need a client
 // boundary — everything else is plain server-rendered JSX.
 
 import { requireUser } from "@/lib/services/auth-guard";
@@ -25,13 +25,16 @@ export default async function DashboardPage() {
       </div>
 
       {/* Total Vehicles / Shipped jump straight to the vehicles table;
-       * Pending Shipping / Unpaid Auction Bills each open a popup listing
-       * exactly which vehicles they are before sending you to one. */}
+       * Pending Shipping / Booking Received / Unpaid Auction Bills each open
+       * a popup listing exactly which vehicles they are before sending you
+       * to one. */}
       <DashboardKpiCards
         totalVehicles={stats.totalVehicles}
         pendingFc={stats.pendingFc}
+        bookingReceivedFc={stats.bookingReceivedFc}
         shippedFc={stats.shippedFc}
         pendingVehicles={stats.pendingVehicles}
+        bookingReceivedVehicles={stats.bookingReceivedVehicles}
         unpaidAuctionBills={stats.unpaidAuctionBills}
       />
 

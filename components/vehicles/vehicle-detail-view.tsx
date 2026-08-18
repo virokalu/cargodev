@@ -235,6 +235,19 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                 <Field label="Auction Bill Paid" value={<TriStateCell value={vehicle.auctionBillPaid} />} />
               </FieldGroup>
 
+              <FieldGroup title="Transport & Logistics">
+                <Field label="Transport By" value={vehicle.transportBy?.name} />
+                <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
+                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
+                <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
+                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
+                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
+                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
+                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
+                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
+                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
+              </FieldGroup>
+
               {isFC && (
                 <FieldGroup title="Shipment Details">
                   <Field label="ETD" value={formatDate(vehicle.etd)} />
@@ -265,19 +278,6 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                   )}
                 </FieldGroup>
               )}
-
-              <FieldGroup title="Transport & Logistics">
-                <Field label="Transport By" value={vehicle.transportBy?.name} />
-                <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
-                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
-                <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
-                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
-                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
-                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
-                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
-                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
-                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
-              </FieldGroup>
 
               <FieldGroup title="Statuses & Flags">
                 <Field label="Row Colour Status" value={<RowColourCell status={vehicle.rowColourStatus} />} />
