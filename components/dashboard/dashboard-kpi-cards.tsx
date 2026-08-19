@@ -5,18 +5,18 @@
 // Component, so the icons have to be picked here, not passed in from the
 // server page. This wrapper takes only plain numbers/objects from the server.
 //
-// All 4 KPI cards are clickable: Total Vehicles and Shipped jump straight to
+// All 5 KPI cards are clickable: Total Vehicles and Shipped jump straight to
 // the vehicles table (Shipped scoped to FC + Shipped, matching exactly what
-// the card counted). Pending Shipping and Unpaid Auction Bills each open the
-// same style of popup instead of navigating away — a Manager glancing at the
-// dashboard usually wants to see *which* vehicles those are, not just how
-// many, before deciding whether it's worth leaving the dashboard at all.
-// Picking one from either popup takes you straight to it in the vehicles
-// table (via the existing serial search).
+// the card counted). Pending Shipping, Booking Received, and Unpaid Auction
+// Bills each open the same style of popup instead of navigating away — a
+// Manager glancing at the dashboard usually wants to see *which* vehicles
+// those are, not just how many, before deciding whether it's worth leaving
+// the dashboard at all. Picking one from any popup takes you straight to it
+// in the vehicles table (via the existing serial search).
 
 import { useState } from "react";
 import Link from "next/link";
-import { Car, CheckCircle2, Clock, Receipt, Ship } from "lucide-react";
+import { CalendarCheck, Car, CheckCircle2, Clock, Receipt, Ship } from "lucide-react";
 import { StatCard } from "@/components/ui/statcard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -25,8 +25,10 @@ import type { VehicleSummary } from "@/lib/services/dashboard.service";
 interface DashboardKpiCardsProps {
   totalVehicles: number;
   pendingFc: number;
+  bookingReceivedFc: number;
   shippedFc: number;
   pendingVehicles: VehicleSummary[];
+  bookingReceivedVehicles: VehicleSummary[];
   unpaidAuctionBills: VehicleSummary[];
 }
 
@@ -98,17 +100,20 @@ function VehicleSummaryDialog({
 export function DashboardKpiCards({
   totalVehicles,
   pendingFc,
+  bookingReceivedFc,
   shippedFc,
   pendingVehicles,
+  bookingReceivedVehicles,
   unpaidAuctionBills,
 }: DashboardKpiCardsProps) {
   const [pendingOpen, setPendingOpen] = useState(false);
+  const [bookingReceivedOpen, setBookingReceivedOpen] = useState(false);
   const [unpaidOpen, setUnpaidOpen] = useState(false);
   const unpaidCount = unpaidAuctionBills.length;
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Link href="/vehicles" className={CLICKABLE_CARD} aria-label="View all vehicles">
           <StatCard label="Total Vehicles" value={totalVehicles} icon={Car} tone="primary" />
         </Link>
@@ -120,6 +125,15 @@ export function DashboardKpiCards({
           aria-label="View pending vehicles"
         >
           <StatCard label="Pending Shipping" value={pendingFc} icon={Clock} tone="warning" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setBookingReceivedOpen(true)}
+          className={CLICKABLE_CARD}
+          aria-label="View vehicles with booking received"
+        >
+          <StatCard label="Booking Received" value={bookingReceivedFc} icon={CalendarCheck} tone="info" />
         </button>
 
         <Link
@@ -152,6 +166,15 @@ export function DashboardKpiCards({
         description="FC vehicles still pending. Pick one to find it in the vehicles table."
         vehicles={pendingVehicles}
         emptyLabel="No FC vehicles are pending shipment."
+      />
+
+      <VehicleSummaryDialog
+        open={bookingReceivedOpen}
+        onOpenChange={setBookingReceivedOpen}
+        title={`Booking Received (${bookingReceivedVehicles.length})`}
+        description="FC vehicles with booking received. Pick one to find it in the vehicles table."
+        vehicles={bookingReceivedVehicles}
+        emptyLabel="No FC vehicles currently have booking received."
       />
 
       <VehicleSummaryDialog
