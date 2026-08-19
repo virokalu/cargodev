@@ -1,20 +1,26 @@
 "use client";
 
-// Pins the title/export-buttons/tabs/tiles/filter-bar block to the top of
-// the dashboard's scrolling <main> (components/shell/AppShell.tsx) while
-// the group card list scrolls underneath it — same idea as a sticky table
-// header, just for the whole "everything above the search bar" block
-// rather than one row. bg-background keeps scrolled-up cards from showing
-// through while this is pinned.
+// The title/export-buttons/tabs/tiles/filter-bar block that sits above the
+// group card list in every Reports panel (see each *-report-panel.tsx,
+// which wraps this in a flex column and gives the card list below it its
+// own `overflow-y-auto` region — grep "min-h-0 flex-1 overflow-y-auto").
 //
-// Only sticky from sm: up. Below that, the tiles grid and filter row stack
-// to one column each (see the *-report-panel.tsx files), so this whole
-// block gets taller than a phone's viewport — pinned, it would permanently
-// cover the screen and leave no room for any card to actually show. Plain
-// static positioning on mobile means it scrolls away normally instead.
+// Deliberately NOT position: sticky. An earlier version used sticky, with
+// the card list scrolling in the same container underneath it — but a
+// sticky element and the content scrolling past it still share one scroll
+// container, and Chrome's scroll anchoring (which nudges scrollTop to keep
+// your reading position stable whenever content above the viewport changes
+// height) could occasionally mis-anchor to a card and briefly render it
+// above this block during a resize/reflow. Giving the card list its own
+// separate scroll box below this one — shrink-0 here, flex-1 overflow-y-auto
+// there — makes that impossible instead of just unlikely: there's no longer
+// any shared scroll position for a card to escape into.
+//
+// shrink-0 stops the flex-1 card list below it from squeezing this block
+// when both are short enough to fit without scrolling.
 
 import type { ReactNode } from "react";
 
 export function ReportStickyHeader({ children }: { children: ReactNode }) {
-  return <div className="space-y-6 bg-background sm:sticky sm:top-0 sm:z-10">{children}</div>;
+  return <div className="shrink-0 space-y-6">{children}</div>;
 }

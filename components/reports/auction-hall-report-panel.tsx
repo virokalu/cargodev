@@ -83,7 +83,7 @@ export function AuctionHallReportPanel({ data, activeTab, onTabChange }: Auction
   const hasResults = filtered.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 sm:h-full">
       <ReportStickyHeader>
         <ReportHeader
           onExportPdf={() => exportAuctionHallReportToPdf(filtered)}
@@ -96,7 +96,7 @@ export function AuctionHallReportPanel({ data, activeTab, onTabChange }: Auction
           <ReportTrackToggle track={track} onTrackChange={handleTrackChange} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
           <ReportSummaryTile
             icon={Gavel}
             tone="primary"
@@ -126,23 +126,31 @@ export function AuctionHallReportPanel({ data, activeTab, onTabChange }: Auction
             onChange={setSearch}
             placeholder="Search auction hall, lot, vehicle ID or model…"
           />
-          <ReportSelectFilter
-            value={auctionHallId}
-            onChange={setAuctionHallId}
-            allLabel="All auction halls"
-            className="w-full sm:w-[200px]"
-            options={auctionHallOptions.map((option) => ({ value: option.id, label: option.name }))}
-          />
-          <ReportSelectFilter
-            value={status}
-            onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
-            allLabel="All statuses"
-            options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
-          />
+          {/* sm:contents removes this wrapper's own box at desktop widths, so the
+              selects fall back to being direct children of the flex row above —
+              identical DOM-effective layout to today. Below sm it's a real
+              flex-wrap container, so the selects wrap 2-per-row instead of
+              stacking one per row (no horizontal scrolling). */}
+          <div className="flex flex-wrap gap-3 sm:contents">
+            <ReportSelectFilter
+              value={auctionHallId}
+              onChange={setAuctionHallId}
+              allLabel="All auction halls"
+              className="w-[calc(50%-6px)] sm:w-[200px]"
+              options={auctionHallOptions.map((option) => ({ value: option.id, label: option.name }))}
+            />
+            <ReportSelectFilter
+              value={status}
+              onChange={(value) => setStatus(value as ReportVehicleStatus | "ALL")}
+              allLabel="All statuses"
+              className="w-[calc(50%-6px)] sm:w-[170px]"
+              options={SHIPMENT_STATUS_ORDER.map((value) => ({ value, label: SHIPMENT_STATUS_META[value].label }))}
+            />
+          </div>
         </div>
       </ReportStickyHeader>
 
-      <div className="space-y-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
         {hasResults ? (
           filtered.map((hall) => (
             <ReportGroupCard
