@@ -34,8 +34,10 @@ export interface VehicleSummary {
 export interface DashboardStats {
   totalVehicles: number;
   pendingFc: number;
+  bookingReceivedFc: number;
   shippedFc: number;
   pendingVehicles: VehicleSummary[];
+  bookingReceivedVehicles: VehicleSummary[];
   trackSplit: { fc: number; fl: number };
   shipmentStatusDistribution: { status: ShipmentStatus; count: number }[];
   exportVolumeByDestination: { destination: string; count: number }[];
@@ -167,6 +169,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     SHIPPED: 0,
   };
   const pendingVehicles: VehicleSummary[] = [];
+  const bookingReceivedVehicles: VehicleSummary[] = [];
   for (const row of fcStatusRows) {
     const cancelled = isCancelShipmentRowColour(row.rowColourStatus?.name);
     const effective = computeEffectiveShipmentStatus(row.shipmentStatus, row.etd, cancelled);
@@ -174,18 +177,19 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     // they don't belong in any of these three dashboard buckets.
     if (effective === "CANCELLED") continue;
     statusTally[effective]++;
-    if (effective === "PENDING") {
-      pendingVehicles.push({
-        id: row.id,
-        serial: row.serial,
-        brand: row.model?.brand?.name ?? null,
-        model: row.model?.name ?? null,
-        yom: row.yom,
-        customerName: row.customer?.name ?? null,
-      });
-    }
+    const summary: VehicleSummary = {
+      id: row.id,
+      serial: row.serial,
+      brand: row.model?.brand?.name ?? null,
+      model: row.model?.name ?? null,
+      yom: row.yom,
+      customerName: row.customer?.name ?? null,
+    };
+    if (effective === "PENDING") pendingVehicles.push(summary);
+    else if (effective === "BOOKING_RECEIVED") bookingReceivedVehicles.push(summary);
   }
   pendingVehicles.sort((a, b) => a.serial.localeCompare(b.serial));
+  bookingReceivedVehicles.sort((a, b) => a.serial.localeCompare(b.serial));
   const shipmentStatusDistribution = STATUS_ORDER.map((status) => ({
     status,
     count: statusTally[status],
@@ -228,8 +232,10 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
   return {
     totalVehicles,
     pendingFc: statusTally.PENDING,
+    bookingReceivedFc: statusTally.BOOKING_RECEIVED,
     shippedFc: statusTally.SHIPPED,
     pendingVehicles,
+    bookingReceivedVehicles,
     trackSplit,
     shipmentStatusDistribution,
     exportVolumeByDestination,

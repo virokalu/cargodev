@@ -8,7 +8,6 @@
 // fields, per CLAUDE.md.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Fingerprint,
@@ -406,7 +405,6 @@ export function VehicleForm({
   rowColourStatuses,
   countries,
 }: VehicleFormProps) {
-  const router = useRouter();
   const backToVehicles = useBackToVehicles();
   const [state, setState] = useState<FormState>(() => ({
     ...INITIAL_STATE,
@@ -583,7 +581,7 @@ export function VehicleForm({
       return;
     }
 
-    router.push("/vehicles");
+    backToVehicles.navigate();
   }
 
   return (
@@ -884,6 +882,104 @@ export function VehicleForm({
             />
           </SectionCard>
 
+          {/* ── Transport & Logistics ──────────────────────────────── */}
+          <SectionCard icon={Truck} title="Transport & Logistics">
+            <ComboboxCreate
+              id="transportBy"
+              label="Transport By"
+              createLabel="transport company"
+              value={state.transportBy}
+              onChange={(value) => setField("transportBy", value)}
+              search={searchTransportCompaniesAction}
+              onCreate={createTransportCompanyAction}
+              onRename={(option, name) => renameTransportCompanyAction(option.id, name)}
+              error={fieldErrors.transportById}
+            />
+            <ComboboxCreate
+              id="vehicleLocation"
+              label="Vehicle Location"
+              createLabel="location"
+              value={state.vehicleLocation}
+              onChange={(value) => setField("vehicleLocation", value)}
+              search={searchVehicleLocationsAction}
+              onCreate={createVehicleLocationAction}
+              onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
+              error={fieldErrors.vehicleLocationId}
+            />
+            {isFC && (
+              <TextField
+                id="trackingNo"
+                label="Tracking No"
+                value={state.trackingNo}
+                onChange={(value) => setField("trackingNo", value)}
+                maxLength={100}
+                error={fieldErrors.trackingNo}
+              />
+            )}
+            <DateField
+              id="docsArrivedDate"
+              label="Docs Arrived Date"
+              value={state.docsArrivedDate}
+              onChange={(value) => setField("docsArrivedDate", value)}
+              error={fieldErrors.docsArrivedDate}
+            />
+            <DateField
+              id="nameChangeDeadline"
+              label="Name Change Deadline"
+              value={state.nameChangeDeadline}
+              onChange={(value) => setField("nameChangeDeadline", value)}
+              error={fieldErrors.nameChangeDeadline}
+            />
+            <TriStateToggle
+              label="Extra Key"
+              value={state.extraKey}
+              onChange={(value) => setField("extraKey", value)}
+            />
+            <TriStateToggle
+              label="Log Book"
+              value={state.logBook}
+              onChange={(value) => setField("logBook", value)}
+            />
+            <DateField
+              id="massoDate"
+              label="Masso Date"
+              value={state.massoDate}
+              onChange={(value) => setField("massoDate", value)}
+              error={fieldErrors.massoDate}
+            />
+            <DateField
+              id="docSentDate"
+              label="Doc Sent to Client"
+              value={state.docSentDate}
+              onChange={(value) => setField("docSentDate", value)}
+              error={fieldErrors.docSentDate}
+            />
+            <TextField
+              id="billNumber"
+              label="Bill Number"
+              value={state.billNumber}
+              onChange={(value) => setField("billNumber", value)}
+              maxLength={100}
+              error={fieldErrors.billNumber}
+            />
+            <div className="sm:col-span-2">
+              <Label htmlFor="docSentComment" className="mb-1.5">
+                Doc Sent Remark
+              </Label>
+              <Textarea
+                id="docSentComment"
+                value={state.docSentComment}
+                onChange={(event) => setField("docSentComment", event.target.value)}
+                maxLength={500}
+                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.docSentComment}
+              />
+              {fieldErrors.docSentComment && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
+              )}
+            </div>
+          </SectionCard>
+
           {/* ── Shipment Details (FC only) ─────────────────────────── */}
           {isFC && (
             <SectionCard
@@ -1003,104 +1099,6 @@ export function VehicleForm({
               )}
             </SectionCard>
           )}
-
-          {/* ── Transport & Logistics ──────────────────────────────── */}
-          <SectionCard icon={Truck} title="Transport & Logistics">
-            <ComboboxCreate
-              id="transportBy"
-              label="Transport By"
-              createLabel="transport company"
-              value={state.transportBy}
-              onChange={(value) => setField("transportBy", value)}
-              search={searchTransportCompaniesAction}
-              onCreate={createTransportCompanyAction}
-              onRename={(option, name) => renameTransportCompanyAction(option.id, name)}
-              error={fieldErrors.transportById}
-            />
-            <ComboboxCreate
-              id="vehicleLocation"
-              label="Vehicle Location"
-              createLabel="location"
-              value={state.vehicleLocation}
-              onChange={(value) => setField("vehicleLocation", value)}
-              search={searchVehicleLocationsAction}
-              onCreate={createVehicleLocationAction}
-              onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
-              error={fieldErrors.vehicleLocationId}
-            />
-            {isFC && (
-              <TextField
-                id="trackingNo"
-                label="Tracking No"
-                value={state.trackingNo}
-                onChange={(value) => setField("trackingNo", value)}
-                maxLength={100}
-                error={fieldErrors.trackingNo}
-              />
-            )}
-            <DateField
-              id="docsArrivedDate"
-              label="Docs Arrived Date"
-              value={state.docsArrivedDate}
-              onChange={(value) => setField("docsArrivedDate", value)}
-              error={fieldErrors.docsArrivedDate}
-            />
-            <DateField
-              id="nameChangeDeadline"
-              label="Name Change Deadline"
-              value={state.nameChangeDeadline}
-              onChange={(value) => setField("nameChangeDeadline", value)}
-              error={fieldErrors.nameChangeDeadline}
-            />
-            <TriStateToggle
-              label="Extra Key"
-              value={state.extraKey}
-              onChange={(value) => setField("extraKey", value)}
-            />
-            <TriStateToggle
-              label="Log Book"
-              value={state.logBook}
-              onChange={(value) => setField("logBook", value)}
-            />
-            <DateField
-              id="massoDate"
-              label="Masso Date"
-              value={state.massoDate}
-              onChange={(value) => setField("massoDate", value)}
-              error={fieldErrors.massoDate}
-            />
-            <DateField
-              id="docSentDate"
-              label="Doc Sent to Client"
-              value={state.docSentDate}
-              onChange={(value) => setField("docSentDate", value)}
-              error={fieldErrors.docSentDate}
-            />
-            <TextField
-              id="billNumber"
-              label="Bill Number"
-              value={state.billNumber}
-              onChange={(value) => setField("billNumber", value)}
-              maxLength={100}
-              error={fieldErrors.billNumber}
-            />
-            <div className="sm:col-span-2">
-              <Label htmlFor="docSentComment" className="mb-1.5">
-                Doc Sent Remark
-              </Label>
-              <Textarea
-                id="docSentComment"
-                value={state.docSentComment}
-                onChange={(event) => setField("docSentComment", event.target.value)}
-                maxLength={500}
-                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
-                aria-invalid={!!fieldErrors.docSentComment}
-              />
-              {fieldErrors.docSentComment && (
-                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
-              )}
-            </div>
-          </SectionCard>
 
           {/* ── Statuses & Flags ───────────────────────────────────── */}
           <SectionCard icon={ClipboardList} title="Statuses & Flags">

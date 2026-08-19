@@ -11,6 +11,7 @@ import {
   Banknote,
   Truck,
   FileCheck,
+  ClipboardCheck,
   Landmark,
   CalendarCheck,
   Boxes,
@@ -59,6 +60,7 @@ const MILESTONE_STYLE: Record<
   AUCTION_BILL_PAID: { icon: Banknote, tone: "primary" },
   TRANSPORT_ASSIGNED: { icon: Truck, tone: "warning" },
   EC_RECEIVED: { icon: FileCheck, tone: "warning" },
+  INSPECTION_COMPLETED: { icon: ClipboardCheck, tone: "warning" },
   LC_OPEN: { icon: Landmark, tone: "primary" },
   BOOKING_RECEIVED: { icon: CalendarCheck, tone: "warning" },
   LOADED: { icon: Boxes, tone: "info" },
@@ -109,6 +111,17 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// Shared by ecReceivedAt and inspectionCompletedAt below — the earliest
+// upload of a given document type is when that milestone completed; neither
+// has its own dated Vehicle column, so both derive from the vehicle's
+// uploaded documents instead.
+function earliestDocumentDate(documents: VehicleFiles["documents"], type: string): Date | null {
+  const matches = documents
+    .filter((document) => document.documentType === type)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  return matches[0]?.createdAt ?? null;
+}
+
 function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
@@ -122,21 +135,22 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
   const isFC = vehicle.track === "FC";
   const titleParts = [vehicle.brand?.name, vehicle.model?.name].filter(Boolean);
   const title = titleParts.length > 0 ? titleParts.join(" ") : vehicle.serial;
-  // EC Received completes the moment the first EC-type document is
-  // uploaded — there's no dedicated Vehicle column for it, so it's derived
-  // from files.documents instead (see ShipmentMilestoneInput.ecReceivedAt).
-  const ecDocuments = files.documents
-    .filter((document) => document.documentType === "EC")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  const ecReceivedAt = ecDocuments[0]?.createdAt ?? null;
+  // EC Received / Inspection Completed complete the moment the first
+  // matching-type document is uploaded — neither has a dedicated Vehicle
+  // column, so both are derived from files.documents instead (see
+  // ShipmentMilestoneInput.ecReceivedAt / inspectionCompletedAt).
+  const ecReceivedAt = earliestDocumentDate(files.documents, "EC");
+  const inspectionCompletedAt = earliestDocumentDate(files.documents, "INSPECTION_REPORT");
   const milestones = buildShipmentMilestones({
     auctionBillPaid: vehicle.auctionBillPaid,
     transportBy: vehicle.transportBy,
     lcNo: vehicle.lcNo,
     etd: vehicle.etd,
+    bookingReceivedAt: vehicle.bookingReceivedAt,
     eta: vehicle.eta,
     destination: vehicle.destination,
     ecReceivedAt,
+    inspectionCompletedAt,
     shippingMethod: vehicle.shippingMethod,
     vanningDate: vehicle.vanningDate,
   });
@@ -173,7 +187,11 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
             </Badge>
           )}
-          <ExportVehiclePdfButton vehicle={vehicle} ecReceivedAt={ecReceivedAt} />
+          <ExportVehiclePdfButton
+            vehicle={vehicle}
+            ecReceivedAt={ecReceivedAt}
+            inspectionCompletedAt={inspectionCompletedAt}
+          />
         </div>
       </div>
 
@@ -235,6 +253,19 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                 <Field label="Auction Bill Paid" value={<TriStateCell value={vehicle.auctionBillPaid} />} />
               </FieldGroup>
 
+              <FieldGroup title="Transport & Logistics">
+                <Field label="Transport By" value={vehicle.transportBy?.name} />
+                <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
+                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
+                <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
+                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
+                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
+                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
+                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
+                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
+                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
+              </FieldGroup>
+
               {isFC && (
                 <FieldGroup title="Shipment Details">
                   <Field label="ETD" value={formatDate(vehicle.etd)} />
@@ -265,19 +296,6 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                   )}
                 </FieldGroup>
               )}
-
-              <FieldGroup title="Transport & Logistics">
-                <Field label="Transport By" value={vehicle.transportBy?.name} />
-                <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
-                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
-                <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
-                <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
-                <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
-                <Field label="Log Book" value={<TriStateCell value={vehicle.logBook} />} />
-                <Field label="Masso Date" value={formatDate(vehicle.massoDate)} />
-                <Field label="Doc Sent to Client" value={formatDate(vehicle.docSentDate)} />
-                <Field label="Doc Sent Remark" value={vehicle.docSentComment} />
-              </FieldGroup>
 
               <FieldGroup title="Statuses & Flags">
                 <Field label="Row Colour Status" value={<RowColourCell status={vehicle.rowColourStatus} />} />

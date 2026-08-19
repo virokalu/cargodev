@@ -3,10 +3,10 @@
 // The filters that don't fit in the inline toolbar row (Brand/Model/Grade,
 // Auction Hall, Freight Agent, RORO/Container, Vehicle Location, Transport
 // Company, and the 3 tri-state flags) live behind a "Filters" button in a
-// side panel, plus a row
-// of removable chips under the toolbar for whatever's active. Customer isn't
-// here — that list can get large, so narrowing by customer goes through the
-// free-text search box instead of a dedicated filter dropdown.
+// side panel, plus a row of removable chips under the toolbar for whatever's
+// active. Status, Destination, Row Colour, and Customer all live directly in
+// the toolbar instead (vehicle-filters-bar.tsx) — frequent enough filters
+// that hiding them behind this panel would cost more clicks than it saves.
 // Every control still does the same immediate-navigate-on-change as the rest
 // of the toolbar (lib/vehicle-list-url.ts buildVehiclesHref) — no separate
 // "Apply" step to keep behaviour consistent across every filter on the page.
@@ -61,6 +61,9 @@ const PANEL_FILTER_KEYS = [
 ] as const satisfies readonly (keyof VehicleListParams)[];
 
 export interface VehicleFilterSelections {
+  /** Toolbar-owned, not this panel — kept in the same shared selections
+   * object as everything else the page resolves in one Promise.all. */
+  customer: FilterOption | null;
   brand: FilterOption | null;
   model: FilterOption | null;
   grade: FilterOption | null;
