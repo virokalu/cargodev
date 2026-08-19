@@ -17,6 +17,7 @@ export type ShipmentMilestoneKey =
   | "AUCTION_BILL_PAID"
   | "TRANSPORT_ASSIGNED"
   | "EC_RECEIVED"
+  | "INSPECTION_COMPLETED"
   | "LC_OPEN"
   | "BOOKING_RECEIVED"
   | "LOADED"
@@ -39,6 +40,11 @@ export interface ShipmentMilestoneInput {
   transportBy: { id: string; name: string } | null;
   lcNo: string | null;
   etd: Date | null;
+  /** When ETD was actually saved (a StatusHistory row), not the ETD value
+   * itself — drives the Booking Received milestone's date instead of etd.
+   * null for legacy-entry vehicles with no such row, in which case the
+   * milestone falls back to etd (see below). */
+  bookingReceivedAt: Date | null;
   eta: Date | null;
   destination: string | null;
   /** Unlike every other field here, this doesn't live on Vehicle directly —
@@ -46,6 +52,11 @@ export interface ShipmentMilestoneInput {
    * rows (documentType "EC"), resolved by the caller. Completed the moment
    * an EC is uploaded, same shape as etd/eta: null = not yet, a Date = when. */
   ecReceivedAt: Date | null;
+  /** Same shape as ecReceivedAt — earliest createdAt among the vehicle's
+   * Inspection Report-type VehicleDocument rows (documentType
+   * "INSPECTION_REPORT"), resolved by the caller. Completed the moment an
+   * inspection report is uploaded. */
+  inspectionCompletedAt: Date | null;
   /** Loaded only applies to Container shipments — RORO has no loaded step. */
   shippingMethod: "RORO" | "CONTAINER" | null;
   /** Container only — when the vehicle was loaded into its container. Drives
@@ -78,6 +89,12 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
       completed: input.ecReceivedAt !== null,
       date: input.ecReceivedAt,
     },
+    {
+      key: "INSPECTION_COMPLETED",
+      label: "Inspection Completed",
+      completed: input.inspectionCompletedAt !== null,
+      date: input.inspectionCompletedAt,
+    },
   ];
 
   if (input.destination && LC_OPEN_DESTINATIONS.has(input.destination)) {
@@ -88,7 +105,7 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
     key: "BOOKING_RECEIVED",
     label: "Booking Received",
     completed: input.etd !== null,
-    date: input.etd,
+    date: input.bookingReceivedAt ?? input.etd,
   });
 
   // Loaded only applies to Container shipments — RORO vehicles never get
