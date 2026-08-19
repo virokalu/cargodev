@@ -126,6 +126,7 @@ function addPhotoGrid(doc: jsPDF, dataUrls: string[], startY: number, pageHeight
 export function buildVehicleDetailPdf(
   vehicle: VehicleDetailData,
   ecReceivedAt: Date | null,
+  inspectionCompletedAt: Date | null,
   images: VehiclePdfImages
 ): DocWithLastAutoTable {
   const isFC = vehicle.track === "FC";
@@ -293,9 +294,11 @@ export function buildVehicleDetailPdf(
         transportBy: vehicle.transportBy,
         lcNo: vehicle.lcNo,
         etd: vehicle.etd,
+        bookingReceivedAt: vehicle.bookingReceivedAt,
         eta: vehicle.eta,
         destination: vehicle.destination,
         ecReceivedAt,
+        inspectionCompletedAt,
         shippingMethod: vehicle.shippingMethod,
         vanningDate: vehicle.vanningDate,
       });
@@ -338,8 +341,9 @@ export function buildVehicleDetailPdf(
 export function exportVehicleDetailToPdf(
   vehicle: VehicleDetailData,
   ecReceivedAt: Date | null,
+  inspectionCompletedAt: Date | null,
   images: VehiclePdfImages
 ): void {
-  const doc = buildVehicleDetailPdf(vehicle, ecReceivedAt, images);
+  const doc = buildVehicleDetailPdf(vehicle, ecReceivedAt, inspectionCompletedAt, images);
   doc.save(`${slugify(vehicle.serial)}-detail.pdf`);
 }

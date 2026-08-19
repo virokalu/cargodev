@@ -409,6 +409,15 @@ export interface VehicleDetailData {
   destination: string | null;
 
   etd: Date | null;
+  // When ETD was actually saved (the StatusHistory row for the PENDING →
+  // BOOKING_RECEIVED transition), not the ETD value itself — the Shipment
+  // Timeline's "Booking Received" milestone shows this instead of etd, since
+  // "booking received" means the date staff entered the booking, not the
+  // date the ship is expected to depart. null for FL vehicles (etd is
+  // always null, so this transition never happens) and for legacy-entry
+  // vehicles whose starting status was hand-picked rather than derived from
+  // an ETD save.
+  bookingReceivedAt: Date | null;
   eta: Date | null;
   blNo: string | null;
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
@@ -497,6 +506,25 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
   // guaranteed to belong to this org — only soft-delete needs checking here.
   if (!vehicle || vehicle.deletedAt !== null) return null;
 
+  // Skip the query entirely when there's no ETD — the milestone this feeds
+  // shows as not-completed in that case regardless (lib/shipment-milestones.ts),
+  // so there's nothing to show a date for. Picking the latest matching row
+  // (not the earliest) matters because ETD can be cleared and re-entered —
+  // CLAUDE.md "Clearing ETD reverts to Pending" — which writes a fresh
+  // PENDING → BOOKING_RECEIVED row each time; the latest one reflects the
+  // *current* booking, not a stale one that was later reverted. Filtering to
+  // trigger: "ETD_SAVED" (not just toStatus) excludes LEGACY_ENTRY rows,
+  // which also land on BOOKING_RECEIVED but represent a hand-picked starting
+  // status, not a real ETD-save event.
+  const bookingReceivedHistory =
+    vehicle.etd !== null
+      ? await prisma.statusHistory.findFirst({
+          where: { vehicleId: vehicle.id, toStatus: "BOOKING_RECEIVED", trigger: "ETD_SAVED" },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true },
+        })
+      : null;
+
   return {
     id: vehicle.id,
     serial: vehicle.serial,
@@ -524,6 +552,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     customer: vehicle.customer,
     destination: vehicle.destination,
     etd: vehicle.etd,
+    bookingReceivedAt: bookingReceivedHistory?.createdAt ?? null,
     eta: vehicle.eta,
     blNo: vehicle.blNo,
     freightAgent: vehicle.freightAgent,

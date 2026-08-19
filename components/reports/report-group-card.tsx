@@ -82,7 +82,16 @@ export function ReportGroupCard({
         tabIndex={0}
         onClick={toggleOpen}
         onKeyDown={handleHeaderKeyDown}
-        className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+        // relative + pr-12 so the PDF button below can anchor to this card's
+        // top-right corner (position: absolute) instead of being just the
+        // last item in the badge row's own flex-wrap — as the last wrapped
+        // item it would land at the *start* of whatever line it wrapped to
+        // (e.g. a 4th status badge pushing it down), not pinned to the
+        // right. pr-12 (48px) clears the button's 28px footprint at
+        // right-2.5 with room to spare, so wrapped badge text never runs
+        // under it. Same anchoring technique as DialogContent's close
+        // button (components/ui/dialog.tsx).
+        className="relative flex w-full flex-col items-start gap-2 px-4 py-3 pr-12 text-left transition-colors hover:bg-muted/50 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3"
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-start gap-2">
@@ -104,18 +113,20 @@ export function ReportGroupCard({
               {statusCounts[status]} {SHIPMENT_STATUS_META[status].label}
             </span>
           ))}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Download PDF for ${title}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDownloadPdf();
-            }}
-          >
-            <FileText className="size-4" />
-          </Button>
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-2.5 right-2.5"
+          aria-label={`Download PDF for ${title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDownloadPdf();
+          }}
+        >
+          <FileText className="size-4" />
+        </Button>
       </div>
 
       {open && (
