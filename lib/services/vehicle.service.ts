@@ -1112,8 +1112,11 @@ export interface VehicleListParams {
   pageSize: number;
   track: SerialPrefix | "ALL";
   search: string;
-  shipmentStatus: EffectiveShipmentStatus | "ALL";
+  /** Multi-select — an empty array means "no filter" (every status shown),
+   * matching how every other "ALL" filter here behaves. */
+  shipmentStatus: EffectiveShipmentStatus[];
   destination: string | "ALL";
+  customerId: string | "ALL";
   rowColourStatusId: string | "ALL";
   /** Excludes one specific row colour status rather than filtering to it —
    * used by the dashboard's "In Progress" transport bar, which means
@@ -1206,13 +1209,16 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   const where: Prisma.VehicleWhereInput = { org_id: orgId, deletedAt: null };
 
   if (params.track !== "ALL") where.serialPrefix = params.track;
-  if (params.shipmentStatus !== "ALL") {
+  if (params.shipmentStatus.length > 0) {
     // Its own AND-array entry (not a direct where.shipmentStatus= equality)
     // so its internal OR doesn't collide with the free-text search's own
-    // top-level where.OR below.
-    where.AND = [buildEffectiveShipmentStatusWhere(params.shipmentStatus)];
+    // top-level where.OR below. Multiple selected statuses are OR'd together
+    // (matches "PENDING or SHIPPED", not "both at once", which no vehicle
+    // could ever satisfy).
+    where.AND = [{ OR: params.shipmentStatus.map(buildEffectiveShipmentStatusWhere) }];
   }
   if (params.destination !== "ALL") where.destination = params.destination;
+  if (params.customerId !== "ALL") where.customerId = params.customerId;
   if (params.rowColourStatusId !== "ALL") {
     where.rowColourStatusId = params.rowColourStatusId;
   } else if (params.rowColourStatusIdNot !== "ALL") {
@@ -1235,10 +1241,10 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
   // brand/model/grade, and customer name — everything else is a dedicated
-  // per-column filter, not free text. Customer has no dedicated filter
-  // dropdown (the customer list can get large — a plain dropdown or combobox
-  // filter doesn't scale the way search-by-name does), so search is the only
-  // way to narrow by customer.
+  // per-column filter, not free text. Customer also has its own dedicated
+  // filter dropdown (params.customerId above, search-as-you-type since the
+  // list can get large) — kept in search too so typing a customer's name
+  // works without opening that dropdown first.
   const search = params.search.trim();
   if (search) {
     where.OR = [
