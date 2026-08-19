@@ -89,13 +89,22 @@ export function buildShipmentMilestones(input: ShipmentMilestoneInput): Shipment
       completed: input.ecReceivedAt !== null,
       date: input.ecReceivedAt,
     },
-    {
+  ];
+
+  // Unlike the other steps, Inspection Completed only appears once it's
+  // actually done — not every vehicle gets an inspection report, so showing
+  // it as a permanent "not yet" step would clutter the timeline for ones
+  // that will never get one. It never shows as the upcoming/next step;
+  // it just appears in its normal spot in the sequence the moment a report
+  // is uploaded.
+  if (input.inspectionCompletedAt !== null) {
+    milestones.push({
       key: "INSPECTION_COMPLETED",
       label: "Inspection Completed",
-      completed: input.inspectionCompletedAt !== null,
+      completed: true,
       date: input.inspectionCompletedAt,
-    },
-  ];
+    });
+  }
 
   if (input.destination && LC_OPEN_DESTINATIONS.has(input.destination)) {
     milestones.push({ key: "LC_OPEN", label: "LC Open", completed: !!input.lcNo, date: null });
