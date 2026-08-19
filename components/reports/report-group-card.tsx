@@ -1,14 +1,24 @@
 "use client";
 
-// One collapsible group block, shared by all three Reports tabs (Customer
-// Vehicle / Auction Hall / Destination) — only the "identity" header
-// (title + subtitle) and which field is being grouped by differ; the
-// vehicle table underneath is identical everywhere, so it lives here once
-// rather than three times. Status column reuses the exact same Badge +
-// SHIPMENT_STATUS_META the Vehicles table's Shipment Status column uses —
-// one status vocabulary across every screen, not a separate "report
-// status". Visual recipe (rounded-lg border container, border-r column
-// dividers) matches vehicles-table.tsx per the approved design.
+// One collapsible group block, shared by all four Reports tabs (Customer
+// Vehicle / Auction Hall / Destination / Freight Agent) — only the
+// "identity" header (title + subtitle) and which field is being grouped by
+// differ; the vehicle table underneath is identical everywhere, so it lives
+// here once rather than four times. Status column reuses the exact same
+// Badge + SHIPMENT_STATUS_META the Vehicles table's Shipment Status column
+// uses — one status vocabulary across every screen, not a separate "report
+// status".
+//
+// Mobile: renders as two side-by-side <table>s, same idea as the Vehicles
+// table (vehicles-table.tsx) — a narrow identity pane (Vehicle ID / Vehicle,
+// the two fields that say which row you're looking at) next to a detail
+// pane (everything else). Both panes get an equal share of the available
+// width (flex-1) and scroll horizontally *independently* — giving the
+// identity pane a fixed 260px instead squeezed the detail pane down to
+// almost nothing on a narrow phone, since 260px alone eats most of a
+// ~375px screen. At 50/50 the identity pane's own ~260px of content now
+// needs its own scroll on narrow screens too (same as the Vehicles table),
+// but the detail pane gets a usable amount of room instead of a sliver.
 
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronRight, FileText } from "lucide-react";
@@ -19,6 +29,15 @@ import { SHIPMENT_STATUS_META, SHIPMENT_STATUS_ORDER } from "@/lib/constants/shi
 import { REPORT_VEHICLE_COLUMN_CONFIG, type ReportVehicleColumnKey } from "@/lib/constants/report-columns";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReportVehicleRow, ReportVehicleStatus } from "@/lib/services/reports.service";
+
+// Two independent <table>s can't share row heights automatically — each
+// sizes its own rows from its own content, and the detail pane's Status
+// column holds a <Badge> that renders slightly taller than the identity
+// pane's plain text, so without this their horizontal row lines drift out
+// of alignment a little more with every row. Pinning both panes' body rows
+// to the same explicit height keeps every row lined up across the two
+// (same fix, same value, as vehicles-table.tsx's ROW_HEIGHT_CLASS).
+const ROW_HEIGHT_CLASS = "h-[52px]";
 
 interface ReportGroupCardProps {
   title: string;
@@ -76,12 +95,12 @@ export function ReportGroupCard({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="font-semibold whitespace-nowrap text-foreground">
             {vehicleCount} Vehicle{vehicleCount === 1 ? "" : "s"}
           </span>
           {SHIPMENT_STATUS_ORDER.filter((status) => statusCounts[status] > 0).map((status) => (
-            <span key={status}>
+            <span key={status} className="whitespace-nowrap">
               {statusCounts[status]} {SHIPMENT_STATUS_META[status].label}
             </span>
           ))}
@@ -100,49 +119,71 @@ export function ReportGroupCard({
       </div>
 
       {open && (
-        <div className="overflow-x-auto border-t">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="border-r">Vehicle ID</TableHead>
-                <TableHead className="border-r">Vehicle</TableHead>
-                <TableHead className="border-r">Chassis</TableHead>
-                <TableHead className="border-r">Lot No.</TableHead>
-                {extraColumns.map((key) => (
-                  <TableHead key={key} className="border-r">
-                    {REPORT_VEHICLE_COLUMN_CONFIG[key].header}
-                  </TableHead>
-                ))}
-                <TableHead className="border-r">ETD</TableHead>
-                <TableHead className="border-r">ETA</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vehicles.map((vehicle) => (
-                <TableRow key={vehicle.id}>
-                  <TableCell className="border-r font-mono font-medium">{vehicle.serial}</TableCell>
-                  <TableCell className="border-r">{vehicle.vehicleLabel}</TableCell>
-                  <TableCell className="border-r font-mono text-xs text-muted-foreground">
-                    {vehicle.chassisNo ?? "—"}
-                  </TableCell>
-                  <TableCell className="border-r">{vehicle.auctionLotNo ?? "—"}</TableCell>
-                  {extraColumns.map((key) => (
-                    <TableCell key={key} className="border-r">
-                      {REPORT_VEHICLE_COLUMN_CONFIG[key].getValue(vehicle)}
-                    </TableCell>
-                  ))}
-                  <TableCell className="border-r">{formatDate(vehicle.etd)}</TableCell>
-                  <TableCell className="border-r">{formatDate(vehicle.eta)}</TableCell>
-                  <TableCell>
-                    <Badge variant={SHIPMENT_STATUS_META[vehicle.status].badgeVariant}>
-                      {SHIPMENT_STATUS_META[vehicle.status].label}
-                    </Badge>
-                  </TableCell>
+        <div className="flex overflow-hidden border-t">
+          {/* Identity pane — Vehicle ID / Vehicle, equal share of the width,
+              scrolls horizontally on its own if narrower than its ~260px
+              of content. */}
+          <div className="min-w-0 flex-1 border-r">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px] min-w-[100px] border-r">Vehicle ID</TableHead>
+                  <TableHead className="w-[160px] min-w-[160px]">Vehicle</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {vehicles.map((vehicle) => (
+                  <TableRow key={vehicle.id} className={ROW_HEIGHT_CLASS}>
+                    <TableCell className="border-r font-mono font-medium">{vehicle.serial}</TableCell>
+                    <TableCell>{vehicle.vehicleLabel}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Detail pane — everything else, equal share of the width,
+              scrolls horizontally on its own. */}
+          <div className="min-w-0 flex-1">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="border-r">Chassis</TableHead>
+                  <TableHead className="border-r">Lot No.</TableHead>
+                  {extraColumns.map((key) => (
+                    <TableHead key={key} className="border-r">
+                      {REPORT_VEHICLE_COLUMN_CONFIG[key].header}
+                    </TableHead>
+                  ))}
+                  <TableHead className="border-r">ETD</TableHead>
+                  <TableHead className="border-r">ETA</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vehicles.map((vehicle) => (
+                  <TableRow key={vehicle.id} className={ROW_HEIGHT_CLASS}>
+                    <TableCell className="border-r font-mono text-xs text-muted-foreground">
+                      {vehicle.chassisNo ?? "—"}
+                    </TableCell>
+                    <TableCell className="border-r">{vehicle.auctionLotNo ?? "—"}</TableCell>
+                    {extraColumns.map((key) => (
+                      <TableCell key={key} className="border-r">
+                        {REPORT_VEHICLE_COLUMN_CONFIG[key].getValue(vehicle)}
+                      </TableCell>
+                    ))}
+                    <TableCell className="border-r">{formatDate(vehicle.etd)}</TableCell>
+                    <TableCell className="border-r">{formatDate(vehicle.eta)}</TableCell>
+                    <TableCell>
+                      <Badge variant={SHIPMENT_STATUS_META[vehicle.status].badgeVariant}>
+                        {SHIPMENT_STATUS_META[vehicle.status].label}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>
