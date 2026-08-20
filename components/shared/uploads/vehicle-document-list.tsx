@@ -95,7 +95,16 @@ type VehicleDocumentListProps = {
    * six near-identical-looking sections stay distinguishable at a glance. */
   label: string;
 } & (
-  | { mode: "persist"; vehicleId: string; documents: VehicleDocumentListItem[]; canEdit: boolean }
+  | {
+      mode: "persist";
+      vehicleId: string;
+      documents: VehicleDocumentListItem[];
+      /** Split rather than one combined canEdit — Operator can upload but
+       * not delete (CLAUDE.md RBAC: their edit-page access is limited to
+       * adding files and Auction Bill Paid, nothing else). */
+      canAdd: boolean;
+      canDelete: boolean;
+    }
   | { mode: "stage"; documents: StagedDocument[]; onChange: (documents: StagedDocument[]) => void }
 );
 
@@ -166,7 +175,8 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
     router.refresh();
   }
 
-  const canEdit = props.mode === "persist" ? props.canEdit : true;
+  const canAdd = props.mode === "persist" ? props.canAdd : true;
+  const canDelete = props.mode === "persist" ? props.canDelete : true;
 
   // Normalized so the list below has one render path regardless of mode —
   // "stage" documents have no id/uploader/date until they're actually
@@ -178,7 +188,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
           url: doc.url,
           name: doc.name,
           meta: `${doc.uploaderName} · ${formatDate(doc.createdAt)}`,
-          onDelete: canEdit ? () => handleDelete(props.vehicleId, doc.id) : null,
+          onDelete: canDelete ? () => handleDelete(props.vehicleId, doc.id) : null,
         }))
       : props.documents.map((doc) => ({
           key: doc.url,
@@ -192,9 +202,9 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
         }));
 
   return (
-    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canEdit}>
+    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canAdd}>
       <div className="space-y-3">
-        {canEdit && (
+        {canAdd && (
           <div className="space-y-1">
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
               <Upload className="size-4" />
