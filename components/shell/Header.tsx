@@ -91,7 +91,7 @@ export default function Header({
   const initials = getInitials(userName);
 
   return (
-    <header className="h-14 flex items-center gap-4 px-4 bg-background border-b border-border flex-shrink-0 z-10">
+    <header className="h-14 flex items-center gap-4 px-4 bg-background dark:bg-sidebar border-b border-border flex-shrink-0 z-10">
       {/* Left */}
       <div className="flex items-center gap-4 flex-1 min-w-0">
         {/* Hamburger — mobile only */}
