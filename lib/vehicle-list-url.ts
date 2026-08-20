@@ -40,7 +40,10 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   sortDir: "desc",
 };
 
-const SORT_KEYS: VehicleListSortKey[] = [
+// Exported so lib/validation/vehicle.schema.ts's mobile query schema can
+// import the same closed lists instead of re-declaring literals that could
+// drift out of sync.
+export const SORT_KEYS: VehicleListSortKey[] = [
   "serial",
   "chassisNo",
   "model",
@@ -57,9 +60,9 @@ const SORT_KEYS: VehicleListSortKey[] = [
   "recycleDate",
 ];
 
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
-const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
-const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
+export const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
+export const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
+export const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
 
 function parseTriState(value: string | undefined): TriStateFilterValue {
   return TRI_STATE_VALUES.includes(value as TriStateFilterValue)
