@@ -44,12 +44,12 @@ enum VehicleDocumentType {
   ED // Export Declaration
   BL // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
   INSPECTION_REPORT
-  SHAKEN_SHO         // Japanese vehicle inspection certificate (車検証) — the vehicle's own
+  SHAKEN_SHO // Japanese vehicle inspection certificate (車検証) — the vehicle's own
   FREIGHT_INVOICE
-  PURCHASE_INVOICE   // FL only — invoice from whoever the vehicle was bought from. Accepts image or PDF (lib/validation/upload.schema.ts)
-  SALES_INVOICE      // FL only — invoice issued when the vehicle is sold locally
+  PURCHASE_INVOICE // FL only — invoice from whoever the vehicle was bought from. Accepts image or PDF (lib/validation/upload.schema.ts)
+  SALES_INVOICE // FL only — invoice issued when the vehicle is sold locally
   CUSTOMER_SHAKEN_SHO // FL only — the customer's own shaken-sho, distinct from the vehicle's SHAKEN_SHO above
-  CASH_RECEIPT       // FL only — accepts image or PDF, same as PURCHASE_INVOICE
+  CASH_RECEIPT // FL only — accepts image or PDF, same as PURCHASE_INVOICE
   OTHER
 }
 
@@ -77,12 +77,12 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   // Relations
-  users           User[]
-  vehicles        Vehicle[]
-  brands          Brand[]
-  auctionHalls    AuctionHall[]
-  suppliers       Supplier[]
-  transportCos    TransportCompany[]
+  users            User[]
+  vehicles         Vehicle[]
+  brands           Brand[]
+  auctionHalls     AuctionHall[]
+  suppliers        Supplier[]
+  transportCos     TransportCompany[]
   vehicleLocations VehicleLocation[]
   freightAgents    FreightAgent[]
   packingAgents    PackingAgent[]
@@ -218,20 +218,6 @@ model Supplier {
   @@unique([org_id, name])
 }
 
-// FL only — an alternative source to Auction Hall for a locally-purchased
-// vehicle (Vehicle.auctionHallId and .supplierId are mutually exclusive,
-// enforced in vehicle.schema.ts). Same plain name-only lookup shape as
-// every other managed lookup in this file.
-model Supplier {
-  id       String       @id @default(cuid())
-  org_id   String
-  name     String
-  org      Organization @relation(fields: [org_id], references: [id])
-  vehicles Vehicle[]
-
-  @@unique([org_id, name])
-}
-
 model TransportCompany {
   id       String       @id @default(cuid())
   org_id   String
@@ -331,7 +317,7 @@ model Vehicle {
   modelId String?
   gradeId String?
 
-  yom         Int?     // Year of Manufacture
+  yom           Int? // Year of Manufacture
   // FL only — mutually exclusive with supplierId below (enforced in
   // vehicle.schema.ts), which source this vehicle was purchased through.
   auctionHallId String?
@@ -419,12 +405,12 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   // ── Relations ──────────────────────────────
-  org             Organization     @relation(fields: [org_id], references: [id])
-  model           VehicleModelRef? @relation(fields: [modelId], references: [id])
-  grade           Grade?           @relation(fields: [gradeId], references: [id])
-  auctionHall     AuctionHall?     @relation(fields: [auctionHallId], references: [id])
-  supplier        Supplier?        @relation(fields: [supplierId], references: [id])
-  customer        User?            @relation("CustomerVehicles", fields: [customerId], references: [id])
+  org             Organization      @relation(fields: [org_id], references: [id])
+  model           VehicleModelRef?  @relation(fields: [modelId], references: [id])
+  grade           Grade?            @relation(fields: [gradeId], references: [id])
+  auctionHall     AuctionHall?      @relation(fields: [auctionHallId], references: [id])
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
+  customer        User?             @relation("CustomerVehicles", fields: [customerId], references: [id])
   transportBy     TransportCompany? @relation(fields: [transportById], references: [id])
   vehicleLocation VehicleLocation?  @relation(fields: [vehicleLocationId], references: [id])
   freightAgent    FreightAgent?     @relation(fields: [freightAgentId], references: [id])
