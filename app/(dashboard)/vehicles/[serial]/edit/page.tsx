@@ -20,10 +20,13 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
     grade: vehicle.grade,
     yomText: vehicle.yom?.toString() ?? "",
     auctionHall: vehicle.auctionHall,
+    supplier: vehicle.supplier,
     purchaseDate: toDateInputValue(vehicle.purchaseDate),
     auctionLotNo: vehicle.auctionLotNo ?? "",
     customer: vehicle.customer,
     destination: vehicle.destination ?? "",
+    hasPartnership: vehicle.hasPartnership,
+    partnerName: vehicle.partnerName ?? "",
 
     etd: toDateInputValue(vehicle.etd),
     eta: toDateInputValue(vehicle.eta),
@@ -52,6 +55,11 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
     recycleDate: toDateInputValue(vehicle.recycleDate),
     jibaishake: vehicle.jibaishake ?? "",
     vehicleRemark: vehicle.vehicleRemark ?? "",
+
+    deliveryDate: toDateInputValue(vehicle.deliveryDate),
+    paidByCustomer: vehicle.paidByCustomer ?? false,
+    sellingPriceText: vehicle.sellingPrice?.toString() ?? "",
+    sellingPriceCurrency: vehicle.sellingPriceCurrency ?? "JPY",
   };
 }
 
@@ -83,11 +91,17 @@ export default async function EditVehiclePage({
 
   return (
     <VehicleForm
+      // Forces a remount after Convert to Export + router.refresh() — the
+      // form's internal useState initializer only runs once per mount, so a
+      // prop change alone wouldn't flip isFC on for the newly-converted
+      // vehicle.
+      key={`${vehicle.id}-${vehicle.convertedToExport}`}
       mode="edit"
       vehicleId={vehicle.id}
       existingSerial={vehicle.serial}
       existingTrack={vehicle.track}
       existingShipmentStatus={vehicle.shipmentStatus}
+      existingConvertedToExport={vehicle.convertedToExport}
       initialValues={toFormValues(vehicle)}
       files={files}
       rowColourStatuses={rowColourStatuses}
