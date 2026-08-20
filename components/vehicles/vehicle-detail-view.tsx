@@ -1,10 +1,13 @@
 // Vehicle detail page body (US-10). Server Component — everything here is
 // read-only display of server-fetched data; the only interactivity (photo
 // hero thumbnails, tabs) lives in small "use client" leaves
-// (vehicle-photo-hero.tsx, ui/tabs.tsx) that this composes. No Edit/Delete
-// here by design — those live on the table row and the edit page; this
-// screen is look-only for every role, including Viewer.
+// (vehicle-photo-hero.tsx, ui/tabs.tsx) that this composes. No Delete here
+// by design — that lives on the table row only; this screen is look-only
+// except for the Edit button in the header, which just links to the edit
+// page (same role gate as the table's own Pencil icon) rather than being
+// an in-place editor itself.
 
+import Link from "next/link";
 import {
   Car,
   Ban,
@@ -18,8 +21,10 @@ import {
   Ship,
   PackageCheck,
   ImageIcon,
+  Pencil,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
@@ -44,6 +49,7 @@ import type { VehicleFiles } from "@/lib/services/file.service";
 interface VehicleDetailViewProps {
   vehicle: VehicleDetailData;
   files: VehicleFiles;
+  canEditVehicle: boolean;
 }
 
 // Grouped by what actually happens at each step rather than one flat
@@ -131,7 +137,7 @@ function FieldGroup({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
+export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDetailViewProps) {
   const isFC = vehicle.track === "FC";
   const titleParts = [vehicle.brand?.name, vehicle.model?.name].filter(Boolean);
   const title = titleParts.length > 0 ? titleParts.join(" ") : vehicle.serial;
@@ -186,6 +192,12 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
             <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
             </Badge>
+          )}
+          {canEditVehicle && (
+            <Button variant="outline" nativeButton={false} render={<Link href={`/vehicles/${vehicle.serial}/edit`} />}>
+              <Pencil className="size-4" />
+              Edit
+            </Button>
           )}
           <ExportVehiclePdfButton
             vehicle={vehicle}

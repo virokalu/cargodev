@@ -14,7 +14,7 @@
 // for why.
 
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Eye, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -31,7 +31,7 @@ import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cel
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
 import { VerticalScrollSyncProvider, IdentityPaneTable } from "@/components/vehicles/vertical-scroll-context";
-import { ClickableRow, RowHoverProvider } from "@/components/vehicles/clickable-row";
+import { HoverSyncRow, RowHoverProvider } from "@/components/vehicles/clickable-row";
 import { cn, formatDate } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -66,7 +66,7 @@ interface VehiclesTableProps {
 
 // Serial No / Chassis No / Model & Grade / Actions are the fields staff use
 // to spot a vehicle at a glance, so they need to stay visible at all times —
-// but at their full desktop widths (116/150/220/84px, 570px combined) they
+// but at their full desktop widths (116/150/220/116px, 602px combined) they
 // alone are wider than a phone screen. Rather than shrink their font/content
 // to fit (tried first — cells got too cramped to read), this renders them as
 // their own separate <table> in a fixed-width pane that scrolls
@@ -76,10 +76,11 @@ interface VehiclesTableProps {
 // pane to see all four columns, and scroll the right pane separately to see
 // the rest — they don't move together, by design (that's what makes this
 // different from a single table with `position: sticky` columns, which was
-// the previous, rejected approach). The pane's sm:w-[570px] below (116 + 150
-// + 220 + 84) has to be a literal class string, not built from a shared
+// the previous, rejected approach). The pane's sm:w-[602px] below (116 + 150
+// + 220 + 116) has to be a literal class string, not built from a shared
 // constant — Tailwind only picks up arbitrary-value classes it can find as
-// static text.
+// static text. Actions is 116px (not 84px) to fit three icon buttons (View/
+// Edit/Delete) instead of two — size-7 (28px) each + gaps + the status dot.
 
 // Two independent <table> elements can't share row heights automatically —
 // each sizes its own rows from its own content. The detail columns are all
@@ -320,7 +321,7 @@ export function VehiclesTable({
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
                 full desktop size always, its own independent horizontal scroll. */}
-            <div className="w-[50vw] shrink-0 border-r sm:w-[570px]">
+            <div className="w-[50vw] shrink-0 border-r sm:w-[602px]">
               <IdentityPaneTable>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
@@ -333,7 +334,7 @@ export function VehiclesTable({
                     <TableHead className="sticky top-0 z-10 w-[220px] min-w-[220px] bg-muted font-semibold">
                       <SortableHeader label="Model / Grade" sortKey="model" params={params} />
                     </TableHead>
-                    <TableHead className="sticky top-0 z-10 w-[84px] min-w-[84px] bg-muted font-semibold">Actions</TableHead>
+                    <TableHead className="sticky top-0 z-10 w-[116px] min-w-[116px] bg-muted font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -344,10 +345,9 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <ClickableRow
+                      <HoverSyncRow
                         key={row.id}
                         id={row.id}
-                        href={`/vehicles/${row.serial}`}
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >
@@ -383,25 +383,34 @@ export function VehiclesTable({
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <StatusScrollDot status={row.effectiveShipmentStatus} />
-                            {canEditVehicle || canDelete ? (
-                              <div className="flex items-center gap-1">
-                                {canEditVehicle && (
-                                  <Link
-                                    href={`/vehicles/${row.serial}/edit`}
-                                    aria-label={`Edit ${row.serial}`}
-                                    className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
-                                  >
-                                    <Pencil className="size-4" />
-                                  </Link>
-                                )}
-                                {canDelete && <DeleteVehicleDialog vehicleId={row.id} serial={row.serial} />}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {/* Always shown, every role — viewing a vehicle's
+                                  detail page isn't gated, unlike Edit/Delete
+                                  below (US-02: Viewer is read-only, not
+                                  no-access). This is now the only way to reach
+                                  it — the row itself no longer navigates on
+                                  click, see clickable-row.tsx. */}
+                              <Link
+                                href={`/vehicles/${row.serial}`}
+                                aria-label={`View ${row.serial}`}
+                                className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                              >
+                                <Eye className="size-4" />
+                              </Link>
+                              {canEditVehicle && (
+                                <Link
+                                  href={`/vehicles/${row.serial}/edit`}
+                                  aria-label={`Edit ${row.serial}`}
+                                  className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                                >
+                                  <Pencil className="size-4" />
+                                </Link>
+                              )}
+                              {canDelete && <DeleteVehicleDialog vehicleId={row.id} serial={row.serial} />}
+                            </div>
                           </div>
                         </TableCell>
-                      </ClickableRow>
+                      </HoverSyncRow>
                     );
                   })}
                 </TableBody>
@@ -440,10 +449,9 @@ export function VehiclesTable({
                         : undefined;
 
                     return (
-                      <ClickableRow
+                      <HoverSyncRow
                         key={row.id}
                         id={row.id}
-                        href={`/vehicles/${row.serial}`}
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >
@@ -456,7 +464,7 @@ export function VehiclesTable({
                             {column.render(row, columnContext)}
                           </TableCell>
                         ))}
-                      </ClickableRow>
+                      </HoverSyncRow>
                     );
                   })}
                 </TableBody>
