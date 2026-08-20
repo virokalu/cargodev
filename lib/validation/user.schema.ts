@@ -43,3 +43,8 @@ export const staffUpdateSchema = z.object({
 
 export type StaffCreateInput = z.infer<typeof staffCreateSchema>;
 export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
+
+// ── GET /api/v1/staff query params ─────────────────────────────────
+export const staffListQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+});

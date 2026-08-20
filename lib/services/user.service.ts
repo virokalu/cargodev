@@ -22,6 +22,7 @@ import {
 } from "@/lib/validation/profile.schema";
 import { flattenFieldErrors } from "@/lib/validation/shared";
 import * as activityLog from "@/lib/services/activity-log.service";
+import { revokeAllUserTokens } from "@/lib/services/mobile-auth.service";
 
 const PASSWORD_SALT_ROUNDS = 10;
 
@@ -295,6 +296,12 @@ export async function setStaffActive(
       after: { loginEnabled: updated.loginEnabled },
     });
 
+    // Deactivating a staff account must cut off its mobile sessions
+    // immediately, not just wait for the next refresh cycle's DB recheck.
+    if (!active) {
+      await revokeAllUserTokens(tx, actor.orgId, staffId);
+    }
+
     return updated as StaffListItem;
   });
 }
@@ -423,5 +430,11 @@ export async function changeOwnPassword(actor: SessionUser, rawInput: unknown): 
       entity: "User",
       entityId: actor.id,
     });
+
+    // Standard "changing your password logs out every other session"
+    // behavior — a leaked old password's still-valid mobile refresh token
+    // must not remain usable after rotation. Does not touch the separate
+    // web NextAuth cookie session.
+    await revokeAllUserTokens(tx, actor.orgId, actor.id);
   });
 }

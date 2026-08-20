@@ -1,12 +1,13 @@
 // NextAuth v4 configuration.
-// Strategy: JWT cookie sessions now; a separate JWT-bearer branch will serve
-// the Phase 2 mobile app from the same service (no data migration needed).
+// Strategy: JWT cookie sessions for the web app. Credential verification
+// itself lives in lib/services/staff-auth.service.ts so the mobile bearer-
+// token login (app/api/v1/auth/login/route.ts) shares the exact same
+// email/bcrypt/loginEnabled logic and login throttle instead of a second copy.
 
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
+import { verifyStaffCredentials } from "@/lib/services/staff-auth.service";
+import { ServiceError } from "@/lib/errors";
 import type { StaffRole } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
@@ -21,57 +22,26 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // Emails are always stored lowercase (zod's emailSchema normalizes on
-        // every write) — normalize the login input the same way so
-        // "Viro@Gmail.com" matches the "viro@gmail.com" row in the database.
-        const email = credentials.email.trim().toLowerCase();
-
-        // Look up staff user only — customers cannot log in in Phase 1.
-        const user = await prisma.user.findFirst({
-          where: {
-            org_id: env.ORG_ID,
-            email,
-            userType: "STAFF",
-            loginEnabled: true,
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            password: true,
-            role: true,
-            org_id: true,
-          },
-        });
-
-        // `role` is nullable in the schema (customers have no role) but we already
-        // filter userType=STAFF above, so null here means data integrity issue — reject.
-        if (!user || !user.password || !user.role) return null;
-
-        const passwordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-        if (!passwordValid) return null;
-
-        // Record the login timestamp (non-blocking — don't await).
-        prisma.user
-          .update({
-            where: { id: user.id },
-            data: { lastActiveAt: new Date() },
-          })
-          .catch(() => {
-            // Intentionally ignore — a failed timestamp update must not block login.
-          });
+        let verified;
+        try {
+          verified = await verifyStaffCredentials(credentials.email, credentials.password);
+        } catch (error) {
+          // A ServiceError("FORBIDDEN") here means an active lockout. The web
+          // login form only ever shows a generic failure message anyway, so
+          // collapse it to the same null-return NextAuth treats as "sign-in
+          // failed" — the mobile login route surfaces this distinctly instead.
+          if (error instanceof ServiceError) return null;
+          throw error;
+        }
+        if (!verified) return null;
 
         return {
-          id: user.id,
-          name: user.name,
+          id: verified.id,
+          name: verified.name,
           // email is nullable in the schema; NextAuth User.email expects string | null | undefined
-          email: user.email,
-          // role is confirmed non-null above
-          role: user.role,
-          orgId: user.org_id,
+          email: verified.email,
+          role: verified.role,
+          orgId: verified.orgId,
         };
       },
     }),
