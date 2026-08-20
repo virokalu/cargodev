@@ -39,12 +39,12 @@ enum ShippingMethod {
 // generic "Add Documents" bucket — kept as the default so every document
 // uploaded before this enum existed reads as OTHER, not as a data gap.
 enum VehicleDocumentType {
-  LC                 // Letter of Credit
-  EC                 // Export Certificate — completing this is the EC_RECEIVED shipment milestone (lib/shipment-milestones.ts)
-  ED                 // Export Declaration
-  BL                 // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
+  LC // Letter of Credit
+  EC // Export Certificate — completing this is the EC_RECEIVED shipment milestone (lib/shipment-milestones.ts)
+  ED // Export Declaration
+  BL // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
   INSPECTION_REPORT
-  SHAKEN_SHO         // Japanese vehicle inspection certificate (車検証)
+  SHAKEN_SHO // Japanese vehicle inspection certificate (車検証)
   FREIGHT_INVOICE
   OTHER
 }
@@ -73,18 +73,19 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   // Relations
-  users           User[]
-  vehicles        Vehicle[]
-  brands          Brand[]
-  auctionHalls    AuctionHall[]
-  transportCos    TransportCompany[]
+  users            User[]
+  vehicles         Vehicle[]
+  brands           Brand[]
+  auctionHalls     AuctionHall[]
+  transportCos     TransportCompany[]
   vehicleLocations VehicleLocation[]
-  freightAgents   FreightAgent[]
-  packingAgents   PackingAgent[]
-  rowStatuses     RowColourStatus[]
-  serialCounters  SerialCounter[]
-  notifications   Notification[]
-  activityLogs    ActivityLog[]
+  freightAgents    FreightAgent[]
+  packingAgents    PackingAgent[]
+  rowStatuses      RowColourStatus[]
+  serialCounters   SerialCounter[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  refreshTokens    RefreshToken[]
 }
 
 // ─────────────────────────────────────────────
@@ -92,32 +93,37 @@ model Organization {
 // ─────────────────────────────────────────────
 
 model User {
-  id           String     @id @default(cuid())
-  org_id       String
-  userType     UserType
-  name         String
-  email        String?
-  phone        String?
-  country      String?
-  address      String?
+  id                  String     @id @default(cuid())
+  org_id              String
+  userType            UserType
+  name                String
+  email               String?
+  phone               String?
+  country             String?
+  address             String?
   // null for CUSTOMER users until Phase 2 logins
-  password     String?
+  password            String?
   // true for staff, false for customers (Phase 1)
-  loginEnabled Boolean    @default(false)
+  loginEnabled        Boolean    @default(false)
   // null for CUSTOMER users
-  role         StaffRole?
-  lastActiveAt DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  role                StaffRole?
+  lastActiveAt        DateTime?
+  // Login throttle (mobile + web share this — see lib/services/staff-auth.service.ts).
+  // Reset to 0/null on any successful login; never defaults to a locked state.
+  failedLoginAttempts Int        @default(0)
+  lockoutUntil        DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  org          Organization @relation(fields: [org_id], references: [id])
+  org Organization @relation(fields: [org_id], references: [id])
 
   // CUSTOMER users can own vehicles; STAFF users cannot (enforced in service layer)
-  vehicles     Vehicle[]    @relation("CustomerVehicles")
-  activityLogs ActivityLog[]
-  notifications Notification[]
+  vehicles          Vehicle[]         @relation("CustomerVehicles")
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
   uploadedPhotos    VehiclePhoto[]
   uploadedDocuments VehicleDocument[]
+  refreshTokens     RefreshToken[]
 
   @@unique([org_id, email])
   @@index([org_id, userType])
@@ -137,7 +143,7 @@ model SerialCounter {
   lastNumber Int          @default(0)
   updatedAt  DateTime     @updatedAt
 
-  org        Organization @relation(fields: [org_id], references: [id])
+  org Organization @relation(fields: [org_id], references: [id])
 
   @@unique([org_id, prefix])
 }
@@ -149,21 +155,21 @@ model SerialCounter {
 // ─────────────────────────────────────────────
 
 model Brand {
-  id      String            @id @default(cuid())
-  org_id  String
-  name    String
-  org     Organization      @relation(fields: [org_id], references: [id])
-  models  VehicleModelRef[]
+  id     String            @id @default(cuid())
+  org_id String
+  name   String
+  org    Organization      @relation(fields: [org_id], references: [id])
+  models VehicleModelRef[]
 
   @@unique([org_id, name])
 }
 
 model VehicleModelRef {
-  id       String  @id @default(cuid())
+  id       String    @id @default(cuid())
   org_id   String
   brand_id String
   name     String
-  brand    Brand    @relation(fields: [brand_id], references: [id])
+  brand    Brand     @relation(fields: [brand_id], references: [id])
   grades   Grade[]
   vehicles Vehicle[]
 
@@ -184,10 +190,10 @@ model Grade {
 }
 
 model AuctionHall {
-  id      String       @id @default(cuid())
-  org_id  String
-  name    String
-  org     Organization @relation(fields: [org_id], references: [id])
+  id       String       @id @default(cuid())
+  org_id   String
+  name     String
+  org      Organization @relation(fields: [org_id], references: [id])
   vehicles Vehicle[]
 
   @@unique([org_id, name])
@@ -214,14 +220,14 @@ model VehicleLocation {
 }
 
 model FreightAgent {
-  id               String       @id @default(cuid())
-  org_id           String
-  name             String
+  id              String       @id @default(cuid())
+  org_id          String
+  name            String
   // These two flags determine which shipping methods can be selected per vehicle
-  offersRoro       Boolean      @default(false)
-  offersContainer  Boolean      @default(false)
-  org              Organization @relation(fields: [org_id], references: [id])
-  vehicles         Vehicle[]
+  offersRoro      Boolean      @default(false)
+  offersContainer Boolean      @default(false)
+  org             Organization @relation(fields: [org_id], references: [id])
+  vehicles        Vehicle[]
 
   @@unique([org_id, name])
 }
@@ -244,14 +250,14 @@ model PackingAgent {
 // Row colour is data, not code — admins configure colours in Settings.
 // "Transport Complete" is special: colours only the Transport By cell, not the whole row.
 model RowColourStatus {
-  id          String       @id @default(cuid())
-  org_id      String
-  name        String
-  colour      String       // e.g. "#f59e0b" — CSS hex colour
+  id                String       @id @default(cuid())
+  org_id            String
+  name              String
+  colour            String // e.g. "#f59e0b" — CSS hex colour
   // When true, only the Transport By cell is coloured; the rest of the row is normal
-  transportCellOnly Boolean @default(false)
-  org         Organization @relation(fields: [org_id], references: [id])
-  vehicles    Vehicle[]
+  transportCellOnly Boolean      @default(false)
+  org               Organization @relation(fields: [org_id], references: [id])
+  vehicles          Vehicle[]
 
   @@unique([org_id, name])
 }
@@ -279,10 +285,10 @@ model Vehicle {
   shipmentStatus ShipmentStatus @default(PENDING)
 
   // Model hierarchy — all three levels are optional individually; grade requires model; model requires brand
-  modelId   String?
-  gradeId   String?
+  modelId String?
+  gradeId String?
 
-  yom         Int?     // Year of Manufacture
+  yom           Int? // Year of Manufacture
   auctionHallId String?
   purchaseDate  DateTime?
 
@@ -308,29 +314,29 @@ model Vehicle {
   // Auction sheet is a single image (R2 URL stored, not the file itself)
   auctionSheetUrl String?
 
-  docsArrivedDate      DateTime?
-  nameChangeDeadline   DateTime? // Drives deadline-approaching notifications
+  docsArrivedDate    DateTime?
+  nameChangeDeadline DateTime? // Drives deadline-approaching notifications
 
-  transportById       String? // FK → TransportCompany
-  vehicleLocationId   String?
-  freightAgentId      String?
-  shippingMethod      ShippingMethod? // RORO or CONTAINER — validated against agent capabilities
+  transportById     String? // FK → TransportCompany
+  vehicleLocationId String?
+  freightAgentId    String?
+  shippingMethod    ShippingMethod? // RORO or CONTAINER — validated against agent capabilities
   // Only meaningful when shippingMethod = CONTAINER — service layer nulls
   // this out otherwise, same treatment as the FC-only shipping fields above.
-  packingAgentId      String?
-  vanningDate         DateTime? // Container only — when the vehicle was loaded into its container; drives the Loaded shipment milestone
-  containerNumber     String?   // Container only
+  packingAgentId    String?
+  vanningDate       DateTime? // Container only — when the vehicle was loaded into its container; drives the Loaded shipment milestone
+  containerNumber   String? // Container only
 
-  massoDate   DateTime? // Deregistration (抹消) date
-  billNumber  String?
-  lcNo        String?
-  trackingNo  String?
+  massoDate  DateTime? // Deregistration (抹消) date
+  billNumber String?
+  lcNo       String?
+  trackingNo String?
 
   docSentDate    DateTime? // #30
   docSentComment String?
 
   recycleDate DateTime? // #31 — confirmed as a date field
-  jibaishake  String?   // #32 — free text for now; can be structured later without migration pain
+  jibaishake  String? // #32 — free text for now; can be structured later without migration pain
 
   // Vehicle Remark — plain free-text note on the vehicle itself, overwritable
   // (not the old append-only RemarkEntry thread). Same shape as docSentComment/jibaishake.
@@ -347,20 +353,20 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   // ── Relations ──────────────────────────────
-  org             Organization     @relation(fields: [org_id], references: [id])
-  model           VehicleModelRef? @relation(fields: [modelId], references: [id])
-  grade           Grade?           @relation(fields: [gradeId], references: [id])
-  auctionHall     AuctionHall?     @relation(fields: [auctionHallId], references: [id])
-  customer        User?            @relation("CustomerVehicles", fields: [customerId], references: [id])
+  org             Organization      @relation(fields: [org_id], references: [id])
+  model           VehicleModelRef?  @relation(fields: [modelId], references: [id])
+  grade           Grade?            @relation(fields: [gradeId], references: [id])
+  auctionHall     AuctionHall?      @relation(fields: [auctionHallId], references: [id])
+  customer        User?             @relation("CustomerVehicles", fields: [customerId], references: [id])
   transportBy     TransportCompany? @relation(fields: [transportById], references: [id])
-  vehicleLocation VehicleLocation? @relation(fields: [vehicleLocationId], references: [id])
-  freightAgent    FreightAgent?    @relation(fields: [freightAgentId], references: [id])
-  packingAgent    PackingAgent?    @relation(fields: [packingAgentId], references: [id])
-  rowColourStatus RowColourStatus? @relation(fields: [rowColourStatusId], references: [id])
+  vehicleLocation VehicleLocation?  @relation(fields: [vehicleLocationId], references: [id])
+  freightAgent    FreightAgent?     @relation(fields: [freightAgentId], references: [id])
+  packingAgent    PackingAgent?     @relation(fields: [packingAgentId], references: [id])
+  rowColourStatus RowColourStatus?  @relation(fields: [rowColourStatusId], references: [id])
 
-  photos         VehiclePhoto[]
-  documents      VehicleDocument[]
-  statusHistory  StatusHistory[]
+  photos        VehiclePhoto[]
+  documents     VehicleDocument[]
+  statusHistory StatusHistory[]
 
   @@unique([org_id, serial])
   @@unique([org_id, serialPrefix, serialNumber])
@@ -389,12 +395,12 @@ model Vehicle {
 model VehiclePhoto {
   id           String   @id @default(cuid())
   vehicleId    String
-  url          String   // Cloudflare R2 URL (presigned for uploads, standard for reads)
+  url          String // Cloudflare R2 URL (presigned for uploads, standard for reads)
   uploadedById String
   createdAt    DateTime @default(now())
 
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
 
   @@index([vehicleId])
 }
@@ -404,13 +410,13 @@ model VehicleDocument {
   id           String              @id @default(cuid())
   vehicleId    String
   url          String
-  name         String              // Original filename shown in the UI
+  name         String // Original filename shown in the UI
   documentType VehicleDocumentType @default(OTHER)
   uploadedById String
   createdAt    DateTime            @default(now())
 
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
 
   @@index([vehicleId])
 }
@@ -421,7 +427,7 @@ model VehicleDocument {
 // ─────────────────────────────────────────────
 
 model StatusHistory {
-  id          String         @id @default(cuid())
+  id          String          @id @default(cuid())
   vehicleId   String
   fromStatus  ShipmentStatus?
   toStatus    ShipmentStatus
@@ -433,9 +439,9 @@ model StatusHistory {
   trigger     String
   // null when triggered by cron/system; set when a staff action caused it
   triggeredBy String?
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime        @default(now())
 
-  vehicle     Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
 }
@@ -447,7 +453,7 @@ model StatusHistory {
 model Notification {
   id        String   @id @default(cuid())
   org_id    String
-  userId    String   // Recipient
+  userId    String // Recipient
   // e.g. "BOOKING_RECEIVED" | "SHIPPED" | "NAME_CHANGE_DEADLINE" | "DOCUMENT_UPLOADED"
   event     String
   title     String
@@ -457,8 +463,8 @@ model Notification {
   vehicleId String?
   createdAt DateTime @default(now())
 
-  org       Organization @relation(fields: [org_id], references: [id])
-  user      User         @relation(fields: [userId], references: [id])
+  org  Organization @relation(fields: [org_id], references: [id])
+  user User         @relation(fields: [userId], references: [id])
 
   @@index([org_id, userId, isRead])
 }
@@ -469,21 +475,61 @@ model Notification {
 // ─────────────────────────────────────────────
 
 model ActivityLog {
-  id         String   @id @default(cuid())
-  org_id     String
-  actorId    String   // User who performed the action
-  action     String   // e.g. "CREATE_VEHICLE", "UPDATE_VEHICLE", "DELETE_REMARK"
-  entity     String   // e.g. "Vehicle", "RemarkEntry"
-  entityId   String
+  id        String   @id @default(cuid())
+  org_id    String
+  actorId   String // User who performed the action
+  action    String // e.g. "CREATE_VEHICLE", "UPDATE_VEHICLE", "DELETE_REMARK"
+  entity    String // e.g. "Vehicle", "RemarkEntry"
+  entityId  String
   // JSON snapshots of the record before and after the change
-  before     Json?
-  after      Json?
-  createdAt  DateTime @default(now())
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
 
-  org        Organization @relation(fields: [org_id], references: [id])
-  actor      User         @relation(fields: [actorId], references: [id])
+  org   Organization @relation(fields: [org_id], references: [id])
+  actor User         @relation(fields: [actorId], references: [id])
 
   @@index([org_id, createdAt])
   @@index([org_id, actorId])
   @@index([org_id, entity, entityId])
+}
+
+// ─────────────────────────────────────────────
+// MOBILE AUTH — refresh tokens for the /api/v1 bearer-token flow.
+// Access tokens (short-lived, signed JWT) are never stored; only the
+// long-lived opaque refresh token is persisted here, hashed, so the DB never
+// holds anything a leaked backup could use directly. Rotated on every use
+// (see lib/services/mobile-auth.service.ts) so a stolen-but-unused old token
+// is a dead end.
+// ─────────────────────────────────────────────
+
+model RefreshToken {
+  id     String @id @default(cuid())
+  org_id String
+  userId String
+
+  // sha256 hex digest of the opaque token. The raw token is returned to the
+  // client exactly once (at login/refresh time) and never stored anywhere.
+  tokenHash String @unique
+
+  createdByIp String?
+  userAgent   String?
+
+  expiresAt         DateTime
+  // Set on logout, on rotation (superseded by a newer token), or when an
+  // account is deactivated / changes its password. Non-null = unusable.
+  revokedAt         DateTime?
+  // Informational pointer to the row that replaced this one on rotation —
+  // not a Prisma relation (a self-relation FK needs explicit onDelete
+  // behaviour to avoid ambiguous-cascade errors on Postgres, not worth the
+  // complexity for a field that's audit-trail-only).
+  replacedByTokenId String?
+
+  createdAt DateTime @default(now())
+
+  org  Organization @relation(fields: [org_id], references: [id])
+  user User         @relation(fields: [userId], references: [id])
+
+  @@index([org_id, userId])
+  @@index([expiresAt])
 }

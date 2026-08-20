@@ -580,6 +580,19 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
   };
 }
 
+/** Resolves a vehicle's serial (the mobile API's URL slug, same as the web
+ * detail page) to its internal id, throwing the standard 404 shape instead
+ * of returning null — used by routes whose downstream service function
+ * (listVehicleStatusHistory, listVehicleFiles, getVehiclePdfImages) is keyed
+ * by id, not serial. */
+export async function resolveVehicleIdBySerial(orgId: string, serial: string): Promise<string> {
+  const vehicle = await getVehicleDetail(orgId, serial);
+  if (!vehicle) {
+    throw new ServiceError("NOT_FOUND", "Vehicle not found.");
+  }
+  return vehicle.id;
+}
+
 const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
   ETD_SAVED: "ETD saved",
   ETD_CLEARED: "ETD cleared",
