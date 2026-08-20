@@ -317,7 +317,8 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                     documentType={documentType}
                     label={DOCUMENT_TYPE_META[documentType].label}
                     documents={files.documents.filter((document) => document.documentType === documentType)}
-                    canEdit={false}
+                    canAdd={false}
+                    canDelete={false}
                   />
                 </DocumentTypeSection>
               ))}
@@ -328,7 +329,8 @@ export function VehicleDetailView({ vehicle, files }: VehicleDetailViewProps) {
                   documentType="OTHER"
                   label={DOCUMENT_TYPE_META.OTHER.label}
                   documents={files.documents.filter((document) => document.documentType === "OTHER")}
-                  canEdit={false}
+                  canAdd={false}
+                  canDelete={false}
                 />
               </DocumentTypeSection>
             </TabsContent>

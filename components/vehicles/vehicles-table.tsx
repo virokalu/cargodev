@@ -55,8 +55,10 @@ interface VehiclesTableProps {
   /** RBAC (US-02): Viewer gets read-only everywhere — no inline editors, no
    * Edit/Delete controls rendered, not just hidden behind a disabled state.
    * `canWrite` covers the inline Row Colour Status editor (Admin/Manager/
-   * Operator — "table level" access); `canEditVehicle` covers the full
-   * edit-form link (Admin/Manager only — Operator doesn't get this one). */
+   * Operator — "table level" access); `canEditVehicle` covers whether the
+   * Pencil icon links to the edit page at all (Admin/Manager/Operator —
+   * VehicleForm itself further restricts what Operator can actually change
+   * once there, see canEditFields in [serial]/edit/page.tsx). */
   canWrite: boolean;
   canEditVehicle: boolean;
   canDelete: boolean;

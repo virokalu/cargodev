@@ -60,9 +60,11 @@ export default async function EditVehiclePage({
 }: {
   params: Promise<{ serial: string }>;
 }) {
-  // Operator's vehicle write access is table-level only (row colour, from
-  // the list view) — the full edit form is Administrator/Manager only.
-  const user = await requireUser(["ADMINISTRATOR", "MANAGER"]);
+  // Operator can reach this page (to add documents/photos and toggle
+  // Auction Bill Paid) but can't edit any general field — canEditFields
+  // tells VehicleForm to grey out and disable everything else.
+  const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
+  const canEditFields = user.role !== "OPERATOR";
   const { serial } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([
@@ -90,6 +92,7 @@ export default async function EditVehiclePage({
       files={files}
       rowColourStatuses={rowColourStatuses}
       countries={COUNTRIES}
+      canEditFields={canEditFields}
     />
   );
 }
