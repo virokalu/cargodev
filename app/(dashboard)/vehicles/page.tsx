@@ -68,12 +68,14 @@ export default async function VehiclesPage({
   };
 
   // US-02: Viewer is read-only everywhere — no inline editors, no Edit/Delete
-  // controls rendered in the table, not just disabled. Operator's write
-  // access is table-level only (row colour) — adding a vehicle and full
-  // edit are both Admin/Manager only.
+  // controls rendered in the table, not just disabled. Operator can open the
+  // edit page (canEditVehicle) but only to add files and toggle Auction Bill
+  // Paid — VehicleForm itself greys out every general field for them
+  // (see canEditFields in [serial]/edit/page.tsx). Adding a new vehicle and
+  // deleting one stay Admin/Manager only.
   const canCreate = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
   const canWrite = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
-  const canEditVehicle = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
+  const canEditVehicle = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
   const canDelete = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
 
   return (

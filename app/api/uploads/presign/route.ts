@@ -14,10 +14,14 @@ import { buildObjectKey, createPresignedPutUrl, publicUrlForKey } from "@/lib/r2
 import { getOwnedVehicle } from "@/lib/services/file.service";
 import { ServiceError } from "@/lib/errors";
 
-// Duplicated from vehicles/actions.ts's STAFF_CAN_EDIT_VEHICLE — that file
-// has "use server" at the top, which only allows async function exports, so
-// it can't be imported from here. Keep the two in sync if roles change.
-const STAFF_CAN_UPLOAD: StaffRole[] = ["ADMINISTRATOR", "MANAGER"];
+// Duplicated from vehicles/actions.ts's STAFF_CAN_ADD_VEHICLE_FILES — that
+// file has "use server" at the top, which only allows async function
+// exports, so it can't be imported from here. Keep the two in sync if roles
+// change. This only gates getting a presigned URL — the actual DB write
+// (addVehicleDocumentAction/addVehiclePhotoAction/setAuctionSheetAction) has
+// its own, independently-enforced check, so widening this to Operator here
+// doesn't grant anything beyond what those actions already allow them to do.
+const STAFF_CAN_UPLOAD: StaffRole[] = ["ADMINISTRATOR", "MANAGER", "OPERATOR"];
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);

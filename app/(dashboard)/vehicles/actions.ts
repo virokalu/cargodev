@@ -14,13 +14,19 @@ import * as lookupService from "@/lib/services/lookup.service";
 import * as customerService from "@/lib/services/customer.service";
 import * as fileService from "@/lib/services/file.service";
 
-// Operator's entire vehicle write access is "table level" only — the row
-// colour dropdown inline in the table. They can't add new vehicles, open the
-// full edit form, or touch the lookup/customer create-create actions those
-// forms depend on. Admin/Manager keep all of it.
+// Operator can't add new vehicles, edit any general vehicle field, delete a
+// vehicle, delete a file, or touch the lookup/customer create actions those
+// forms depend on — all of that stays Admin/Manager only. Operator's write
+// access is limited to three narrow things: the row colour dropdown inline
+// in the table, adding (not deleting) documents/photos/the auction sheet
+// from the edit page, and toggling Auction Bill Paid. Each of those three
+// gets its own allow-list below rather than reusing STAFF_CAN_WRITE, so
+// widening one can never accidentally widen the others.
 const STAFF_CAN_WRITE = ["ADMINISTRATOR", "MANAGER"] as const;
 const STAFF_CAN_EDIT_VEHICLE = ["ADMINISTRATOR", "MANAGER"] as const;
 const STAFF_CAN_UPDATE_ROW_COLOUR = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
+const STAFF_CAN_ADD_VEHICLE_FILES = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
+const STAFF_CAN_UPDATE_AUCTION_BILL_PAID = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
 const STAFF_CAN_DELETE = ["ADMINISTRATOR", "MANAGER"] as const;
 
 export type VehicleMutationResult =
@@ -89,7 +95,7 @@ export async function updateAuctionBillPaidAction(
   id: string,
   auctionBillPaid: boolean | null
 ): Promise<void> {
-  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const user = await requireUser([...STAFF_CAN_UPDATE_AUCTION_BILL_PAID]);
   await vehicleService.updateVehicleAuctionBillPaid(user.orgId, user.id, id, auctionBillPaid);
   revalidatePath("/vehicles");
 }
@@ -285,7 +291,7 @@ export async function renameCustomerAction(id: string, name: string) {
 export type FileMutationResult = { ok: true } | { ok: false; message: string };
 
 export async function setAuctionSheetAction(vehicleId: string, url: string): Promise<FileMutationResult> {
-  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  const user = await requireUser([...STAFF_CAN_ADD_VEHICLE_FILES]);
   try {
     await fileService.setAuctionSheet(user, vehicleId, url);
     // Path pattern, not a resolved value — see the comment in
@@ -300,7 +306,7 @@ export async function setAuctionSheetAction(vehicleId: string, url: string): Pro
 }
 
 export async function addVehiclePhotoAction(vehicleId: string, url: string): Promise<FileMutationResult> {
-  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  const user = await requireUser([...STAFF_CAN_ADD_VEHICLE_FILES]);
   try {
     await fileService.addVehiclePhoto(user, vehicleId, url);
     // Path pattern, not a resolved value — see the comment in
@@ -335,7 +341,7 @@ export async function addVehicleDocumentAction(
   name: string,
   documentType: VehicleDocumentType
 ): Promise<FileMutationResult> {
-  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  const user = await requireUser([...STAFF_CAN_ADD_VEHICLE_FILES]);
   try {
     await fileService.addVehicleDocument(user, vehicleId, url, name, documentType);
     // Path pattern, not a resolved value — see the comment in
