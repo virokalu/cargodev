@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["ADMINISTRATOR", "MANAGER"],
   },
   { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMINISTRATOR", "MANAGER"] },
+  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMINISTRATOR", "MANAGER", "OPERATOR"] },
   { label: "Users", href: "/users", icon: Users, roles: ["ADMINISTRATOR", "MANAGER"] },
   {
     label: "Customers",
