@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -977,6 +978,20 @@ export function VehicleForm({
               </Select>
               {fieldErrors.yom && <p className="mt-1 text-xs text-destructive">{fieldErrors.yom}</p>}
             </div>
+            <DateField
+              id="purchaseDate"
+              label="Purchase Date"
+              value={state.purchaseDate}
+              onChange={(value) => setField("purchaseDate", value)}
+              error={fieldErrors.purchaseDate}
+            />
+            <CountrySelect
+              id="destination"
+              label="Destination"
+              options={countries}
+              value={state.destination}
+              onChange={(name) => setField("destination", name)}
+            />
 
             {!isFC && (
               <div className="sm:col-span-2">
@@ -1031,13 +1046,6 @@ export function VehicleForm({
                 error={fieldErrors.supplierId}
               />
             )}
-            <DateField
-              id="purchaseDate"
-              label="Purchase Date"
-              value={state.purchaseDate}
-              onChange={(value) => setField("purchaseDate", value)}
-              error={fieldErrors.purchaseDate}
-            />
             {(isFC || state.purchaseSource === "AUCTION_HALL") && (
               <TextField
                 id="auctionLotNo"
@@ -1048,36 +1056,38 @@ export function VehicleForm({
                 error={fieldErrors.auctionLotNo}
               />
             )}
-            <ComboboxCreate
-              id="customer"
-              label="Customer"
-              createLabel="customer"
-              value={state.customer}
-              onChange={(value) => setField("customer", value)}
-              search={searchCustomersAction}
-              onCreate={createCustomerAction}
-              onRename={(option, name) => renameCustomerAction(option.id, name)}
-              error={fieldErrors.customerId}
-            />
-            <CountrySelect
-              id="destination"
-              label="Destination"
-              options={countries}
-              value={state.destination}
-              onChange={(name) => setField("destination", name)}
-            />
-            {!isFC && (
-              <YesNoToggle
-                label="Partnership"
-                value={state.hasPartnership}
-                onChange={(value) =>
-                  setState((previous) => ({
-                    ...previous,
-                    hasPartnership: value,
-                    partnerName: value ? previous.partnerName : "",
-                  }))
-                }
+            {isFC && (
+              <ComboboxCreate
+                id="customer"
+                label="Customer"
+                createLabel="customer"
+                value={state.customer}
+                onChange={(value) => setField("customer", value)}
+                search={searchCustomersAction}
+                onCreate={createCustomerAction}
+                onRename={(option, name) => renameCustomerAction(option.id, name)}
+                error={fieldErrors.customerId}
               />
+            )}
+            {!isFC && (
+              <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                <YesNoToggle
+                  label="Partnership"
+                  value={state.hasPartnership}
+                  onChange={(value) =>
+                    setState((previous) => ({
+                      ...previous,
+                      hasPartnership: value,
+                      partnerName: value ? previous.partnerName : "",
+                    }))
+                  }
+                />
+                <TriStateToggle
+                  label="Bill Paid"
+                  value={state.auctionBillPaid}
+                  onChange={(value) => setField("auctionBillPaid", value)}
+                />
+              </div>
             )}
             {!isFC && state.hasPartnership && (
               <TextField
@@ -1090,11 +1100,13 @@ export function VehicleForm({
                 error={fieldErrors.partnerName}
               />
             )}
-            <TriStateToggle
-              label="Auction Bill Paid"
-              value={state.auctionBillPaid}
-              onChange={(value) => setField("auctionBillPaid", value)}
-            />
+            {isFC && (
+              <TriStateToggle
+                label="Bill Paid"
+                value={state.auctionBillPaid}
+                onChange={(value) => setField("auctionBillPaid", value)}
+              />
+            )}
           </SectionCard>
 
           {/* ── Transport & Logistics ──────────────────────────────── */}
@@ -1318,6 +1330,17 @@ export function VehicleForm({
           {/* ── Sold Details (FL only) ─────────────────────────────── */}
           {!isFC && (
             <SectionCard icon={Banknote} title="Sale Details">
+              <ComboboxCreate
+                id="customer"
+                label="Customer"
+                createLabel="customer"
+                value={state.customer}
+                onChange={(value) => setField("customer", value)}
+                search={searchCustomersAction}
+                onCreate={createCustomerAction}
+                onRename={(option, name) => renameCustomerAction(option.id, name)}
+                error={fieldErrors.customerId}
+              />
               <DateField
                 id="deliveryDate"
                 label="Delivery Date"
@@ -1325,40 +1348,48 @@ export function VehicleForm({
                 onChange={(value) => setField("deliveryDate", value)}
                 error={fieldErrors.deliveryDate}
               />
+              <div>
+                <Label htmlFor="sellingPrice" className="mb-1.5">
+                  Selling Price
+                </Label>
+                <InputGroup>
+                  <Select
+                    value={state.sellingPriceCurrency}
+                    onValueChange={(value) => setField("sellingPriceCurrency", value ?? "JPY")}
+                  >
+                    <SelectTrigger
+                      id="sellingPriceCurrency"
+                      className="w-auto shrink-0 rounded-none rounded-l-lg border-0 border-r border-input bg-transparent shadow-none focus-visible:ring-0"
+                    >
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOLD_CURRENCY_OPTIONS.map((currency) => (
+                        <SelectItem key={currency} value={currency} label={currency}>
+                          {currency}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputGroupInput
+                    id="sellingPrice"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={state.sellingPriceText}
+                    onChange={(event) => setField("sellingPriceText", event.target.value)}
+                    aria-invalid={!!fieldErrors.sellingPrice}
+                  />
+                </InputGroup>
+                {fieldErrors.sellingPrice && (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.sellingPrice}</p>
+                )}
+              </div>
               <YesNoToggle
                 label="Paid by Customer"
                 value={state.paidByCustomer}
                 onChange={(value) => setField("paidByCustomer", value)}
               />
-              <NumberField
-                id="sellingPrice"
-                label="Selling Price"
-                value={state.sellingPriceText}
-                onChange={(value) => setField("sellingPriceText", value)}
-                error={fieldErrors.sellingPrice}
-                min={0}
-                step={0.01}
-              />
-              <div>
-                <Label htmlFor="sellingPriceCurrency" className="mb-1.5">
-                  Currency
-                </Label>
-                <Select
-                  value={state.sellingPriceCurrency}
-                  onValueChange={(value) => setField("sellingPriceCurrency", value ?? "JPY")}
-                >
-                  <SelectTrigger id="sellingPriceCurrency" className="w-full">
-                    <SelectValue placeholder="Select currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOLD_CURRENCY_OPTIONS.map((currency) => (
-                      <SelectItem key={currency} value={currency} label={currency}>
-                        {currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </SectionCard>
           )}
 
