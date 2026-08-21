@@ -1313,6 +1313,8 @@ export interface VehicleListRow {
   auctionItemNo: string | null;
   auctionHallName: string | null;
   supplierName: string | null;
+  hasPartnership: boolean;
+  partnerName: string | null;
   auctionLotNo: string | null;
   purchaseDate: Date | null;
   customerName: string | null;
@@ -1489,6 +1491,8 @@ const VEHICLE_LIST_SELECT = {
   yom: true,
   purchaseDate: true,
   destination: true,
+  hasPartnership: true,
+  partnerName: true,
   deliveryDate: true,
   paidByCustomer: true,
   sellingPrice: true,
@@ -1547,6 +1551,8 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     purchaseDate: v.purchaseDate,
     customerName: v.customer?.name ?? null,
     destination: v.destination,
+    hasPartnership: v.hasPartnership,
+    partnerName: v.partnerName,
     etd: v.etd,
     eta: v.eta,
     blNo: v.blNo,

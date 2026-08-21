@@ -152,18 +152,33 @@ const SCROLL_COLUMNS: {
   /** Centers both the header label and the cell content — used for the
    * tri-state columns, whose Yes/No/— values read oddly left-aligned. */
   center?: boolean;
+  /** Restricts a column to one track (by *effective* track — a converted
+   * FL vehicle shows FC-only columns too, see computeEffectiveTrack).
+   * Omitted = shown for both FC and FL, since most of the 35-field spec
+   * (Tech Doc §2) isn't track-specific — only real shipping fields are
+   * FC-only, and only Sale Details / Partnership are FL-only (vehicle-form.tsx's
+   * own `isFC`/`!isFC` guards are the source of truth this mirrors). */
+  tracks?: ("FC" | "FL")[];
 }[] = [
   {
     key: "shipmentStatus",
     header: "Shipment Status",
     sortKey: "shipmentStatus",
+    tracks: ["FC"],
     render: (row) => (
       <Badge variant={SHIPMENT_STATUS_META[row.effectiveShipmentStatus].badgeVariant}>
         {SHIPMENT_STATUS_META[row.effectiveShipmentStatus].label}
       </Badge>
     ),
   },
-  { key: "auctionHall", header: "Auction Hall", render: (row) => row.auctionHallName ?? "—" },
+  {
+    key: "auctionHall",
+    header: "Auction Hall",
+    // FL vehicles can be purchased via a Supplier instead of an Auction
+    // Hall (vehicle-form.tsx's "Purchased Via" toggle) — fall back to the
+    // supplier name so that case isn't shown as blank.
+    render: (row) => row.auctionHallName ?? row.supplierName ?? "—",
+  },
   {
     key: "purchaseDate",
     header: "Purchase Date",
@@ -177,6 +192,19 @@ const SCROLL_COLUMNS: {
     header: "Destination",
     sortKey: "destination",
     render: (row) => row.destination ?? "—",
+  },
+  {
+    key: "partnership",
+    header: "Partnership",
+    center: true,
+    tracks: ["FL"],
+    render: (row) => (row.hasPartnership ? "Yes" : "No"),
+  },
+  {
+    key: "partnerName",
+    header: "Partner Name",
+    tracks: ["FL"],
+    render: (row) => row.partnerName ?? "—",
   },
   {
     key: "auctionBillPaid",
@@ -220,22 +248,38 @@ const SCROLL_COLUMNS: {
     cellStyle: transportByStyle,
   },
   { key: "vehicleLocation", header: "Vehicle Location", render: (row) => row.vehicleLocationName ?? "—" },
-  { key: "freightAgent", header: "Forwarding Agent", render: (row) => row.freightAgentName ?? "—" },
+  {
+    key: "freightAgent",
+    header: "Forwarding Agent",
+    tracks: ["FC"],
+    render: (row) => row.freightAgentName ?? "—",
+  },
   {
     key: "shippingMethod",
     header: "RORO / Container",
+    tracks: ["FC"],
     render: (row) =>
       row.shippingMethod === "RORO" ? "RORO" : row.shippingMethod === "CONTAINER" ? "Container" : "—",
   },
-  { key: "containerNumber", header: "Container Number", render: (row) => row.containerNumber ?? "—" },
-  { key: "packingAgent", header: "Packing Agent", render: (row) => row.packingAgentName ?? "—" },
-  { key: "vanningDate", header: "Vanning Date", render: (row) => formatDate(row.vanningDate) },
+  {
+    key: "containerNumber",
+    header: "Container Number",
+    tracks: ["FC"],
+    render: (row) => row.containerNumber ?? "—",
+  },
+  {
+    key: "packingAgent",
+    header: "Packing Agent",
+    tracks: ["FC"],
+    render: (row) => row.packingAgentName ?? "—",
+  },
+  { key: "vanningDate", header: "Vanning Date", tracks: ["FC"], render: (row) => formatDate(row.vanningDate) },
   { key: "massoDate", header: "Masso Date", sortKey: "massoDate", render: (row) => formatDate(row.massoDate) },
-  { key: "etd", header: "ETD", sortKey: "etd", render: (row) => formatDate(row.etd) },
-  { key: "eta", header: "ETA", sortKey: "eta", render: (row) => formatDate(row.eta) },
-  { key: "blNo", header: "BL No", render: (row) => row.blNo ?? "—" },
-  { key: "lcNo", header: "LC No", render: (row) => row.lcNo ?? "—" },
-  { key: "trackingNo", header: "Tracking No", render: (row) => row.trackingNo ?? "—" },
+  { key: "etd", header: "ETD", sortKey: "etd", tracks: ["FC"], render: (row) => formatDate(row.etd) },
+  { key: "eta", header: "ETA", sortKey: "eta", tracks: ["FC"], render: (row) => formatDate(row.eta) },
+  { key: "blNo", header: "BL No", tracks: ["FC"], render: (row) => row.blNo ?? "—" },
+  { key: "lcNo", header: "LC No", tracks: ["FC"], render: (row) => row.lcNo ?? "—" },
+  { key: "trackingNo", header: "Tracking No", tracks: ["FC"], render: (row) => row.trackingNo ?? "—" },
   {
     key: "docSentComment",
     header: "Doc Sent Remark",
@@ -281,6 +325,28 @@ const SCROLL_COLUMNS: {
   },
   { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
   {
+    key: "deliveryDate",
+    header: "Delivery Date",
+    tracks: ["FL"],
+    render: (row) => formatDate(row.deliveryDate),
+  },
+  {
+    key: "sellingPrice",
+    header: "Selling Price",
+    tracks: ["FL"],
+    render: (row) =>
+      row.sellingPrice != null
+        ? `${row.sellingPriceCurrency ?? ""} ${row.sellingPrice.toLocaleString()}`.trim()
+        : "—",
+  },
+  {
+    key: "paidByCustomer",
+    header: "Paid by Customer",
+    center: true,
+    tracks: ["FL"],
+    render: (row) => <TriStateCell value={row.paidByCustomer} />,
+  },
+  {
     key: "rowColourStatus",
     header: "Row Colour Status",
     render: (row, ctx) =>
@@ -307,6 +373,9 @@ export function VehiclesTable({
 }: VehiclesTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / params.pageSize));
   const columnContext: ColumnContext = { canWrite, rowColourStatuses };
+  const columns = SCROLL_COLUMNS.filter(
+    (column) => !column.tracks || params.track === "ALL" || column.tracks.includes(params.track)
+  );
 
   return (
     <div className="space-y-4">
@@ -430,13 +499,13 @@ export function VehiclesTable({
               <DetailPaneTable>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
-                    {SCROLL_COLUMNS.map((column, i) => (
+                    {columns.map((column, i) => (
                       <TableHead
                         key={column.key}
                         className={cn(
                           "sticky top-0 z-10 bg-muted font-semibold",
                           column.center && "text-center",
-                          i < SCROLL_COLUMNS.length - 1 && "border-r"
+                          i < columns.length - 1 && "border-r"
                         )}
                       >
                         {column.sortKey ? (
@@ -462,10 +531,10 @@ export function VehiclesTable({
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >
-                        {SCROLL_COLUMNS.map((column, i) => (
+                        {columns.map((column, i) => (
                           <TableCell
                             key={column.key}
-                            className={cn(column.center && "text-center", i < SCROLL_COLUMNS.length - 1 && "border-r")}
+                            className={cn(column.center && "text-center", i < columns.length - 1 && "border-r")}
                             style={column.cellStyle?.(row)}
                           >
                             {column.render(row, columnContext)}
