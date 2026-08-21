@@ -833,61 +833,63 @@ export function VehicleForm({
               </div>
             )}
 
-            <div className="sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-semibold">Shipment Status</span>
-              {canSetShipmentStatusManually ? (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {STORABLE_SHIPMENT_STATUSES.map((status) => {
-                      const meta = SHIPMENT_STATUS_META[status];
-                      const active = state.manualShipmentStatus === status;
-                      return (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setField("manualShipmentStatus", status)}
-                          className={cn(
-                            active
-                              ? badgeVariants({ variant: meta.badgeVariant })
-                              : badgeVariants({ variant: "outline" }),
-                            "cursor-pointer transition-colors",
-                            !active && "text-muted-foreground hover:text-foreground"
-                          )}
-                          aria-pressed={active}
-                        >
-                          {meta.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
-                    tracked through the normal ETD flow.
-                  </p>
-                  {manualShipmentStatus !== state.manualShipmentStatus && (
-                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-warning">
-                      <AlertTriangle className="size-3.5 shrink-0" />
-                      Will actually save as{" "}
-                      <Badge variant={SHIPMENT_STATUS_META[manualShipmentStatus].badgeVariant}>
-                        {SHIPMENT_STATUS_META[manualShipmentStatus].label}
-                      </Badge>{" "}
-                      — {SHIPMENT_STATUS_META[state.manualShipmentStatus].label}{" "}
-                      doesn&apos;t match the ETD already entered below.
+            {isFC && (
+              <div className="sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-semibold">Shipment Status</span>
+                {canSetShipmentStatusManually ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {STORABLE_SHIPMENT_STATUSES.map((status) => {
+                        const meta = SHIPMENT_STATUS_META[status];
+                        const active = state.manualShipmentStatus === status;
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => setField("manualShipmentStatus", status)}
+                            className={cn(
+                              active
+                                ? badgeVariants({ variant: meta.badgeVariant })
+                                : badgeVariants({ variant: "outline" }),
+                              "cursor-pointer transition-colors",
+                              !active && "text-muted-foreground hover:text-foreground"
+                            )}
+                            aria-pressed={active}
+                          >
+                            {meta.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
+                      tracked through the normal ETD flow.
                     </p>
-                  )}
-                </>
-              ) : (
-                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
-                  {SHIPMENT_STATUS_META[shipmentStatus].label}
-                </Badge>
-              )}
-              {mode === "edit" && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Updates automatically — set or clear ETD below to move this between Pending and
-                  Booking Received.
-                </p>
-              )}
-            </div>
+                    {manualShipmentStatus !== state.manualShipmentStatus && (
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-warning">
+                        <AlertTriangle className="size-3.5 shrink-0" />
+                        Will actually save as{" "}
+                        <Badge variant={SHIPMENT_STATUS_META[manualShipmentStatus].badgeVariant}>
+                          {SHIPMENT_STATUS_META[manualShipmentStatus].label}
+                        </Badge>{" "}
+                        — {SHIPMENT_STATUS_META[state.manualShipmentStatus].label}{" "}
+                        doesn&apos;t match the ETD already entered below.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                    {SHIPMENT_STATUS_META[shipmentStatus].label}
+                  </Badge>
+                )}
+                {mode === "edit" && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Updates automatically — set or clear ETD below to move this between Pending and
+                    Booking Received.
+                  </p>
+                )}
+              </div>
+            )}
           </SectionCard>
 
           {/* ── Vehicle Information ────────────────────────────────── */}
@@ -1493,12 +1495,14 @@ export function VehicleForm({
                     : nextSerialPreview}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
-                {SHIPMENT_STATUS_META[shipmentStatus].label}
-              </Badge>
-            </div>
+            {isFC && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                  {SHIPMENT_STATUS_META[shipmentStatus].label}
+                </Badge>
+              </div>
+            )}
           </SectionCard>
 
           {/* Operator's one editable field, outside the fieldset above so
