@@ -192,6 +192,11 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {vehicle.convertedToExport && (
+            <Badge variant="outline" className="text-sm">
+              Converted from FL
+            </Badge>
+          )}
           {isFC && (
             <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}

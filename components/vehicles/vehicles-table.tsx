@@ -351,7 +351,14 @@ export function VehiclesTable({
                         className={ROW_HEIGHT_CLASS}
                         rowColour={rowBg}
                       >
-                        <TableCell className="font-mono font-medium">{row.serial}</TableCell>
+                        <TableCell className="font-mono font-medium">
+                          {row.serial}
+                          {row.convertedToExport && (
+                            <Badge variant="outline" className="ml-1.5 align-middle text-[10px]">
+                              Converted
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{row.chassisNo ?? "—"}</TableCell>
                         <TableCell>
                           {row.brandName || row.modelName ? (

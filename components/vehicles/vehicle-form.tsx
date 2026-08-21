@@ -727,7 +727,7 @@ export function VehicleForm({
           </div>
         </div>
         {mode === "edit" && existingTrack === "FL" && !existingConvertedToExport && canEditFields && (
-          <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} />
+          <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
         )}
       </div>
 

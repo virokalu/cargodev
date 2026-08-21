@@ -20,23 +20,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { CountrySelect } from "@/components/shared/country-select";
+import type { CountryOption } from "@/lib/constants/countries";
 import { convertVehicleToExportAction } from "@/app/(dashboard)/vehicles/actions";
 
 interface ConvertToExportDialogProps {
   vehicleId: string;
   serial: string;
+  countries: CountryOption[];
 }
 
-export function ConvertToExportDialog({ vehicleId, serial }: ConvertToExportDialogProps) {
+export function ConvertToExportDialog({ vehicleId, serial, countries }: ConvertToExportDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [destination, setDestination] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleConvert() {
     setError(null);
     startTransition(async () => {
-      const result = await convertVehicleToExportAction(vehicleId);
+      const result = await convertVehicleToExportAction(vehicleId, destination);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -47,7 +51,13 @@ export function ConvertToExportDialog({ vehicleId, serial }: ConvertToExportDial
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setDestination("");
+      }}
+    >
       <DialogTrigger render={<Button variant="outline" />}>
         <ArrowRightLeft className="size-4" />
         Convert to Export
@@ -61,10 +71,17 @@ export function ConvertToExportDialog({ vehicleId, serial }: ConvertToExportDial
             Its serial number stays the same. This can&apos;t be undone.
           </DialogDescription>
         </DialogHeader>
+        <CountrySelect
+          id="convertDestination"
+          label="Destination"
+          options={countries}
+          value={destination}
+          onChange={setDestination}
+        />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" disabled={isPending} />}>Cancel</DialogClose>
-          <Button onClick={handleConvert} disabled={isPending}>
+          <Button onClick={handleConvert} disabled={isPending || !destination.trim()}>
             {isPending ? <Loader2 className="size-4 animate-spin" /> : <ArrowRightLeft className="size-4" />}
             Convert to Export
           </Button>

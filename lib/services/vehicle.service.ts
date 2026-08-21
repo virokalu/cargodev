@@ -1068,12 +1068,18 @@ export async function updateVehicleAuctionBillPaid(
 /** One-way — an FL vehicle that ends up being exported instead of sold
  * locally keeps its FL-prefixed serial forever (see lib/vehicle-track.ts's
  * computeEffectiveTrack for why), but needs to behave as a full export
- * vehicle from this point on. Doesn't touch destination or any shipping
- * field — staff fill those in afterward through the now-unlocked FC form
- * fields. The StatusHistory row (fromStatus null, same as a fresh vehicle's
- * very first row) marks the moment real shipment-status tracking begins for
+ * vehicle from this point on. Destination is collected here (rather than
+ * left for staff to fill in later via the now-unlocked FC form) since it
+ * only becomes meaningful the moment the vehicle stops being sold locally.
+ * The StatusHistory row (fromStatus null, same as a fresh vehicle's very
+ * first row) marks the moment real shipment-status tracking begins for
  * this vehicle, since FL vehicles never track it before this. */
-export async function convertVehicleToExport(orgId: string, actorId: string, id: string): Promise<void> {
+export async function convertVehicleToExport(
+  orgId: string,
+  actorId: string,
+  id: string,
+  destination: string
+): Promise<void> {
   const existing = await assertVehicleInOrg(orgId, id);
 
   if (existing.serialPrefix !== "FL") {
@@ -1082,11 +1088,14 @@ export async function convertVehicleToExport(orgId: string, actorId: string, id:
   if (existing.convertedToExport) {
     throw new ServiceError("VALIDATION", "This vehicle has already been converted to export.");
   }
+  if (!destination.trim()) {
+    throw new ServiceError("VALIDATION", "Destination is required to convert to export.");
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.vehicle.update({
       where: { id },
-      data: { convertedToExport: true, convertedToExportAt: new Date() },
+      data: { convertedToExport: true, convertedToExportAt: new Date(), destination },
     });
     await tx.statusHistory.create({
       data: {
@@ -1103,8 +1112,8 @@ export async function convertVehicleToExport(orgId: string, actorId: string, id:
       action: "CONVERT_VEHICLE_TO_EXPORT",
       entity: "Vehicle",
       entityId: id,
-      before: { convertedToExport: false },
-      after: { convertedToExport: true },
+      before: { convertedToExport: false, destination: existing.destination },
+      after: { convertedToExport: true, destination },
     });
   });
 }
@@ -1295,6 +1304,7 @@ export interface VehicleListRow {
   id: string;
   serial: string;
   track: SerialPrefix;
+  convertedToExport: boolean;
   chassisNo: string | null;
   brandName: string | null;
   modelName: string | null;
@@ -1524,6 +1534,7 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     id: v.id,
     serial: v.serial,
     track: effectiveTrack,
+    convertedToExport: v.convertedToExport,
     chassisNo: v.chassisNo,
     brandName: v.model?.brand.name ?? null,
     modelName: v.model?.name ?? null,

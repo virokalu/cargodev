@@ -67,11 +67,12 @@ export async function updateVehicleAction(id: string, input: unknown): Promise<V
 }
 
 export async function convertVehicleToExportAction(
-  id: string
+  id: string,
+  destination: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {
-    await vehicleService.convertVehicleToExport(user.orgId, user.id, id);
+    await vehicleService.convertVehicleToExport(user.orgId, user.id, id, destination);
     revalidatePath("/vehicles");
     revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
