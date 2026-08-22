@@ -7,8 +7,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -16,12 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FilterCombobox } from "@/components/shared/filter-combobox";
 import { cn } from "@/lib/utils";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import type { VehicleListParams } from "@/lib/services/vehicle.service";
 import { VehicleFiltersPanel, type VehicleFilterSelections } from "@/components/vehicles/vehicle-filters-panel";
 import { VehicleFilterChips } from "@/components/vehicles/vehicle-filter-chips";
+import { searchCustomersAction } from "@/app/(dashboard)/vehicles/actions";
 
 interface RowColourStatusOption {
   id: string;
@@ -39,6 +50,15 @@ interface VehicleFiltersBarProps {
 const DEBOUNCE_MS = 300;
 const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 
+/** Trigger label for the multi-select status dropdown — the full label when
+ * exactly one status is picked (matches how the old single-select read),
+ * otherwise a count so the trigger doesn't grow unbounded. */
+function statusTriggerLabel(selected: ShipmentStatus[]): string {
+  if (selected.length === 0) return "All statuses";
+  if (selected.length === 1) return SHIPMENT_STATUS_META[selected[0]].label;
+  return `${selected.length} statuses`;
+}
+
 export function VehicleFiltersBar({
   params,
   destinations,
@@ -48,6 +68,24 @@ export function VehicleFiltersBar({
   const router = useRouter();
   const [searchText, setSearchText] = useState(params.search);
   const isFirstRender = useRef(true);
+
+  // Local copy of the selected statuses, kept in sync with the URL but
+  // updated (and read from) synchronously on every click — never from
+  // params.shipmentStatus directly. params only updates after a full server
+  // round trip, so two clicks close together would otherwise each compute
+  // their "next" array off the same stale params from before either
+  // navigation landed, silently dropping the first pick. Local state updates
+  // are applied before the next click can be handled (JS is single-threaded),
+  // so building `next` off this instead lets every click navigate right away
+  // — filtering live as you check boxes — without that race. Re-seeded from
+  // params.shipmentStatus when the menu opens, so opening it after an
+  // external change (browser back/forward) starts from what's actually in
+  // the URL.
+  const [selectedStatuses, setSelectedStatuses] = useState<ShipmentStatus[]>(params.shipmentStatus);
+
+  function statusMenuOpenChange(open: boolean) {
+    if (open) setSelectedStatuses(params.shipmentStatus);
+  }
 
   // Debounced search-as-you-type — every other filter navigates immediately
   // since those are discrete clicks, not keystrokes.
@@ -76,40 +114,73 @@ export function VehicleFiltersBar({
           />
         </div>
 
-        <Select
-          value={params.shipmentStatus}
-          onValueChange={(value) =>
-            router.push(
-              buildVehiclesHref(params, {
-                shipmentStatus: value as ShipmentStatus | "ALL",
-                page: 1,
-              })
-            )
-          }
-        >
-          <SelectTrigger className="w-full sm:w-[170px]">
-            {/* Select.Value doesn't read a SelectItem's rendered children —
-             * without this render function it prints the raw value
-             * ("ALL"/"BOOKING_RECEIVED") instead of the friendly label. */}
-            <SelectValue placeholder="All statuses">
-              {(itemValue: string) =>
-                itemValue === "ALL"
-                  ? "All statuses"
-                  : (SHIPMENT_STATUS_META[itemValue as ShipmentStatus]?.label ?? "All statuses")
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL" label="All statuses">
-              All statuses
-            </SelectItem>
+        <DropdownMenu onOpenChange={statusMenuOpenChange}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                className="h-8 w-full justify-between px-2.5 font-normal sm:w-[170px]"
+              />
+            }
+          >
+            <span className="truncate">{statusTriggerLabel(selectedStatuses)}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56">
             {SHIPMENT_STATUSES.map((status) => (
-              <SelectItem key={status} value={status} label={SHIPMENT_STATUS_META[status].label}>
+              <DropdownMenuCheckboxItem
+                key={status}
+                checked={selectedStatuses.includes(status)}
+                onCheckedChange={(checked) => {
+                  // Reads selectedStatuses directly (not inside the setState
+                  // call) — React invokes state-updater callbacks during its
+                  // render phase, and calling router.push from in there trips
+                  // "Cannot update a component while rendering a different
+                  // component." selectedStatuses is safe to read straight
+                  // from the closure here: it's local state, already current
+                  // as of this render, unlike params (which lags a full
+                  // round trip behind and caused the original race).
+                  const next = checked
+                    ? [...selectedStatuses, status]
+                    : selectedStatuses.filter((s) => s !== status);
+                  setSelectedStatuses(next);
+                  router.push(buildVehiclesHref(params, { shipmentStatus: next, page: 1 }));
+                }}
+              >
                 {SHIPMENT_STATUS_META[status].label}
-              </SelectItem>
+              </DropdownMenuCheckboxItem>
             ))}
-          </SelectContent>
-        </Select>
+            {selectedStatuses.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    // Commits immediately, same as every other "clear" control
+                    // on this page — doesn't rely on the subsequent
+                    // onOpenChange(false) from this item's own closeOnClick,
+                    // whose ordering relative to this onClick isn't guaranteed.
+                    setSelectedStatuses([]);
+                    router.push(buildVehiclesHref(params, { shipmentStatus: [], page: 1 }));
+                  }}
+                >
+                  Clear statuses
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="w-full sm:w-[170px]">
+          <FilterCombobox
+            value={selected.customer}
+            onChange={(option) =>
+              router.push(buildVehiclesHref(params, { customerId: option?.id ?? "ALL", page: 1 }))
+            }
+            search={searchCustomersAction}
+            placeholder="All customers"
+            allLabel="All customers"
+          />
+        </div>
 
         <Select
           value={params.destination}

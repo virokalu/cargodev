@@ -42,3 +42,12 @@ export const customerUpdateSchema = customerCreateSchema;
 
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
+
+// ── GET /api/v1/customers query params ─────────────────────────────
+export const customerListQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+});
+
+export const customerSearchQuerySchema = z.object({
+  q: z.string().trim().max(200).default(""),
+});

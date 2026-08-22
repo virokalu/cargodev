@@ -13,6 +13,15 @@ import type { MouseEventHandler } from "react";
  * directly via a bookmark/external link). */
 export function useBackToVehicles() {
   const router = useRouter();
+  /** Same history.back()-preferring logic as onClick below, callable directly
+   * (e.g. after a successful save) where there's no click event to hook. */
+  const navigate = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/vehicles");
+    }
+  };
   const onClick: MouseEventHandler = (event) => {
     if (window.history.length > 1) {
       event.preventDefault();
@@ -20,5 +29,5 @@ export function useBackToVehicles() {
     }
     // else: no in-app history — let the plain href="/vehicles" navigate normally
   };
-  return { href: "/vehicles", onClick } as const;
+  return { href: "/vehicles", onClick, navigate } as const;
 }

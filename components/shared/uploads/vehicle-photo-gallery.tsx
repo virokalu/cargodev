@@ -78,7 +78,16 @@ function PhotoUploadRow({ vehicleId, file, onSettled, onStaged }: PhotoUploadRow
 }
 
 type VehiclePhotoGalleryProps =
-  | { mode: "persist"; vehicleId: string; photos: VehiclePhotoListItem[]; canEdit: boolean }
+  | {
+      mode: "persist";
+      vehicleId: string;
+      photos: VehiclePhotoListItem[];
+      /** Split rather than one combined canEdit — Operator can upload but
+       * not delete (CLAUDE.md RBAC: their edit-page access is limited to
+       * adding files and Auction Bill Paid, nothing else). */
+      canAdd: boolean;
+      canDelete: boolean;
+    }
   | { mode: "stage"; photos: string[]; onChange: (urls: string[]) => void };
 
 interface InFlightFile {
@@ -147,7 +156,8 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
     router.refresh();
   }
 
-  const canEdit = props.mode === "persist" ? props.canEdit : true;
+  const canAdd = props.mode === "persist" ? props.canAdd : true;
+  const canDelete = props.mode === "persist" ? props.canDelete : true;
 
   // Normalized so the grid below has one render path regardless of mode —
   // "stage" photos are just URLs (no id/uploader/date until they're actually
@@ -157,7 +167,7 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
       ? props.photos.map((photo) => ({
           key: photo.id,
           url: photo.url,
-          onDelete: canEdit ? () => handleDelete(props.vehicleId, photo.id) : null,
+          onDelete: canDelete ? () => handleDelete(props.vehicleId, photo.id) : null,
         }))
       : props.photos.map((url) => ({
           key: url,
@@ -169,9 +179,9 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
         }));
 
   return (
-    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canEdit}>
+    <FileDropZone accept={ACCEPT} onFilesDropped={handleNewFiles} disabled={!canAdd}>
       <div className="space-y-3">
-        {canEdit && (
+        {canAdd && (
           <div className="space-y-1">
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
               <Upload className="size-4" />

@@ -24,6 +24,17 @@ export interface CustomerOption {
   name: string;
 }
 
+/** Resolves a single customer's label for the vehicle filter bar — only
+ * called when the Customer filter is actually active, never as part of
+ * listing customers. Mirrors the lookup services' getXById pattern. */
+export async function getCustomerById(orgId: string, id: string): Promise<CustomerOption | null> {
+  const customer = await prisma.user.findFirst({
+    where: { id, org_id: orgId, userType: "CUSTOMER" },
+    select: { id: true, name: true },
+  });
+  return customer ?? null;
+}
+
 export async function searchCustomers(orgId: string, query: string): Promise<CustomerOption[]> {
   return prisma.user.findMany({
     where: {

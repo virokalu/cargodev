@@ -16,9 +16,14 @@ import type { VehicleDetailData } from "@/lib/services/vehicle.service";
 interface ExportVehiclePdfButtonProps {
   vehicle: VehicleDetailData;
   ecReceivedAt: Date | null;
+  inspectionCompletedAt: Date | null;
 }
 
-export function ExportVehiclePdfButton({ vehicle, ecReceivedAt }: ExportVehiclePdfButtonProps) {
+export function ExportVehiclePdfButton({
+  vehicle,
+  ecReceivedAt,
+  inspectionCompletedAt,
+}: ExportVehiclePdfButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -27,7 +32,7 @@ export function ExportVehiclePdfButton({ vehicle, ecReceivedAt }: ExportVehicleP
     setError(false);
     try {
       const images = await fetchVehiclePdfImagesAction(vehicle.id);
-      exportVehicleDetailToPdf(vehicle, ecReceivedAt, images);
+      exportVehicleDetailToPdf(vehicle, ecReceivedAt, inspectionCompletedAt, images);
     } catch {
       setError(true);
     } finally {

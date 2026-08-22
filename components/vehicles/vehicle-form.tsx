@@ -8,7 +8,6 @@
 // fields, per CLAUDE.md.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Fingerprint,
@@ -24,6 +23,8 @@ import {
   Folder,
   Image as ImageIcon,
   StickyNote,
+  Banknote,
+  Lock,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { SectionCard } from "@/components/shared/section-card";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
+import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
 import { ComboboxCreate, type ComboboxOption } from "@/components/shared/combobox-create";
@@ -139,6 +141,13 @@ interface VehicleFormProps {
   files?: VehicleFiles;
   rowColourStatuses: RowColourStatusOption[];
   countries: CountryOption[];
+  /** Edit mode only — false for Operator (CLAUDE.md RBAC), who can reach
+   * this page to add documents/photos/the auction sheet and toggle Auction
+   * Bill Paid, but can't touch any other field. Ignored in create mode,
+   * which Operator never reaches at all (STAFF_CAN_WRITE gates both the
+   * /vehicles/add page and createVehicleAction). Defaults to true so
+   * Admin/Manager (and create mode) don't need to pass it explicitly. */
+  canEditFields?: boolean;
 }
 
 export interface FormState {
@@ -405,8 +414,8 @@ export function VehicleForm({
   files,
   rowColourStatuses,
   countries,
+  canEditFields = true,
 }: VehicleFormProps) {
-  const router = useRouter();
   const backToVehicles = useBackToVehicles();
   const [state, setState] = useState<FormState>(() => ({
     ...INITIAL_STATE,
@@ -583,7 +592,7 @@ export function VehicleForm({
       return;
     }
 
-    router.push("/vehicles");
+    backToVehicles.navigate();
   }
 
   return (
@@ -604,6 +613,16 @@ export function VehicleForm({
         </div>
       </div>
 
+      {mode === "edit" && !canEditFields && (
+        <div className="flex items-start gap-2 rounded-lg border border-info/30 bg-info/10 p-3 text-sm text-info">
+          <Lock className="mt-0.5 size-4 shrink-0" />
+          <span>
+            You can add documents, photos, and the auction sheet, and update Auction Bill Paid status below.
+            Other fields are managed by Administrators and Managers.
+          </span>
+        </div>
+      )}
+
       {bannerError && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -612,7 +631,16 @@ export function VehicleForm({
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        {/* fieldset (not a div) so the browser natively disables every
+            input/select/textarea/button inside — no need to thread a
+            disabled prop through every field individually. Auction Bill
+            Paid still shows here too (now non-interactive, for context),
+            since Operator's actionable copy of it lives in the right rail
+            below instead (see "Auction Bill Paid" SectionCard). */}
+        <fieldset
+          disabled={!canEditFields}
+          className="m-0 min-w-0 space-y-6 border-0 p-0 lg:col-span-2 disabled:opacity-50"
+        >
           {/* ── Serial & Track ─────────────────────────────────────── */}
           <SectionCard icon={Fingerprint} title="Serial & Track">
             <div className="sm:col-span-2">
@@ -884,6 +912,104 @@ export function VehicleForm({
             />
           </SectionCard>
 
+          {/* ── Transport & Logistics ──────────────────────────────── */}
+          <SectionCard icon={Truck} title="Transport & Logistics">
+            <ComboboxCreate
+              id="transportBy"
+              label="Transport By"
+              createLabel="transport company"
+              value={state.transportBy}
+              onChange={(value) => setField("transportBy", value)}
+              search={searchTransportCompaniesAction}
+              onCreate={createTransportCompanyAction}
+              onRename={(option, name) => renameTransportCompanyAction(option.id, name)}
+              error={fieldErrors.transportById}
+            />
+            <ComboboxCreate
+              id="vehicleLocation"
+              label="Vehicle Location"
+              createLabel="location"
+              value={state.vehicleLocation}
+              onChange={(value) => setField("vehicleLocation", value)}
+              search={searchVehicleLocationsAction}
+              onCreate={createVehicleLocationAction}
+              onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
+              error={fieldErrors.vehicleLocationId}
+            />
+            {isFC && (
+              <TextField
+                id="trackingNo"
+                label="Tracking No"
+                value={state.trackingNo}
+                onChange={(value) => setField("trackingNo", value)}
+                maxLength={100}
+                error={fieldErrors.trackingNo}
+              />
+            )}
+            <DateField
+              id="docsArrivedDate"
+              label="Docs Arrived Date"
+              value={state.docsArrivedDate}
+              onChange={(value) => setField("docsArrivedDate", value)}
+              error={fieldErrors.docsArrivedDate}
+            />
+            <DateField
+              id="nameChangeDeadline"
+              label="Name Change Deadline"
+              value={state.nameChangeDeadline}
+              onChange={(value) => setField("nameChangeDeadline", value)}
+              error={fieldErrors.nameChangeDeadline}
+            />
+            <TriStateToggle
+              label="Extra Key"
+              value={state.extraKey}
+              onChange={(value) => setField("extraKey", value)}
+            />
+            <TriStateToggle
+              label="Log Book"
+              value={state.logBook}
+              onChange={(value) => setField("logBook", value)}
+            />
+            <DateField
+              id="massoDate"
+              label="Masso Date"
+              value={state.massoDate}
+              onChange={(value) => setField("massoDate", value)}
+              error={fieldErrors.massoDate}
+            />
+            <DateField
+              id="docSentDate"
+              label="Doc Sent to Client"
+              value={state.docSentDate}
+              onChange={(value) => setField("docSentDate", value)}
+              error={fieldErrors.docSentDate}
+            />
+            <TextField
+              id="billNumber"
+              label="Bill Number"
+              value={state.billNumber}
+              onChange={(value) => setField("billNumber", value)}
+              maxLength={100}
+              error={fieldErrors.billNumber}
+            />
+            <div className="sm:col-span-2">
+              <Label htmlFor="docSentComment" className="mb-1.5">
+                Doc Sent Remark
+              </Label>
+              <Textarea
+                id="docSentComment"
+                value={state.docSentComment}
+                onChange={(event) => setField("docSentComment", event.target.value)}
+                maxLength={500}
+                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
+                aria-invalid={!!fieldErrors.docSentComment}
+              />
+              {fieldErrors.docSentComment && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
+              )}
+            </div>
+          </SectionCard>
+
           {/* ── Shipment Details (FC only) ─────────────────────────── */}
           {isFC && (
             <SectionCard
@@ -1004,104 +1130,6 @@ export function VehicleForm({
             </SectionCard>
           )}
 
-          {/* ── Transport & Logistics ──────────────────────────────── */}
-          <SectionCard icon={Truck} title="Transport & Logistics">
-            <ComboboxCreate
-              id="transportBy"
-              label="Transport By"
-              createLabel="transport company"
-              value={state.transportBy}
-              onChange={(value) => setField("transportBy", value)}
-              search={searchTransportCompaniesAction}
-              onCreate={createTransportCompanyAction}
-              onRename={(option, name) => renameTransportCompanyAction(option.id, name)}
-              error={fieldErrors.transportById}
-            />
-            <ComboboxCreate
-              id="vehicleLocation"
-              label="Vehicle Location"
-              createLabel="location"
-              value={state.vehicleLocation}
-              onChange={(value) => setField("vehicleLocation", value)}
-              search={searchVehicleLocationsAction}
-              onCreate={createVehicleLocationAction}
-              onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
-              error={fieldErrors.vehicleLocationId}
-            />
-            {isFC && (
-              <TextField
-                id="trackingNo"
-                label="Tracking No"
-                value={state.trackingNo}
-                onChange={(value) => setField("trackingNo", value)}
-                maxLength={100}
-                error={fieldErrors.trackingNo}
-              />
-            )}
-            <DateField
-              id="docsArrivedDate"
-              label="Docs Arrived Date"
-              value={state.docsArrivedDate}
-              onChange={(value) => setField("docsArrivedDate", value)}
-              error={fieldErrors.docsArrivedDate}
-            />
-            <DateField
-              id="nameChangeDeadline"
-              label="Name Change Deadline"
-              value={state.nameChangeDeadline}
-              onChange={(value) => setField("nameChangeDeadline", value)}
-              error={fieldErrors.nameChangeDeadline}
-            />
-            <TriStateToggle
-              label="Extra Key"
-              value={state.extraKey}
-              onChange={(value) => setField("extraKey", value)}
-            />
-            <TriStateToggle
-              label="Log Book"
-              value={state.logBook}
-              onChange={(value) => setField("logBook", value)}
-            />
-            <DateField
-              id="massoDate"
-              label="Masso Date"
-              value={state.massoDate}
-              onChange={(value) => setField("massoDate", value)}
-              error={fieldErrors.massoDate}
-            />
-            <DateField
-              id="docSentDate"
-              label="Doc Sent to Client"
-              value={state.docSentDate}
-              onChange={(value) => setField("docSentDate", value)}
-              error={fieldErrors.docSentDate}
-            />
-            <TextField
-              id="billNumber"
-              label="Bill Number"
-              value={state.billNumber}
-              onChange={(value) => setField("billNumber", value)}
-              maxLength={100}
-              error={fieldErrors.billNumber}
-            />
-            <div className="sm:col-span-2">
-              <Label htmlFor="docSentComment" className="mb-1.5">
-                Doc Sent Remark
-              </Label>
-              <Textarea
-                id="docSentComment"
-                value={state.docSentComment}
-                onChange={(event) => setField("docSentComment", event.target.value)}
-                maxLength={500}
-                className={fieldErrors.docSentComment ? "border-destructive" : undefined}
-                aria-invalid={!!fieldErrors.docSentComment}
-              />
-              {fieldErrors.docSentComment && (
-                <p className="mt-1 text-xs text-destructive">{fieldErrors.docSentComment}</p>
-              )}
-            </div>
-          </SectionCard>
-
           {/* ── Statuses & Flags ───────────────────────────────────── */}
           <SectionCard icon={ClipboardList} title="Statuses & Flags">
             <div>
@@ -1181,7 +1209,7 @@ export function VehicleForm({
               )}
             </div>
           </SectionCard>
-        </div>
+        </fieldset>
 
         {/* ── Right rail ─────────────────────────────────────────── */}
         <div className="space-y-6">
@@ -1209,6 +1237,18 @@ export function VehicleForm({
               </Badge>
             </div>
           </SectionCard>
+
+          {/* Operator's one editable field, outside the fieldset above so
+              it stays interactive — the same field also appears (now
+              disabled) inside "Vehicle Information" for Admin/Manager, who
+              edit it there as part of the normal Update Vehicle submit
+              instead. Immediate-persist, same as the vehicles table's
+              inline control (auction-bill-paid-cell.tsx) it reuses. */}
+          {mode === "edit" && !canEditFields && (
+            <SectionCard icon={Banknote} title="Auction Bill Paid" contentClassName="">
+              <AuctionBillPaidCell vehicleId={vehicleId!} value={state.auctionBillPaid} />
+            </SectionCard>
+          )}
 
           {/* ── Auction Sheet, Documents & Photos ───────────────────── */}
           {/* Right-rail placement matches the approved design
@@ -1274,7 +1314,8 @@ export function VehicleForm({
                     documentType={documentType}
                     label={DOCUMENT_TYPE_META[documentType].label}
                     documents={files.documents.filter((document) => document.documentType === documentType)}
-                    canEdit
+                    canAdd
+                    canDelete={canEditFields}
                   />
                 </DocumentTypeSection>
               ))}
@@ -1285,7 +1326,8 @@ export function VehicleForm({
                   documentType="OTHER"
                   label={DOCUMENT_TYPE_META.OTHER.label}
                   documents={files.documents.filter((document) => document.documentType === "OTHER")}
-                  canEdit
+                  canAdd
+                  canDelete={canEditFields}
                 />
               </DocumentTypeSection>
             </SectionCard>
@@ -1302,7 +1344,13 @@ export function VehicleForm({
           )}
           {mode === "edit" && files && (
             <SectionCard icon={ImageIcon} title="Vehicle Photos" contentClassName="">
-              <VehiclePhotoGallery mode="persist" vehicleId={vehicleId!} photos={files.photos} canEdit />
+              <VehiclePhotoGallery
+                mode="persist"
+                vehicleId={vehicleId!}
+                photos={files.photos}
+                canAdd
+                canDelete={canEditFields}
+              />
             </SectionCard>
           )}
 
@@ -1314,6 +1362,7 @@ export function VehicleForm({
               onChange={(event) => setField("vehicleRemark", event.target.value)}
               maxLength={2000}
               rows={4}
+              disabled={!canEditFields}
               className={fieldErrors.vehicleRemark ? "border-destructive" : undefined}
               aria-invalid={!!fieldErrors.vehicleRemark}
             />
@@ -1323,14 +1372,16 @@ export function VehicleForm({
           </SectionCard>
 
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-            <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
-              {submitting ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
-              {mode === "edit" ? "Update Vehicle" : "Save Vehicle"}
-            </Button>
+            {canEditFields && (
+              <Button onClick={handleSubmit} disabled={submitting || !!etaError} className="w-full">
+                {submitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {mode === "edit" ? "Update Vehicle" : "Save Vehicle"}
+              </Button>
+            )}
             <Button
               variant="outline"
               nativeButton={false}

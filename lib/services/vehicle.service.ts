@@ -409,6 +409,15 @@ export interface VehicleDetailData {
   destination: string | null;
 
   etd: Date | null;
+  // When ETD was actually saved (the StatusHistory row for the PENDING →
+  // BOOKING_RECEIVED transition), not the ETD value itself — the Shipment
+  // Timeline's "Booking Received" milestone shows this instead of etd, since
+  // "booking received" means the date staff entered the booking, not the
+  // date the ship is expected to depart. null for FL vehicles (etd is
+  // always null, so this transition never happens) and for legacy-entry
+  // vehicles whose starting status was hand-picked rather than derived from
+  // an ETD save.
+  bookingReceivedAt: Date | null;
   eta: Date | null;
   blNo: string | null;
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
@@ -497,6 +506,25 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
   // guaranteed to belong to this org — only soft-delete needs checking here.
   if (!vehicle || vehicle.deletedAt !== null) return null;
 
+  // Skip the query entirely when there's no ETD — the milestone this feeds
+  // shows as not-completed in that case regardless (lib/shipment-milestones.ts),
+  // so there's nothing to show a date for. Picking the latest matching row
+  // (not the earliest) matters because ETD can be cleared and re-entered —
+  // CLAUDE.md "Clearing ETD reverts to Pending" — which writes a fresh
+  // PENDING → BOOKING_RECEIVED row each time; the latest one reflects the
+  // *current* booking, not a stale one that was later reverted. Filtering to
+  // trigger: "ETD_SAVED" (not just toStatus) excludes LEGACY_ENTRY rows,
+  // which also land on BOOKING_RECEIVED but represent a hand-picked starting
+  // status, not a real ETD-save event.
+  const bookingReceivedHistory =
+    vehicle.etd !== null
+      ? await prisma.statusHistory.findFirst({
+          where: { vehicleId: vehicle.id, toStatus: "BOOKING_RECEIVED", trigger: "ETD_SAVED" },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true },
+        })
+      : null;
+
   return {
     id: vehicle.id,
     serial: vehicle.serial,
@@ -524,6 +552,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     customer: vehicle.customer,
     destination: vehicle.destination,
     etd: vehicle.etd,
+    bookingReceivedAt: bookingReceivedHistory?.createdAt ?? null,
     eta: vehicle.eta,
     blNo: vehicle.blNo,
     freightAgent: vehicle.freightAgent,
@@ -549,6 +578,19 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     jibaishake: vehicle.jibaishake,
     vehicleRemark: vehicle.vehicleRemark,
   };
+}
+
+/** Resolves a vehicle's serial (the mobile API's URL slug, same as the web
+ * detail page) to its internal id, throwing the standard 404 shape instead
+ * of returning null — used by routes whose downstream service function
+ * (listVehicleStatusHistory, listVehicleFiles, getVehiclePdfImages) is keyed
+ * by id, not serial. */
+export async function resolveVehicleIdBySerial(orgId: string, serial: string): Promise<string> {
+  const vehicle = await getVehicleDetail(orgId, serial);
+  if (!vehicle) {
+    throw new ServiceError("NOT_FOUND", "Vehicle not found.");
+  }
+  return vehicle.id;
 }
 
 const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
@@ -1112,8 +1154,11 @@ export interface VehicleListParams {
   pageSize: number;
   track: SerialPrefix | "ALL";
   search: string;
-  shipmentStatus: EffectiveShipmentStatus | "ALL";
+  /** Multi-select — an empty array means "no filter" (every status shown),
+   * matching how every other "ALL" filter here behaves. */
+  shipmentStatus: EffectiveShipmentStatus[];
   destination: string | "ALL";
+  customerId: string | "ALL";
   rowColourStatusId: string | "ALL";
   /** Excludes one specific row colour status rather than filtering to it —
    * used by the dashboard's "In Progress" transport bar, which means
@@ -1206,13 +1251,16 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   const where: Prisma.VehicleWhereInput = { org_id: orgId, deletedAt: null };
 
   if (params.track !== "ALL") where.serialPrefix = params.track;
-  if (params.shipmentStatus !== "ALL") {
+  if (params.shipmentStatus.length > 0) {
     // Its own AND-array entry (not a direct where.shipmentStatus= equality)
     // so its internal OR doesn't collide with the free-text search's own
-    // top-level where.OR below.
-    where.AND = [buildEffectiveShipmentStatusWhere(params.shipmentStatus)];
+    // top-level where.OR below. Multiple selected statuses are OR'd together
+    // (matches "PENDING or SHIPPED", not "both at once", which no vehicle
+    // could ever satisfy).
+    where.AND = [{ OR: params.shipmentStatus.map(buildEffectiveShipmentStatusWhere) }];
   }
   if (params.destination !== "ALL") where.destination = params.destination;
+  if (params.customerId !== "ALL") where.customerId = params.customerId;
   if (params.rowColourStatusId !== "ALL") {
     where.rowColourStatusId = params.rowColourStatusId;
   } else if (params.rowColourStatusIdNot !== "ALL") {
@@ -1235,10 +1283,10 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
   // brand/model/grade, and customer name — everything else is a dedicated
-  // per-column filter, not free text. Customer has no dedicated filter
-  // dropdown (the customer list can get large — a plain dropdown or combobox
-  // filter doesn't scale the way search-by-name does), so search is the only
-  // way to narrow by customer.
+  // per-column filter, not free text. Customer also has its own dedicated
+  // filter dropdown (params.customerId above, search-as-you-type since the
+  // list can get large) — kept in search too so typing a customer's name
+  // works without opening that dropdown first.
   const search = params.search.trim();
   if (search) {
     where.OR = [

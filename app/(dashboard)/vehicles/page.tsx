@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/services/auth-guard";
 import { listVehicles, listDistinctDestinations } from "@/lib/services/vehicle.service";
+import { getCustomerById } from "@/lib/services/customer.service";
 import {
   listRowColourStatuses,
   getBrandById,
@@ -31,6 +32,7 @@ export default async function VehiclesPage({
     { rows, total },
     destinations,
     rowColourStatuses,
+    customer,
     brand,
     model,
     grade,
@@ -43,6 +45,7 @@ export default async function VehiclesPage({
     listVehicles(user.orgId, params),
     listDistinctDestinations(user.orgId),
     listRowColourStatuses(user.orgId),
+    params.customerId !== "ALL" ? getCustomerById(user.orgId, params.customerId) : null,
     params.brandId !== "ALL" ? getBrandById(user.orgId, params.brandId) : null,
     params.modelId !== "ALL" ? getModelById(user.orgId, params.modelId) : null,
     params.gradeId !== "ALL" ? getGradeById(user.orgId, params.gradeId) : null,
@@ -53,6 +56,7 @@ export default async function VehiclesPage({
     params.transportById !== "ALL" ? getTransportCompanyById(user.orgId, params.transportById) : null,
   ]);
   const selected: VehicleFilterSelections = {
+    customer,
     brand,
     model,
     grade,
@@ -64,12 +68,14 @@ export default async function VehiclesPage({
   };
 
   // US-02: Viewer is read-only everywhere — no inline editors, no Edit/Delete
-  // controls rendered in the table, not just disabled. Operator's write
-  // access is table-level only (row colour) — adding a vehicle and full
-  // edit are both Admin/Manager only.
+  // controls rendered in the table, not just disabled. Operator can open the
+  // edit page (canEditVehicle) but only to add files and toggle Auction Bill
+  // Paid — VehicleForm itself greys out every general field for them
+  // (see canEditFields in [serial]/edit/page.tsx). Adding a new vehicle and
+  // deleting one stay Admin/Manager only.
   const canCreate = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
   const canWrite = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
-  const canEditVehicle = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
+  const canEditVehicle = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
   const canDelete = ["ADMINISTRATOR", "MANAGER"].includes(user.role);
 
   return (

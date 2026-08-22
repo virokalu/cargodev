@@ -32,6 +32,13 @@ export const env = {
   NEXTAUTH_SECRET: requireEnv("NEXTAUTH_SECRET"),
   NEXTAUTH_URL: requireEnv("NEXTAUTH_URL"),
 
+  // Mobile API (/api/v1) bearer access tokens — a separate secret from
+  // NEXTAUTH_SECRET so the two can be rotated independently. Required (not
+  // an optional "" fallback like the integrations below) because it guards
+  // every mobile request — an unconfigured deployment should fail to boot,
+  // not silently accept forged tokens.
+  MOBILE_JWT_SECRET: requireEnv("MOBILE_JWT_SECRET"),
+
   // Phase 1 single org (safe fallback — matches prisma/seed.ts)
   ORG_ID: process.env.ORG_ID ?? "org_global_motors",
 

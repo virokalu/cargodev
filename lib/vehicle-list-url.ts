@@ -19,8 +19,9 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   // UI toggle anymore, just FC/FL.
   track: "FC",
   search: "",
-  shipmentStatus: "ALL",
+  shipmentStatus: [],
   destination: "ALL",
+  customerId: "ALL",
   rowColourStatusId: "ALL",
   rowColourStatusIdNot: "ALL",
   brandId: "ALL",
@@ -39,7 +40,10 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   sortDir: "desc",
 };
 
-const SORT_KEYS: VehicleListSortKey[] = [
+// Exported so lib/validation/vehicle.schema.ts's mobile query schema can
+// import the same closed lists instead of re-declaring literals that could
+// drift out of sync.
+export const SORT_KEYS: VehicleListSortKey[] = [
   "serial",
   "chassisNo",
   "model",
@@ -56,9 +60,9 @@ const SORT_KEYS: VehicleListSortKey[] = [
   "recycleDate",
 ];
 
-const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
-const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
-const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
+export const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
+export const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
+export const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
 
 function parseTriState(value: string | undefined): TriStateFilterValue {
   return TRI_STATE_VALUES.includes(value as TriStateFilterValue)
@@ -70,6 +74,13 @@ function firstValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** Same idea as firstValue, but keeps every value — used by the multi-select
+ * status filter, where the URL can carry repeated ?status= params. */
+function allValues(value: string | string[] | undefined): string[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
 /** Parses raw Next.js searchParams into safe, clamped query params — the URL
  * is user-editable, so enum values, sort keys and numbers are never trusted
  * as-is (falls back to defaults instead of erroring). */
@@ -77,7 +88,7 @@ export function parseVehicleListParams(
   searchParams: Record<string, string | string[] | undefined>
 ): VehicleListParams {
   const track = firstValue(searchParams.track);
-  const status = firstValue(searchParams.status);
+  const statuses = allValues(searchParams.status);
   const method = firstValue(searchParams.method);
   const sortBy = firstValue(searchParams.sort);
   const sortDir = firstValue(searchParams.dir);
@@ -88,10 +99,11 @@ export function parseVehicleListParams(
     pageSize: VEHICLE_LIST_DEFAULTS.pageSize,
     track: track === "FC" || track === "FL" ? track : VEHICLE_LIST_DEFAULTS.track,
     search: firstValue(searchParams.q)?.trim() ?? "",
-    shipmentStatus: SHIPMENT_STATUSES.includes(status as ShipmentStatus)
-      ? (status as ShipmentStatus)
-      : "ALL",
+    shipmentStatus: statuses.filter((s): s is ShipmentStatus =>
+      SHIPMENT_STATUSES.includes(s as ShipmentStatus)
+    ),
     destination: firstValue(searchParams.destination) || "ALL",
+    customerId: firstValue(searchParams.customer) || "ALL",
     rowColourStatusId: firstValue(searchParams.rowColour) || "ALL",
     rowColourStatusIdNot: firstValue(searchParams.rowColourNot) || "ALL",
     brandId: firstValue(searchParams.brand) || "ALL",
@@ -128,8 +140,9 @@ export function buildVehiclesHref(
 
   if (merged.search) query.set("q", merged.search);
   if (merged.track !== VEHICLE_LIST_DEFAULTS.track) query.set("track", merged.track);
-  if (merged.shipmentStatus !== "ALL") query.set("status", merged.shipmentStatus);
+  for (const status of merged.shipmentStatus) query.append("status", status);
   if (merged.destination !== "ALL") query.set("destination", merged.destination);
+  if (merged.customerId !== "ALL") query.set("customer", merged.customerId);
   if (merged.rowColourStatusId !== "ALL") query.set("rowColour", merged.rowColourStatusId);
   if (merged.rowColourStatusIdNot !== "ALL") query.set("rowColourNot", merged.rowColourStatusIdNot);
   if (merged.brandId !== "ALL") query.set("brand", merged.brandId);
