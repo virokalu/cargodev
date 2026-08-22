@@ -14,15 +14,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 
-// Falls back to common local Expo dev origins so mobile dev works without
-// extra setup; set CORS_ALLOWED_ORIGINS explicitly in production.
-const DEFAULT_DEV_ORIGINS = ["http://localhost:8099", "http://localhost:19006", "http://localhost:8081"];
-
 function allowedOrigins(): string[] {
   const configured = env.CORS_ALLOWED_ORIGINS.split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return configured.length > 0 ? configured : DEFAULT_DEV_ORIGINS;
+  return configured;
 }
 
 const CORS_OPTIONS = {
