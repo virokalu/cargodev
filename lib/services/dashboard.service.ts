@@ -42,7 +42,6 @@ export interface DashboardStats {
   shipmentStatusDistribution: { status: ShipmentStatus; count: number }[];
   exportVolumeByDestination: { destination: string; count: number }[];
   transportByCompany: { id: string; company: string; complete: number; inProgress: number }[];
-  transportCompleteStatusId: string | null;
   vehicleLocationDistribution: IdNameCount[];
   transportByDistribution: IdNameCount[];
   freightAgentDistribution: IdNameCount[];
@@ -105,8 +104,11 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     prisma.vehicle.findMany({
       where: { ...baseWhere, transportById: { not: null } },
       select: {
+        serialPrefix: true,
+        shipmentStatus: true,
+        etd: true,
         transportBy: { select: { id: true, name: true } },
-        rowColourStatus: { select: { id: true, transportCellOnly: true } },
+        rowColourStatus: { select: { transportCellOnly: true } },
       },
     }),
     prisma.vehicle.findMany({
@@ -199,20 +201,24 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     .map((group) => ({ destination: group.destination as string, count: group._count }))
     .sort((a, b) => b.count - a.count);
 
-  // Complete/In-Progress split by company, plus the id of the org's
-  // Transport-Complete row colour status (captured off whichever row hits
-  // it first) — the dashboard's "Complete" bar segment links to
-  // ?transport=<id>&rowColour=<transportCompleteStatusId>, so both ids need
-  // to survive the tally, not just the display names.
+  // Complete/In-Progress split by company. A vehicle counts as transported
+  // if EITHER signal says so: its FC shipment has actually shipped
+  // (computeEffectiveShipmentStatus, same read-time guard used for the
+  // Shipment Status pie above — cancelled is always false here since a
+  // cancelled deal was never "transported"), or it carries the
+  // manually-set Transport Complete row colour (the only signal FL
+  // vehicles have, since shipment status isn't tracked for FL). The bar
+  // segments link by company only (?transport=<id>) — not by row colour —
+  // so the drill-through always matches exactly what the bar counted.
   const transportTally = new Map<string, { id: string; company: string; complete: number; inProgress: number }>();
-  let transportCompleteStatusId: string | null = null;
   for (const row of transportRows) {
     const company = row.transportBy;
     if (!company) continue;
     const entry = transportTally.get(company.id) ?? { id: company.id, company: company.name, complete: 0, inProgress: 0 };
-    if (row.rowColourStatus?.transportCellOnly) {
+    const shipped =
+      row.serialPrefix === "FC" && computeEffectiveShipmentStatus(row.shipmentStatus, row.etd, false) === "SHIPPED";
+    if (shipped || row.rowColourStatus?.transportCellOnly) {
       entry.complete++;
-      transportCompleteStatusId ??= row.rowColourStatus.id;
     } else {
       entry.inProgress++;
     }
@@ -240,7 +246,6 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     shipmentStatusDistribution,
     exportVolumeByDestination,
     transportByCompany,
-    transportCompleteStatusId,
     vehicleLocationDistribution,
     transportByDistribution,
     freightAgentDistribution,

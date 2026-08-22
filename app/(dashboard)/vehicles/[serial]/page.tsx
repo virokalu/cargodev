@@ -6,7 +6,10 @@ import { VehicleDetailView } from "@/components/vehicles/vehicle-detail-view";
 
 // Read-only detail page (US-10) — every role can view, including Viewer
 // (CLAUDE.md: "Viewer gets read-only everywhere"), so unlike the edit page
-// this has no requireUser role whitelist.
+// this has no requireUser role whitelist. The Edit link it offers is gated
+// client-side (canEditVehicle below) rather than the page itself, same
+// Administrator/Manager/Operator whitelist as the Pencil icon on the
+// vehicles table (app/(dashboard)/vehicles/page.tsx).
 export default async function VehicleDetailPage({
   params,
 }: {
@@ -25,6 +28,7 @@ export default async function VehicleDetailPage({
   // rather than gracefully 404 if run in parallel with a vehicle that
   // turns out not to exist.
   const files = await listVehicleFiles(user.orgId, vehicle.id);
+  const canEditVehicle = ["ADMINISTRATOR", "MANAGER", "OPERATOR"].includes(user.role);
 
-  return <VehicleDetailView vehicle={vehicle} files={files} />;
+  return <VehicleDetailView vehicle={vehicle} files={files} canEditVehicle={canEditVehicle} />;
 }
