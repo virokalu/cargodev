@@ -210,8 +210,16 @@ member's.
 
 - `GET /api/v1/notifications?limit=` — `limit` is 1–100, default 50.
 - `GET /api/v1/notifications/unread-count` — `{ count: number }`.
+- `POST /api/v1/notifications/:id/read` — marks one notification read. Idempotent — an already-read id, or one that doesn't belong to you, just no-ops (`{ read: true }` either way, never a 404 — same "don't leak what exists" reasoning as everywhere else).
+- `POST /api/v1/notifications/read-all` — marks every unread notification read for the calling user.
 
-Marking notifications read is a write — not part of this read-only API.
+Mirrors the web app's Notifications page exactly: list, unread count, mark
+one read, mark all read. The web page's real-time delivery (Pusher) and
+click-through-to-vehicle behavior are both client-side concerns — for
+mobile, real-time delivery is push notifications (device registration,
+tracked separately) rather than a live socket subscription, and
+click-through just means navigating to `GET /vehicles/:serial` using the
+notification's `vehicleSerial` field.
 
 ## Profile
 

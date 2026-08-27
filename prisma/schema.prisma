@@ -91,6 +91,7 @@ model Organization {
   notifications    Notification[]
   activityLogs     ActivityLog[]
   refreshTokens    RefreshToken[]
+  deviceTokens     DeviceToken[]
 }
 
 // ─────────────────────────────────────────────
@@ -129,6 +130,7 @@ model User {
   uploadedPhotos    VehiclePhoto[]
   uploadedDocuments VehicleDocument[]
   refreshTokens     RefreshToken[]
+  deviceTokens      DeviceToken[]
 
   @@unique([org_id, email])
   @@index([org_id, userType])
@@ -588,4 +590,42 @@ model RefreshToken {
 
   @@index([org_id, userId])
   @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────
+// PUSH NOTIFICATIONS — Expo device registration. One row per device (not
+// per user — a staff member can be logged into more than one phone/tablet,
+// and push has to reach all of them). notification.service.ts's
+// notifyRealtime() reads this table to fan out via expo-server-sdk
+// alongside its existing Pusher branch (lib/expo-push.ts).
+// ─────────────────────────────────────────────
+
+model DeviceToken {
+  id     String @id @default(cuid())
+  org_id String
+  userId String
+
+  // Expo's own push token format ("ExponentPushToken[...]"), validated at
+  // registration time with Expo.isExpoPushToken() (lib/services/device-
+  // token.service.ts) — not just a shape check, since a malformed token
+  // would silently fail every future send. Unique so re-registering the
+  // same physical device (token refresh, or a different staff member
+  // signing into a shared device) updates one row instead of accumulating
+  // duplicates that still point at whoever registered first.
+  expoPushToken String @unique
+
+  // "ios" | "android" — plain string, not an enum, same small-UI-owned-
+  // option-list convention as Vehicle.sellingPriceCurrency.
+  platform String
+
+  // Bumped on every re-registration (e.g. app foreground) — not currently
+  // used to expire anything, but gives a Settings-page "last seen" and a
+  // future cheap way to prune devices that stopped checking in.
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  org  Organization @relation(fields: [org_id], references: [id])
+  user User         @relation(fields: [userId], references: [id])
+
+  @@index([org_id, userId])
 }
