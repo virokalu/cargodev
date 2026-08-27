@@ -300,6 +300,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                   <Field label="ETD" value={formatDate(vehicle.etd)} />
                   <Field label="ETA" value={formatDate(vehicle.eta)} />
                   <Field label="BL No" value={vehicle.blNo} />
+                  <Field label="Vessel Name" value={vehicle.vesselName} />
                   <Field label="Forwarding Agent" value={vehicle.freightAgent?.name} />
                   <Field
                     label="RORO / Container"

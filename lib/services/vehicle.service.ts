@@ -68,6 +68,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const etd = isFC ? input.etd : null;
   const eta = isFC ? input.eta : null;
   const blNo = isFC ? input.blNo : null;
+  const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
@@ -182,6 +183,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         etd,
         eta,
         blNo,
+        vesselName,
         freightAgentId,
         shippingMethod,
         packingAgentId,
@@ -442,6 +444,7 @@ export interface VehicleDetailData {
   bookingReceivedAt: Date | null;
   eta: Date | null;
   blNo: string | null;
+  vesselName: string | null;
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
   shippingMethod: ShippingMethod | null;
   packingAgent: LookupRef | null;
@@ -511,6 +514,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       etd: true,
       eta: true,
       blNo: true,
+      vesselName: true,
       shippingMethod: true,
       vanningDate: true,
       containerNumber: true,
@@ -602,6 +606,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     bookingReceivedAt: bookingReceivedHistory?.createdAt ?? null,
     eta: vehicle.eta,
     blNo: vehicle.blNo,
+    vesselName: vehicle.vesselName,
     freightAgent: vehicle.freightAgent,
     shippingMethod: vehicle.shippingMethod,
     packingAgent: vehicle.packingAgent,
@@ -736,6 +741,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const etd = isFC ? input.etd : null;
   const eta = isFC ? input.eta : null;
   const blNo = isFC ? input.blNo : null;
+  const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
@@ -831,6 +837,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         etd,
         eta,
         blNo,
+        vesselName,
         freightAgentId,
         shippingMethod,
         packingAgentId,
@@ -1322,6 +1329,7 @@ export interface VehicleListRow {
   etd: Date | null;
   eta: Date | null;
   blNo: string | null;
+  vesselName: string | null;
   freightAgentName: string | null;
   shippingMethod: ShippingMethod | null;
   packingAgentName: string | null;
@@ -1500,6 +1508,7 @@ const VEHICLE_LIST_SELECT = {
   etd: true,
   eta: true,
   blNo: true,
+  vesselName: true,
   shippingMethod: true,
   vanningDate: true,
   containerNumber: true,
@@ -1556,6 +1565,7 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     etd: v.etd,
     eta: v.eta,
     blNo: v.blNo,
+    vesselName: v.vesselName,
     freightAgentName: v.freightAgent?.name ?? null,
     shippingMethod: v.shippingMethod,
     packingAgentName: v.packingAgent?.name ?? null,

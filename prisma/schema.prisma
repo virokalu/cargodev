@@ -337,6 +337,8 @@ model Vehicle {
 
   blNo String? // Bill of Lading number
 
+  vesselName String? // FC only — applies to both RORO and Container shipments
+
   // FL only — was this purchase made with a partner. Unlike the tri-state
   // flags below, this is a plain Yes/No: whoever enters the vehicle always
   // knows whether there was a partner, there's no realistic "not entered
