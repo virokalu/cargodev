@@ -6,6 +6,7 @@
 // except for the Edit button in the header, which just links to the edit
 // page (same role gate as the table's own Pencil icon) rather than being
 // an in-place editor itself.
+// The "Export PDF" button is also here, but it just triggers a server
 
 import Link from "next/link";
 import {
