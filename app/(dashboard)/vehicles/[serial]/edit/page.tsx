@@ -31,6 +31,7 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
     etd: toDateInputValue(vehicle.etd),
     eta: toDateInputValue(vehicle.eta),
     blNo: vehicle.blNo ?? "",
+    vesselName: vehicle.vesselName ?? "",
     freightAgent: vehicle.freightAgent,
     shippingMethod: vehicle.shippingMethod ?? "",
     packingAgent: vehicle.packingAgent,

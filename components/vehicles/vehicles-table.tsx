@@ -278,6 +278,7 @@ const SCROLL_COLUMNS: {
   { key: "etd", header: "ETD", sortKey: "etd", tracks: ["FC"], render: (row) => formatDate(row.etd) },
   { key: "eta", header: "ETA", sortKey: "eta", tracks: ["FC"], render: (row) => formatDate(row.eta) },
   { key: "blNo", header: "BL No", tracks: ["FC"], render: (row) => row.blNo ?? "—" },
+  { key: "vesselName", header: "Vessel Name", tracks: ["FC"], render: (row) => row.vesselName ?? "—" },
   { key: "lcNo", header: "LC No", tracks: ["FC"], render: (row) => row.lcNo ?? "—" },
   { key: "trackingNo", header: "Tracking No", tracks: ["FC"], render: (row) => row.trackingNo ?? "—" },
   {

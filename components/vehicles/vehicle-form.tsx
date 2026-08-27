@@ -209,6 +209,7 @@ export interface FormState {
   etd: string | null;
   eta: string | null;
   blNo: string;
+  vesselName: string;
   freightAgent: FreightAgentOption | null;
   shippingMethod: "" | "RORO" | "CONTAINER";
   // Only meaningful (and only shown) when shippingMethod === "CONTAINER".
@@ -272,6 +273,7 @@ const INITIAL_STATE: FormState = {
   etd: null,
   eta: null,
   blNo: "",
+  vesselName: "",
   freightAgent: null,
   shippingMethod: "",
   packingAgent: null,
@@ -346,6 +348,7 @@ function buildPayload(state: FormState) {
     etd: state.etd,
     eta: state.eta,
     blNo: state.blNo,
+    vesselName: state.vesselName,
     freightAgentId: state.freightAgent?.id ?? null,
     shippingMethod: state.shippingMethod || null,
     packingAgentId: state.packingAgent?.id ?? null,
@@ -1238,6 +1241,14 @@ export function VehicleForm({
                 onChange={(value) => setField("blNo", value)}
                 maxLength={100}
                 error={fieldErrors.blNo}
+              />
+              <TextField
+                id="vesselName"
+                label="Vessel Name"
+                value={state.vesselName}
+                onChange={(value) => setField("vesselName", value)}
+                maxLength={100}
+                error={fieldErrors.vesselName}
               />
               <FreightAgentCombobox
                 id="freightAgentId"

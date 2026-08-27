@@ -103,6 +103,7 @@ const vehicleSharedFields = {
   etd: optionalDate,
   eta: optionalDate,
   blNo: optionalText(100),
+  vesselName: optionalText(100),
   freightAgentId: optionalId,
   shippingMethod: z.enum(["RORO", "CONTAINER"]).nullable().optional(),
   trackingNo: optionalText(100),
