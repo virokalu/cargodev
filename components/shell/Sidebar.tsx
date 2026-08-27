@@ -90,7 +90,7 @@ export default function Sidebar({
         {!collapsed && (
           <div className="min-w-0">
             <p className="text-sm font-bold text-white leading-tight">CargoDev</p>
-            <p className="text-[10px] text-slate-400 leading-tight truncate">
+            <p className="text-[10px] text-slate-400 dark:text-[#6b7280] leading-tight truncate">
               Vehicle Management
             </p>
           </div>
@@ -115,8 +115,8 @@ export default function Sidebar({
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
                 collapsed && "justify-center px-2",
                 isActive
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.08]"
+                  ? "bg-blue-600 text-white dark:bg-linear-to-r dark:from-[#2563eb] dark:to-[#3b82f6]"
+                  : "text-slate-400 hover:text-white hover:bg-white/[0.08] dark:text-[#6b7280] dark:hover:text-white dark:hover:bg-[#1d4ed8]/20"
               )}
               title={collapsed ? label : undefined}
             >
@@ -132,7 +132,7 @@ export default function Sidebar({
         <button
           onClick={onToggleCollapse}
           className={cn(
-            "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white transition-colors",
+            "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white transition-colors dark:text-[#6b7280] dark:hover:text-white",
             collapsed && "justify-center px-2"
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -176,7 +176,7 @@ export default function Sidebar({
             {/* Close button for mobile */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white dark:text-[#6b7280] dark:hover:text-white"
               aria-label="Close sidebar"
             >
               <X className="w-4 h-4" />

@@ -18,6 +18,7 @@ import {
   flattenFieldErrors,
 } from "@/lib/validation/vehicle.schema";
 import { assignNextSerial, assignLegacySerial } from "@/lib/services/serial.service";
+import { computeEffectiveTrack } from "@/lib/vehicle-track";
 import * as activityLog from "@/lib/services/activity-log.service";
 import * as notificationService from "@/lib/services/notification.service";
 import {
@@ -67,6 +68,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const etd = isFC ? input.etd : null;
   const eta = isFC ? input.eta : null;
   const blNo = isFC ? input.blNo : null;
+  const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
@@ -170,14 +172,18 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         gradeId: input.gradeId,
         yom: input.yom,
         auctionHallId: input.auctionHallId,
+        supplierId: input.supplierId,
         purchaseDate: input.purchaseDate,
         auctionLotNo: input.auctionLotNo,
         customerId: input.customerId,
         destination: input.destination,
+        hasPartnership: input.hasPartnership,
+        partnerName: input.hasPartnership ? input.partnerName : null,
 
         etd,
         eta,
         blNo,
+        vesselName,
         freightAgentId,
         shippingMethod,
         packingAgentId,
@@ -202,6 +208,11 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         recycleDate: input.recycleDate,
         jibaishake: input.jibaishake,
         vehicleRemark: input.vehicleRemark,
+
+        deliveryDate: input.deliveryDate,
+        paidByCustomer: input.paidByCustomer,
+        sellingPrice: input.sellingPrice,
+        sellingPriceCurrency: input.sellingPrice !== null ? (input.sellingPriceCurrency ?? "JPY") : null,
       },
     });
 
@@ -393,7 +404,17 @@ interface LookupRef {
 export interface VehicleDetailData {
   id: string;
   serial: string;
+  // Effective track (lib/vehicle-track.ts) — "FC" once convertedToExport is
+  // true, even though serialPrefix (and the serial string above) never
+  // changes. Every existing FC/FL field-visibility check in the form/detail
+  // view/PDF already reads this field, so they get converted-vehicle
+  // behaviour automatically with no changes of their own.
   track: SerialPrefix;
+  // Whether this vehicle has been converted from FL to export — combined
+  // with track === "FL" this is how the edit page decides whether to show
+  // the "Convert to Export" button (only offered once, to a still-FL,
+  // not-yet-converted vehicle).
+  convertedToExport: boolean;
   shipmentStatus: EffectiveShipmentStatus;
 
   auctionItemNo: string | null;
@@ -403,10 +424,13 @@ export interface VehicleDetailData {
   grade: LookupRef | null;
   yom: number | null;
   auctionHall: LookupRef | null;
+  supplier: LookupRef | null;
   purchaseDate: Date | null;
   auctionLotNo: string | null;
   customer: LookupRef | null;
   destination: string | null;
+  hasPartnership: boolean;
+  partnerName: string | null;
 
   etd: Date | null;
   // When ETD was actually saved (the StatusHistory row for the PENDING →
@@ -420,6 +444,7 @@ export interface VehicleDetailData {
   bookingReceivedAt: Date | null;
   eta: Date | null;
   blNo: string | null;
+  vesselName: string | null;
   freightAgent: (LookupRef & { offersRoro: boolean; offersContainer: boolean }) | null;
   shippingMethod: ShippingMethod | null;
   packingAgent: LookupRef | null;
@@ -444,6 +469,15 @@ export interface VehicleDetailData {
   recycleDate: Date | null;
   jibaishake: string | null;
   vehicleRemark: string | null;
+
+  // ── Sold Details (FL only) ─────────────────
+  deliveryDate: Date | null;
+  paidByCustomer: boolean | null;
+  // Prisma's Decimal isn't safe to hand to a Client Component as-is — plain
+  // number, same treatment money would get anywhere else in this app if it
+  // existed elsewhere (it doesn't, this is the first).
+  sellingPrice: number | null;
+  sellingPriceCurrency: string | null;
 }
 
 /** Fetches a vehicle shaped for display — the edit form and the read-only
@@ -463,6 +497,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       deletedAt: true,
       serial: true,
       serialPrefix: true,
+      convertedToExport: true,
       shipmentStatus: true,
       auctionItemNo: true,
       chassisNo: true,
@@ -470,9 +505,16 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       purchaseDate: true,
       auctionLotNo: true,
       destination: true,
+      hasPartnership: true,
+      partnerName: true,
+      deliveryDate: true,
+      paidByCustomer: true,
+      sellingPrice: true,
+      sellingPriceCurrency: true,
       etd: true,
       eta: true,
       blNo: true,
+      vesselName: true,
       shippingMethod: true,
       vanningDate: true,
       containerNumber: true,
@@ -493,6 +535,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       model: { select: { id: true, name: true, brand: { select: { id: true, name: true } } } },
       grade: { select: { id: true, name: true } },
       auctionHall: { select: { id: true, name: true } },
+      supplier: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true } },
       freightAgent: { select: { id: true, name: true, offersRoro: true, offersContainer: true } },
       packingAgent: { select: { id: true, name: true } },
@@ -525,20 +568,25 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
         })
       : null;
 
+  const effectiveTrack = computeEffectiveTrack(vehicle.serialPrefix, vehicle.convertedToExport);
+
   return {
     id: vehicle.id,
     serial: vehicle.serial,
-    track: vehicle.serialPrefix,
+    track: effectiveTrack,
+    convertedToExport: vehicle.convertedToExport,
     // Same "computed guard on read" the vehicles table uses (see
     // computeEffectiveShipmentStatus above) — without it, this page shows
     // the raw stored status, which reads BOOKING_RECEIVED until the daily
     // cron catches up, even right after saving an ETD that's already in
     // the past (which should read as SHIPPED immediately, same as the
-    // table already shows). Same treatment for Cancelled — FC only.
+    // table already shows). Same treatment for Cancelled — FC only. Uses
+    // the effective track, not the raw serialPrefix, so a converted vehicle
+    // gets real shipment-status tracking from the moment it's converted.
     shipmentStatus: computeEffectiveShipmentStatus(
       vehicle.shipmentStatus,
       vehicle.etd,
-      vehicle.serialPrefix === "FC" && isCancelShipmentRowColour(vehicle.rowColourStatus?.name)
+      effectiveTrack === "FC" && isCancelShipmentRowColour(vehicle.rowColourStatus?.name)
     ),
     auctionItemNo: vehicle.auctionItemNo,
     chassisNo: vehicle.chassisNo,
@@ -547,14 +595,18 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     grade: vehicle.grade,
     yom: vehicle.yom,
     auctionHall: vehicle.auctionHall,
+    supplier: vehicle.supplier,
     purchaseDate: vehicle.purchaseDate,
     auctionLotNo: vehicle.auctionLotNo,
     customer: vehicle.customer,
     destination: vehicle.destination,
+    hasPartnership: vehicle.hasPartnership,
+    partnerName: vehicle.partnerName,
     etd: vehicle.etd,
     bookingReceivedAt: bookingReceivedHistory?.createdAt ?? null,
     eta: vehicle.eta,
     blNo: vehicle.blNo,
+    vesselName: vehicle.vesselName,
     freightAgent: vehicle.freightAgent,
     shippingMethod: vehicle.shippingMethod,
     packingAgent: vehicle.packingAgent,
@@ -577,7 +629,24 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     recycleDate: vehicle.recycleDate,
     jibaishake: vehicle.jibaishake,
     vehicleRemark: vehicle.vehicleRemark,
+    deliveryDate: vehicle.deliveryDate,
+    paidByCustomer: vehicle.paidByCustomer,
+    sellingPrice: vehicle.sellingPrice ? Number(vehicle.sellingPrice) : null,
+    sellingPriceCurrency: vehicle.sellingPriceCurrency,
   };
+}
+
+/** Resolves a vehicle's serial (the mobile API's URL slug, same as the web
+ * detail page) to its internal id, throwing the standard 404 shape instead
+ * of returning null — used by routes whose downstream service function
+ * (listVehicleStatusHistory, listVehicleFiles, getVehiclePdfImages) is keyed
+ * by id, not serial. */
+export async function resolveVehicleIdBySerial(orgId: string, serial: string): Promise<string> {
+  const vehicle = await getVehicleDetail(orgId, serial);
+  if (!vehicle) {
+    throw new ServiceError("NOT_FOUND", "Vehicle not found.");
+  }
+  return vehicle.id;
 }
 
 const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
@@ -586,6 +655,7 @@ const STATUS_HISTORY_TRIGGER_LABEL: Record<string, string> = {
   CRON_JOB: "Automatic — daily job",
   COMPUTED_GUARD: "Computed on read",
   LEGACY_ENTRY: "Entered manually (legacy)",
+  CONVERTED_TO_EXPORT: "Converted from Local to Export",
 };
 
 export interface StatusHistoryItem {
@@ -664,11 +734,14 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
 
   // Track is fixed at creation — driven by the existing row, never the
   // client, same as createVehicle strips FL shipping fields regardless of
-  // what's posted.
-  const isFC = existing.serialPrefix === "FC";
+  // what's posted. Uses the effective track (lib/vehicle-track.ts), not the
+  // raw serialPrefix, so a vehicle converted to export stops having its
+  // shipping fields stripped from the moment it's converted.
+  const isFC = computeEffectiveTrack(existing.serialPrefix, existing.convertedToExport) === "FC";
   const etd = isFC ? input.etd : null;
   const eta = isFC ? input.eta : null;
   const blNo = isFC ? input.blNo : null;
+  const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
   const trackingNo = isFC ? input.trackingNo : null;
@@ -753,14 +826,18 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         gradeId: input.gradeId,
         yom: input.yom,
         auctionHallId: input.auctionHallId,
+        supplierId: input.supplierId,
         purchaseDate: input.purchaseDate,
         auctionLotNo: input.auctionLotNo,
         customerId: input.customerId,
         destination: input.destination,
+        hasPartnership: input.hasPartnership,
+        partnerName: input.hasPartnership ? input.partnerName : null,
 
         etd,
         eta,
         blNo,
+        vesselName,
         freightAgentId,
         shippingMethod,
         packingAgentId,
@@ -785,6 +862,11 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         recycleDate: input.recycleDate,
         jibaishake: input.jibaishake,
         vehicleRemark: input.vehicleRemark,
+
+        deliveryDate: input.deliveryDate,
+        paidByCustomer: input.paidByCustomer,
+        sellingPrice: input.sellingPrice,
+        sellingPriceCurrency: input.sellingPrice !== null ? (input.sellingPriceCurrency ?? "JPY") : null,
 
         shipmentStatus: nextStatus,
       },
@@ -990,6 +1072,59 @@ export async function updateVehicleAuctionBillPaid(
   if (notification) notificationService.notifyRealtime(notification);
 }
 
+/** One-way — an FL vehicle that ends up being exported instead of sold
+ * locally keeps its FL-prefixed serial forever (see lib/vehicle-track.ts's
+ * computeEffectiveTrack for why), but needs to behave as a full export
+ * vehicle from this point on. Destination is collected here (rather than
+ * left for staff to fill in later via the now-unlocked FC form) since it
+ * only becomes meaningful the moment the vehicle stops being sold locally.
+ * The StatusHistory row (fromStatus null, same as a fresh vehicle's very
+ * first row) marks the moment real shipment-status tracking begins for
+ * this vehicle, since FL vehicles never track it before this. */
+export async function convertVehicleToExport(
+  orgId: string,
+  actorId: string,
+  id: string,
+  destination: string
+): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (existing.serialPrefix !== "FL") {
+    throw new ServiceError("VALIDATION", "Only local (FL) vehicles can be converted to export.");
+  }
+  if (existing.convertedToExport) {
+    throw new ServiceError("VALIDATION", "This vehicle has already been converted to export.");
+  }
+  if (!destination.trim()) {
+    throw new ServiceError("VALIDATION", "Destination is required to convert to export.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: { convertedToExport: true, convertedToExportAt: new Date(), destination },
+    });
+    await tx.statusHistory.create({
+      data: {
+        vehicleId: id,
+        fromStatus: null,
+        toStatus: "PENDING",
+        trigger: "CONVERTED_TO_EXPORT",
+        triggeredBy: actorId,
+      },
+    });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "CONVERT_VEHICLE_TO_EXPORT",
+      entity: "Vehicle",
+      entityId: id,
+      before: { convertedToExport: false, destination: existing.destination },
+      after: { convertedToExport: true, destination },
+    });
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Daily shipment-status transition (Tech Doc §1: "daily Vercel Cron once
 // today > ETD") — called once a day from app/api/cron/daily-vehicle-checks
@@ -998,7 +1133,8 @@ export async function updateVehicleAuctionBillPaid(
 // Status), never actually written — this is the real transition.
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Flips every FC vehicle whose ETD has passed from Booking Received to
+/** Flips every FC vehicle (including an FL vehicle converted to export —
+ * lib/vehicle-track.ts) whose ETD has passed from Booking Received to
  * Shipped for real, writes the StatusHistory row (trigger "CRON_JOB",
  * triggeredBy null — no human actor, so this can't go through activityLog
  * .record, which requires a real User; StatusHistory is the one audit trail
@@ -1012,7 +1148,7 @@ export async function runDailyShipmentStatusTransitions(orgId: string): Promise<
     where: {
       org_id: orgId,
       deletedAt: null,
-      serialPrefix: "FC",
+      OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
       shipmentStatus: "BOOKING_RECEIVED",
       etd: { lt: today },
     },
@@ -1060,12 +1196,13 @@ export async function runDailyShipmentStatusTransitions(orgId: string): Promise<
 // vehicle table: FC/FL toggle, search, per-column filters, sort, pagination.
 // ─────────────────────────────────────────────────────────────────────────
 
-// FC vehicle whose row colour is the one that overrides shipment status to
-// Cancelled — same condition computeEffectiveShipmentStatus checks, just
-// expressed as a where-clause fragment so it can be reused as both the
-// CANCELLED branch below and an exclusion on the other three branches.
+// FC (or converted-to-export) vehicle whose row colour is the one that
+// overrides shipment status to Cancelled — same condition
+// computeEffectiveShipmentStatus checks, just expressed as a where-clause
+// fragment so it can be reused as both the CANCELLED branch below and an
+// exclusion on the other three branches.
 const CANCELLED_WHERE: Prisma.VehicleWhereInput = {
-  serialPrefix: "FC",
+  OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
   rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } },
 };
 
@@ -1174,6 +1311,7 @@ export interface VehicleListRow {
   id: string;
   serial: string;
   track: SerialPrefix;
+  convertedToExport: boolean;
   chassisNo: string | null;
   brandName: string | null;
   modelName: string | null;
@@ -1181,6 +1319,9 @@ export interface VehicleListRow {
   yom: number | null;
   auctionItemNo: string | null;
   auctionHallName: string | null;
+  supplierName: string | null;
+  hasPartnership: boolean;
+  partnerName: string | null;
   auctionLotNo: string | null;
   purchaseDate: Date | null;
   customerName: string | null;
@@ -1188,6 +1329,7 @@ export interface VehicleListRow {
   etd: Date | null;
   eta: Date | null;
   blNo: string | null;
+  vesselName: string | null;
   freightAgentName: string | null;
   shippingMethod: ShippingMethod | null;
   packingAgentName: string | null;
@@ -1209,6 +1351,10 @@ export interface VehicleListRow {
   recycleDate: Date | null;
   jibaishake: string | null;
   vehicleRemark: string | null;
+  deliveryDate: Date | null;
+  paidByCustomer: boolean | null;
+  sellingPrice: number | null;
+  sellingPriceCurrency: string | null;
   shipmentStatus: ShipmentStatus;
   effectiveShipmentStatus: EffectiveShipmentStatus;
   rowColourStatus: { id: string; name: string; colour: string; transportCellOnly: boolean } | null;
@@ -1236,16 +1382,28 @@ function applyTriStateFilter(
 
 function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma.VehicleWhereInput {
   const where: Prisma.VehicleWhereInput = { org_id: orgId, deletedAt: null };
+  // Collected instead of assigning where.AND directly in each block below,
+  // since a later plain `where.AND = [...]` would silently overwrite an
+  // earlier one — both the track and shipmentStatus conditions need their
+  // own OR-group, and OR-groups can't share the top-level where.OR key
+  // (that one's reserved for the free-text search further down).
+  const andConditions: Prisma.VehicleWhereInput[] = [];
 
-  if (params.track !== "ALL") where.serialPrefix = params.track;
-  if (params.shipmentStatus.length > 0) {
-    // Its own AND-array entry (not a direct where.shipmentStatus= equality)
-    // so its internal OR doesn't collide with the free-text search's own
-    // top-level where.OR below. Multiple selected statuses are OR'd together
-    // (matches "PENDING or SHIPPED", not "both at once", which no vehicle
-    // could ever satisfy).
-    where.AND = [{ OR: params.shipmentStatus.map(buildEffectiveShipmentStatusWhere) }];
+  // Effective track (lib/vehicle-track.ts) — a vehicle converted to export
+  // belongs in the "FC — Export" list from that point on, even though its
+  // serialPrefix (and serial string) never changes.
+  if (params.track === "FC") {
+    andConditions.push({ OR: [{ serialPrefix: "FC" }, { convertedToExport: true }] });
+  } else if (params.track === "FL") {
+    where.serialPrefix = "FL";
+    where.convertedToExport = false;
   }
+  if (params.shipmentStatus.length > 0) {
+    // Multiple selected statuses are OR'd together (matches "PENDING or
+    // SHIPPED", not "both at once", which no vehicle could ever satisfy).
+    andConditions.push({ OR: params.shipmentStatus.map(buildEffectiveShipmentStatusWhere) });
+  }
+  if (andConditions.length > 0) where.AND = andConditions;
   if (params.destination !== "ALL") where.destination = params.destination;
   if (params.customerId !== "ALL") where.customerId = params.customerId;
   if (params.rowColourStatusId !== "ALL") {
@@ -1334,15 +1492,23 @@ const VEHICLE_LIST_SELECT = {
   id: true,
   serial: true,
   serialPrefix: true,
+  convertedToExport: true,
   chassisNo: true,
   auctionItemNo: true,
   auctionLotNo: true,
   yom: true,
   purchaseDate: true,
   destination: true,
+  hasPartnership: true,
+  partnerName: true,
+  deliveryDate: true,
+  paidByCustomer: true,
+  sellingPrice: true,
+  sellingPriceCurrency: true,
   etd: true,
   eta: true,
   blNo: true,
+  vesselName: true,
   shippingMethod: true,
   vanningDate: true,
   containerNumber: true,
@@ -1364,6 +1530,7 @@ const VEHICLE_LIST_SELECT = {
   model: { select: { name: true, brand: { select: { name: true } } } },
   grade: { select: { name: true } },
   auctionHall: { select: { name: true } },
+  supplier: { select: { name: true } },
   customer: { select: { name: true } },
   freightAgent: { select: { name: true } },
   packingAgent: { select: { name: true } },
@@ -1375,10 +1542,12 @@ const VEHICLE_LIST_SELECT = {
 type VehicleListRawRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_LIST_SELECT }>;
 
 function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
+  const effectiveTrack = computeEffectiveTrack(v.serialPrefix, v.convertedToExport);
   return {
     id: v.id,
     serial: v.serial,
-    track: v.serialPrefix,
+    track: effectiveTrack,
+    convertedToExport: v.convertedToExport,
     chassisNo: v.chassisNo,
     brandName: v.model?.brand.name ?? null,
     modelName: v.model?.name ?? null,
@@ -1386,13 +1555,17 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     yom: v.yom,
     auctionItemNo: v.auctionItemNo,
     auctionHallName: v.auctionHall?.name ?? null,
+    supplierName: v.supplier?.name ?? null,
     auctionLotNo: v.auctionLotNo,
     purchaseDate: v.purchaseDate,
     customerName: v.customer?.name ?? null,
     destination: v.destination,
+    hasPartnership: v.hasPartnership,
+    partnerName: v.partnerName,
     etd: v.etd,
     eta: v.eta,
     blNo: v.blNo,
+    vesselName: v.vesselName,
     freightAgentName: v.freightAgent?.name ?? null,
     shippingMethod: v.shippingMethod,
     packingAgentName: v.packingAgent?.name ?? null,
@@ -1414,11 +1587,15 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     recycleDate: v.recycleDate,
     jibaishake: v.jibaishake,
     vehicleRemark: v.vehicleRemark,
+    deliveryDate: v.deliveryDate,
+    paidByCustomer: v.paidByCustomer,
+    sellingPrice: v.sellingPrice ? Number(v.sellingPrice) : null,
+    sellingPriceCurrency: v.sellingPriceCurrency,
     shipmentStatus: v.shipmentStatus,
     effectiveShipmentStatus: computeEffectiveShipmentStatus(
       v.shipmentStatus,
       v.etd,
-      v.serialPrefix === "FC" && isCancelShipmentRowColour(v.rowColourStatus?.name)
+      effectiveTrack === "FC" && isCancelShipmentRowColour(v.rowColourStatus?.name)
     ),
     rowColourStatus: v.rowColourStatus,
   };

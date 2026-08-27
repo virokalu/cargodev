@@ -211,6 +211,7 @@ export function buildVehicleDetailPdf(
         field("ETD", formatDate(vehicle.etd)),
         field("ETA", formatDate(vehicle.eta)),
         field("BL No", vehicle.blNo),
+        field("Vessel Name", vehicle.vesselName),
         field("Forwarding Agent", vehicle.freightAgent?.name),
         field(
           "RORO / Container",

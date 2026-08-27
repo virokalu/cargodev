@@ -11,7 +11,14 @@
 // turns that into a Date | null for Prisma.
 
 import { z } from "zod";
+import type { ShippingMethod } from "@prisma/client";
 import { flattenFieldErrors } from "@/lib/validation/shared";
+import type { ShipmentStatus } from "@/lib/constants/shipment-status";
+// Type-only imports — erased at compile time, so this doesn't create a real
+// runtime circular dependency even though vehicle.service.ts also imports
+// from this file (for vehicleCreateSchema/vehicleUpdateSchema).
+import type { VehicleListSortKey, TriStateFilterValue } from "@/lib/services/vehicle.service";
+import { SORT_KEYS, SHIPMENT_STATUSES, SHIPPING_METHODS, TRI_STATE_VALUES } from "@/lib/vehicle-list-url";
 
 export { flattenFieldErrors };
 
@@ -74,11 +81,21 @@ const vehicleSharedFields = {
     .max(new Date().getFullYear() + 1, "Enter a valid year")
     .nullable()
     .optional(),
+  // FL only — mutually exclusive (checkSharedVehicleRules below), which
+  // source this vehicle was purchased through.
   auctionHallId: optionalId,
+  supplierId: optionalId,
   purchaseDate: optionalDate,
   auctionLotNo: optionalText(100),
   customerId: optionalId,
   destination: optionalText(100),
+
+  // FL only. hasPartnership is a plain boolean (not tri-state — whoever
+  // enters the vehicle always knows whether there was a partner), defaults
+  // false to match the DB column. partnerName only means something when
+  // hasPartnership is true (checkSharedVehicleRules below).
+  hasPartnership: z.boolean().optional().default(false),
+  partnerName: optionalText(200),
 
   // Shipment fields — FC only. Present in the schema so FC submissions
   // validate them, but vehicle.service strips them to null for FL regardless
@@ -86,6 +103,7 @@ const vehicleSharedFields = {
   etd: optionalDate,
   eta: optionalDate,
   blNo: optionalText(100),
+  vesselName: optionalText(100),
   freightAgentId: optionalId,
   shippingMethod: z.enum(["RORO", "CONTAINER"]).nullable().optional(),
   trackingNo: optionalText(100),
@@ -112,6 +130,22 @@ const vehicleSharedFields = {
   recycleDate: optionalDate,
   jibaishake: optionalText(500),
   vehicleRemark: optionalText(2000),
+
+  // Sold Details — FL only.
+  deliveryDate: optionalDate,
+  // Same nullable-boolean shape as triState above — null means "not
+  // touched yet", not a third UI state (the form always writes true/false
+  // once staff check/uncheck it; see CLAUDE.md-style tri-state reasoning,
+  // just applied to a plain Yes/No checkbox here instead of a —/Yes/No
+  // control).
+  paidByCustomer: triState,
+  sellingPrice: z
+    .number()
+    .nonnegative("Must be zero or more")
+    .nullable()
+    .optional()
+    .transform((v) => v ?? null),
+  sellingPriceCurrency: optionalText(10),
 };
 
 /** Cross-field rules shared by create and edit. */
@@ -122,6 +156,10 @@ function checkSharedVehicleRules(
     packingAgentId?: string | null;
     etd?: Date | null;
     eta?: Date | null;
+    auctionHallId?: string | null;
+    supplierId?: string | null;
+    hasPartnership?: boolean;
+    partnerName?: string | null;
   },
   ctx: z.RefinementCtx
 ) {
@@ -144,6 +182,20 @@ function checkSharedVehicleRules(
       code: z.ZodIssueCode.custom,
       path: ["eta"],
       message: "ETA must be after ETD",
+    });
+  }
+  if (data.auctionHallId && data.supplierId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["supplierId"],
+      message: "Choose either an auction hall or a supplier, not both",
+    });
+  }
+  if (data.hasPartnership && !data.partnerName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["partnerName"],
+      message: "Enter the partnership name",
     });
   }
 }
@@ -179,6 +231,10 @@ export const vehicleCreateSchema = z
             "INSPECTION_REPORT",
             "SHAKEN_SHO",
             "FREIGHT_INVOICE",
+            "PURCHASE_INVOICE",
+            "SALES_INVOICE",
+            "CUSTOMER_SHAKEN_SHO",
+            "CASH_RECEIPT",
             "OTHER",
           ]),
         })
@@ -208,3 +264,85 @@ export type VehicleCreateInput = z.infer<typeof vehicleCreateSchema>;
 export const vehicleUpdateSchema = z.object(vehicleSharedFields).superRefine(checkSharedVehicleRules);
 
 export type VehicleUpdateInput = z.infer<typeof vehicleUpdateSchema>;
+
+// ── GET /api/v1/vehicles query params ──────────────────────────────
+// Mirrors VehicleListParams (lib/services/vehicle.service.ts) and the same
+// URL param names lib/vehicle-list-url.ts uses for the web filter bar — a
+// mobile client sends the same query string shape. Unlike the web page's
+// parser (which silently falls back to defaults on a bad value, since a
+// stale bookmark shouldn't error), invalid enum values here are rejected
+// with a 400: this is a machine-consumed API, so a bad filter value is a
+// client bug worth surfacing, not something to swallow silently.
+//
+// One deliberate divergence from the web app: pageSize is client-
+// controlled here (the web UI always uses a fixed 50), since a mobile
+// client reasonably wants its own page size.
+
+const idOrAll = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() !== "" ? v.trim() : "ALL"));
+
+const shipmentStatusEnum = z.enum(SHIPMENT_STATUSES as [ShipmentStatus, ...ShipmentStatus[]]);
+const sortKeyEnum = z.enum(SORT_KEYS as [VehicleListSortKey, ...VehicleListSortKey[]]);
+const shippingMethodOrAllEnum = z.enum(
+  [...SHIPPING_METHODS, "ALL"] as unknown as [ShippingMethod | "ALL", ...(ShippingMethod | "ALL")[]]
+);
+const triStateOrAllEnum = z.enum(["ALL", ...TRI_STATE_VALUES] as [
+  TriStateFilterValue,
+  ...TriStateFilterValue[],
+]);
+
+export const vehicleListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(50),
+    track: z.enum(["FC", "FL", "ALL"]).default("FC"),
+    q: z.string().trim().max(200).default(""),
+    status: z.array(shipmentStatusEnum).default([]),
+    destination: idOrAll,
+    customer: idOrAll,
+    rowColour: idOrAll,
+    rowColourNot: idOrAll,
+    brand: idOrAll,
+    model: idOrAll,
+    grade: idOrAll,
+    hall: idOrAll,
+    agent: idOrAll,
+    packingAgent: idOrAll,
+    location: idOrAll,
+    transport: idOrAll,
+    method: shippingMethodOrAllEnum.default("ALL"),
+    billPaid: triStateOrAllEnum.default("ALL"),
+    logBook: triStateOrAllEnum.default("ALL"),
+    extraKey: triStateOrAllEnum.default("ALL"),
+    sort: sortKeyEnum.default("serial"),
+    dir: z.enum(["asc", "desc"]).default("desc"),
+  })
+  .transform((v) => ({
+    page: v.page,
+    pageSize: v.pageSize,
+    track: v.track,
+    search: v.q,
+    shipmentStatus: v.status,
+    destination: v.destination,
+    customerId: v.customer,
+    rowColourStatusId: v.rowColour,
+    rowColourStatusIdNot: v.rowColourNot,
+    brandId: v.brand,
+    modelId: v.model,
+    gradeId: v.grade,
+    auctionHallId: v.hall,
+    freightAgentId: v.agent,
+    packingAgentId: v.packingAgent,
+    vehicleLocationId: v.location,
+    transportById: v.transport,
+    shippingMethod: v.method,
+    auctionBillPaid: v.billPaid,
+    logBook: v.logBook,
+    extraKey: v.extraKey,
+    sortBy: v.sort,
+    sortDir: v.dir,
+  }));
+
+export type VehicleListQuery = z.infer<typeof vehicleListQuerySchema>;

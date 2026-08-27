@@ -132,41 +132,49 @@
 }
 
 .dark {
-  --background: oklch(0.18 0.025 257);
-  --foreground: oklch(0.95 0.01 247);
-  --card: oklch(0.23 0.03 257);
-  --card-foreground: oklch(0.95 0.01 247);
-  --popover: oklch(0.23 0.03 257);
-  --popover-foreground: oklch(0.95 0.01 247);
-  --primary: oklch(0.62 0.16 256);
-  --primary-foreground: oklch(0.15 0.02 257);
-  --secondary: oklch(0.28 0.03 257);
-  --secondary-foreground: oklch(0.95 0.01 247);
-  --muted: oklch(0.28 0.03 257);
-  --muted-foreground: oklch(0.68 0.02 257);
-  --accent: oklch(0.32 0.05 256);
-  --accent-foreground: oklch(0.95 0.01 247);
-  --destructive: oklch(0.62 0.2 27);
-  --destructive-foreground: oklch(0.98 0.003 247);
-  --success: oklch(0.65 0.15 152);
-  --success-foreground: oklch(0.15 0.02 257);
-  --warning: oklch(0.78 0.15 70);
-  --warning-foreground: oklch(0.2 0.03 70);
-  --info: oklch(0.65 0.13 230);
-  --info-foreground: oklch(0.15 0.02 257);
-  --border: oklch(0.32 0.03 257);
-  --input: oklch(0.34 0.03 257);
-  --ring: oklch(0.62 0.16 256);
-  --chart-1: oklch(0.65 0.16 256);
-  --chart-2: oklch(0.68 0.13 230);
-  --chart-3: oklch(0.68 0.15 152);
-  --chart-4: oklch(0.78 0.15 70);
-  --chart-5: oklch(0.65 0.2 27);
-  --chart-track-fc: oklch(0.68 0.18 285);
-  --chart-track-fl: oklch(0.70 0.18 322);
-  --chart-roro: oklch(0.68 0.19 18);
-  --chart-container: oklch(0.75 0.16 48);
-  --sidebar: oklch(0.14 0.07 258);
+  /* Dark-mode palette — hand-specified hex (not derived from the light
+   * oklch scale) so surfaces, semantic status colors, and chart series all
+   * land on exact, pre-approved values rather than an oklch conversion. */
+  --background: #0b0f19;
+  --foreground: #f9fafb;
+  --card: #111827;
+  --card-foreground: #f9fafb;
+  --popover: #111827;
+  --popover-foreground: #f9fafb;
+  --primary: #3b82f6;
+  --primary-foreground: #f9fafb;
+  --secondary: #1e293b;
+  --secondary-foreground: #f9fafb;
+  --muted: #1e293b;
+  --muted-foreground: #9ca3af;
+  --accent: #1e293b;
+  --accent-foreground: #f9fafb;
+  /* Status tokens pair a light/saturated tone (used as text, an icon color,
+   * or a badge's solid fill) with a dark "-foreground" ink of the *same*
+   * hue family — components/ui/badge.tsx's success/warning/info variants
+   * fill solid with the base color, so the foreground has to hold real
+   * contrast against it, not just against the page background. */
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f87171;
+  --success: #065f46;
+  --success-foreground: #34d399;
+  --warning: #78350f;
+  --warning-foreground: #fbbf24;
+  --info: #0c4a6e;
+  --info-foreground: #38bdf8;
+  --border: #1f2937;
+  --input: #1f2937;
+  --ring: #3b82f6;
+  --chart-1: #3b82f6;
+  --chart-2: #0284c7;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --chart-track-fc: #818cf8;
+  --chart-track-fl: #8b5cf6;
+  --chart-roro: #f43f5e;
+  --chart-container: #fb923c;
+  --sidebar: #080c14;
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);

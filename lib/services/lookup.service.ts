@@ -265,6 +265,55 @@ export async function renameAuctionHall(orgId: string, id: string, newName: stri
   });
 }
 
+// ── Supplier (FL only — alternative to Auction Hall) ────────────────────
+
+export async function searchSuppliers(orgId: string, query: string): Promise<LookupOption[]> {
+  return prisma.supplier.findMany({
+    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+    take: SEARCH_LIMIT,
+  });
+}
+
+export async function getSupplierById(orgId: string, id: string): Promise<LookupOption | null> {
+  const supplier = await prisma.supplier.findFirst({ where: { id, org_id: orgId }, select: { id: true, name: true } });
+  return supplier ?? null;
+}
+
+export async function findOrCreateSupplier(orgId: string, name: string): Promise<LookupOption> {
+  const trimmed = name.trim();
+  const existing = await prisma.supplier.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" } },
+    select: { id: true, name: true },
+  });
+  if (existing) return existing;
+  return prisma.supplier.create({
+    data: { org_id: orgId, name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
+export async function renameSupplier(orgId: string, id: string, newName: string): Promise<LookupOption> {
+  const trimmed = newName.trim();
+  const current = await prisma.supplier.findUnique({ where: { id } });
+  assertBelongsToOrg(orgId, current, "Supplier not found.");
+
+  const duplicate = await prisma.supplier.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" }, id: { not: id } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new ServiceError("CONFLICT", `A supplier named "${trimmed}" already exists.`);
+  }
+
+  return prisma.supplier.update({
+    where: { id },
+    data: { name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
 // ── Transport Company ────────────────────────────────────────────────────
 
 export async function searchTransportCompanies(orgId: string, query: string): Promise<LookupOption[]> {
