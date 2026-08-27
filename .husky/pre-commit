@@ -6,6 +6,11 @@
 # ──────────────────────────────────────────────────────────────
 
 # Only scan files staged for this commit
+# `|| true` guards against `grep` exiting 1 when nothing matches — the
+# dispatcher in .husky/_/h runs this script with `sh -e`, so an unguarded
+# no-match here would kill the whole hook before it reaches the STAGED
+# empty-check below, failing every commit that touches no ts/tsx/js/mjs/yml
+# files.
 STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|mjs|yml)$' || true)
 
 if [ -z "$STAGED" ]; then
