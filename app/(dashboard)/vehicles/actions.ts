@@ -66,6 +66,24 @@ export async function updateVehicleAction(id: string, input: unknown): Promise<V
   }
 }
 
+export async function convertVehicleToExportAction(
+  id: string,
+  destination: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await vehicleService.convertVehicleToExport(user.orgId, user.id, id, destination);
+    revalidatePath("/vehicles");
+    revalidatePath("/vehicles/[serial]/edit", "page");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
 export async function deleteVehicleAction(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -182,6 +200,25 @@ export async function createAuctionHallAction(name: string) {
 export async function renameAuctionHallAction(id: string, name: string) {
   const user = await requireUser([...STAFF_CAN_WRITE]);
   const renamed = await lookupService.renameAuctionHall(user.orgId, id, name);
+  revalidatePath("/vehicles");
+  return renamed;
+}
+
+// ── Supplier (FL only) ─────────────────────────────────────────────────
+
+export async function searchSuppliersAction(query: string) {
+  const user = await requireUser();
+  return lookupService.searchSuppliers(user.orgId, query);
+}
+
+export async function createSupplierAction(name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.findOrCreateSupplier(user.orgId, name);
+}
+
+export async function renameSupplierAction(id: string, name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const renamed = await lookupService.renameSupplier(user.orgId, id, name);
   revalidatePath("/vehicles");
   return renamed;
 }

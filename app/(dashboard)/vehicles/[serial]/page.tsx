@@ -6,10 +6,10 @@ import { VehicleDetailView } from "@/components/vehicles/vehicle-detail-view";
 
 // Read-only detail page (US-10) — every role can view, including Viewer
 // (CLAUDE.md: "Viewer gets read-only everywhere"), so unlike the edit page
-// this has no requireUser role whitelist. The Edit link it offers is gated
-// client-side (canEditVehicle below) rather than the page itself, same
-// Administrator/Manager/Operator whitelist as the Pencil icon on the
-// vehicles table (app/(dashboard)/vehicles/page.tsx).
+// this has no requireUser role whitelist. canEditVehicle only controls
+// whether the Edit button in the header links anywhere — the edit page
+// itself (and everything it lets Operator touch) still enforces its own
+// gate independently, this is just so Viewer doesn't see a dead-end button.
 export default async function VehicleDetailPage({
   params,
 }: {

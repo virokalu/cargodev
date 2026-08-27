@@ -163,12 +163,21 @@ function toReportVehicleRow(v: RawReportVehicle, track: ReportTrack): ReportVehi
   };
 }
 
+// Effective track (lib/vehicle-track.ts) — an FL vehicle converted to
+// export belongs in the FC report from that point on, even though its
+// serialPrefix (and serial string) never changes.
+function trackWhere(track: ReportTrack): Prisma.VehicleWhereInput {
+  return track === "FC"
+    ? { OR: [{ serialPrefix: "FC" }, { convertedToExport: true }] }
+    : { serialPrefix: "FL", convertedToExport: false };
+}
+
 export async function getCustomerVehicleReport(
   orgId: string,
   track: ReportTrack
 ): Promise<CustomerVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: track, customerId: { not: null } },
+    where: { org_id: orgId, deletedAt: null, ...trackWhere(track), customerId: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -219,7 +228,7 @@ export async function getAuctionHallVehicleReport(
   track: ReportTrack
 ): Promise<AuctionHallVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: track, auctionHallId: { not: null } },
+    where: { org_id: orgId, deletedAt: null, ...trackWhere(track), auctionHallId: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -261,7 +270,7 @@ export async function getDestinationVehicleReport(
   track: ReportTrack
 ): Promise<DestinationVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: track, destination: { not: null } },
+    where: { org_id: orgId, deletedAt: null, ...trackWhere(track), destination: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });
@@ -298,7 +307,7 @@ export async function getDestinationVehicleReport(
 // parameter and is always scoped to FC.
 export async function getFreightAgentVehicleReport(orgId: string): Promise<FreightAgentVehicleReportData> {
   const vehicles = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, serialPrefix: "FC", freightAgentId: { not: null } },
+    where: { org_id: orgId, deletedAt: null, ...trackWhere("FC"), freightAgentId: { not: null } },
     select: REPORT_VEHICLE_SELECT,
     orderBy: [{ serialNumber: "asc" }],
   });

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { SectionCard } from "@/components/shared/section-card";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
+import { ConvertToExportDialog } from "@/components/vehicles/convert-to-export-dialog";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
@@ -58,7 +60,11 @@ import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
 import type { VehicleFiles } from "@/lib/services/file.service";
 import type { VehicleDocumentType } from "@prisma/client";
-import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
+import {
+  DOCUMENT_TYPE_META,
+  NAMED_DOCUMENT_TYPES,
+  FL_NAMED_DOCUMENT_TYPES,
+} from "@/lib/constants/document-type";
 import {
   SHIPMENT_STATUS_META,
   STORABLE_SHIPMENT_STATUSES,
@@ -87,6 +93,9 @@ import {
   searchAuctionHallsAction,
   createAuctionHallAction,
   renameAuctionHallAction,
+  searchSuppliersAction,
+  createSupplierAction,
+  renameSupplierAction,
   searchTransportCompaniesAction,
   createTransportCompanyAction,
   renameTransportCompanyAction,
@@ -118,6 +127,10 @@ const YOM_MAX_YEAR = new Date().getFullYear() + 1;
 const YOM_MIN_YEAR = 1980;
 const YOM_OPTIONS = Array.from({ length: YOM_MAX_YEAR - YOM_MIN_YEAR + 1 }, (_, i) => YOM_MAX_YEAR - i);
 
+// Sold Details currency — UI-owned option list (Tech Doc doesn't enforce an
+// ISO currency enum server-side, sellingPriceCurrency is a free string).
+const SOLD_CURRENCY_OPTIONS = ["JPY", "LKR", "USD"] as const;
+
 interface VehicleFormProps {
   mode: "create" | "edit";
   /** Required when mode === "edit". */
@@ -128,6 +141,10 @@ interface VehicleFormProps {
   existingSerial?: string;
   existingTrack?: "FC" | "FL";
   existingShipmentStatus?: ShipmentStatus;
+  /** Edit mode only — whether this (originally FL) vehicle has already been
+   * converted to export. Combined with existingTrack === "FL", this decides
+   * whether the header shows the one-way "Convert to Export" button. */
+  existingConvertedToExport?: boolean;
   /** Prefills FormState in edit mode; ignored in create mode. */
   initialValues?: Partial<FormState>;
   /** Create mode only — the next-serial preview shown before a track/legacy
@@ -165,11 +182,22 @@ export interface FormState {
   model: ComboboxOption | null;
   grade: ComboboxOption | null;
   yomText: string;
+  // FL only — which of these two is in use, driven by the "Purchased Via"
+  // toggle so the two stay mutually exclusive by construction rather than by
+  // clearing each other on change. FC ignores this and always uses
+  // auctionHall. Never sent to the server as its own field — buildPayload
+  // still just reads whichever of auctionHall/supplier is non-null.
+  purchaseSource: "AUCTION_HALL" | "SUPPLIER";
   auctionHall: ComboboxOption | null;
+  supplier: ComboboxOption | null;
   purchaseDate: string | null;
   auctionLotNo: string;
   customer: ComboboxOption | null;
   destination: string;
+  // FL only. hasPartnership is a plain Yes/No (not tri-state — whoever enters
+  // the vehicle always knows), partnerName only matters when it's true.
+  hasPartnership: boolean;
+  partnerName: string;
   // Create-only — staged here via the presigned-upload flow before the
   // vehicle exists. Editing the auction sheet happens through the Files
   // panel's immediate-persist action instead (see vehicle.schema.ts).
@@ -206,6 +234,14 @@ export interface FormState {
   recycleDate: string | null;
   jibaishake: string;
   vehicleRemark: string;
+
+  // Sold Details — FL only.
+  deliveryDate: string | null;
+  // Plain Yes/No, same reasoning as hasPartnership above — not the tri-state
+  // control even though the DB column is nullable.
+  paidByCustomer: boolean;
+  sellingPriceText: string;
+  sellingPriceCurrency: string;
 }
 
 const INITIAL_STATE: FormState = {
@@ -220,11 +256,15 @@ const INITIAL_STATE: FormState = {
   model: null,
   grade: null,
   yomText: "",
+  purchaseSource: "AUCTION_HALL",
   auctionHall: null,
+  supplier: null,
   purchaseDate: null,
   auctionLotNo: "",
   customer: null,
   destination: "",
+  hasPartnership: false,
+  partnerName: "",
   auctionSheetUrl: "",
   stagedPhotoUrls: [],
   stagedDocuments: [],
@@ -256,6 +296,11 @@ const INITIAL_STATE: FormState = {
   recycleDate: null,
   jibaishake: "",
   vehicleRemark: "",
+
+  deliveryDate: null,
+  paidByCustomer: false,
+  sellingPriceText: "",
+  sellingPriceCurrency: "JPY",
 };
 
 /** Builds the raw payload the server's vehicleCreateSchema expects. */
@@ -267,6 +312,8 @@ function buildPayload(state: FormState) {
       : Number.parseInt(state.legacySerialNumberText, 10);
 
   const isFC = state.track === "FC";
+  const sellingPrice =
+    state.sellingPriceText.trim() === "" ? null : Number.parseFloat(state.sellingPriceText);
 
   return {
     track: state.track,
@@ -283,10 +330,13 @@ function buildPayload(state: FormState) {
     gradeId: state.grade?.id ?? null,
     yom: Number.isNaN(yom) ? null : yom,
     auctionHallId: state.auctionHall?.id ?? null,
+    supplierId: state.supplier?.id ?? null,
     purchaseDate: state.purchaseDate,
     auctionLotNo: state.auctionLotNo,
     customerId: state.customer?.id ?? null,
     destination: state.destination,
+    hasPartnership: state.hasPartnership,
+    partnerName: state.partnerName,
     // Ignored by the server for edit-mode submits (not part of
     // vehicleUpdateSchema) — only meaningful on create.
     auctionSheetUrl: state.auctionSheetUrl,
@@ -320,6 +370,11 @@ function buildPayload(state: FormState) {
     recycleDate: state.recycleDate,
     jibaishake: state.jibaishake,
     vehicleRemark: state.vehicleRemark,
+
+    deliveryDate: state.deliveryDate,
+    paidByCustomer: state.paidByCustomer,
+    sellingPrice: Number.isNaN(sellingPrice) ? null : sellingPrice,
+    sellingPriceCurrency: state.sellingPriceCurrency,
   };
 }
 
@@ -373,6 +428,7 @@ function NumberField({
   error,
   min,
   max,
+  step,
 }: {
   id: string;
   label: string;
@@ -381,6 +437,7 @@ function NumberField({
   error?: string;
   min?: number;
   max?: number;
+  step?: number;
 }) {
   return (
     <div>
@@ -392,6 +449,7 @@ function NumberField({
         type="number"
         min={min}
         max={max}
+        step={step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={error ? "border-destructive" : undefined}
@@ -402,12 +460,54 @@ function NumberField({
   );
 }
 
+// Plain Yes/No pill toggle — same visual language as the Track and Purchased
+// Via toggles below, for a genuinely-boolean field (no "not entered" state,
+// unlike TriStateToggle's —/Yes/No).
+function YesNoToggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-sm font-semibold">{label}</span>
+      <div className="inline-flex gap-1 rounded-md bg-muted p-1">
+        {(
+          [
+            { value: true, label: "Yes" },
+            { value: false, label: "No" },
+          ] as const
+        ).map((option) => (
+          <button
+            key={String(option.value)}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "min-w-16 rounded-sm px-3 py-1.5 text-sm font-semibold transition-colors",
+              value === option.value
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function VehicleForm({
   mode,
   vehicleId,
   existingSerial,
   existingTrack,
   existingShipmentStatus,
+  existingConvertedToExport,
   initialValues,
   nextFcSerial,
   nextFlSerial,
@@ -421,6 +521,9 @@ export function VehicleForm({
     ...INITIAL_STATE,
     ...(mode === "edit" ? { track: existingTrack ?? INITIAL_STATE.track } : {}),
     ...initialValues,
+    // Derived, not stored server-side — open the toggle on whichever side
+    // the existing record actually has a value for.
+    purchaseSource: initialValues?.supplier ? "SUPPLIER" : "AUCTION_HALL",
   }));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [bannerError, setBannerError] = useState<string | null>(null);
@@ -532,6 +635,18 @@ export function VehicleForm({
     setChassisDuplicate(isDuplicate);
   }
 
+  // Auction Hall and Supplier are mutually exclusive (FL only), but that's
+  // enforced by the "Purchased Via" toggle only ever rendering one of them —
+  // switching sides (below) is what clears the other, not picking a value.
+  function handlePurchaseSourceChange(source: "AUCTION_HALL" | "SUPPLIER") {
+    setState((previous) => ({
+      ...previous,
+      purchaseSource: source,
+      auctionHall: source === "AUCTION_HALL" ? previous.auctionHall : null,
+      supplier: source === "SUPPLIER" ? previous.supplier : null,
+    }));
+  }
+
   // Freight Agent and RORO/Container can be filled in either order (staff
   // sometimes know the shipping method before they've picked an agent).
   // Whichever one changes, drop the other if it's no longer a valid
@@ -611,6 +726,9 @@ export function VehicleForm({
             </p>
           </div>
         </div>
+        {mode === "edit" && existingTrack === "FL" && !existingConvertedToExport && canEditFields && (
+          <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
+        )}
       </div>
 
       {mode === "edit" && !canEditFields && (
@@ -715,61 +833,63 @@ export function VehicleForm({
               </div>
             )}
 
-            <div className="sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-semibold">Shipment Status</span>
-              {canSetShipmentStatusManually ? (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {STORABLE_SHIPMENT_STATUSES.map((status) => {
-                      const meta = SHIPMENT_STATUS_META[status];
-                      const active = state.manualShipmentStatus === status;
-                      return (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setField("manualShipmentStatus", status)}
-                          className={cn(
-                            active
-                              ? badgeVariants({ variant: meta.badgeVariant })
-                              : badgeVariants({ variant: "outline" }),
-                            "cursor-pointer transition-colors",
-                            !active && "text-muted-foreground hover:text-foreground"
-                          )}
-                          aria-pressed={active}
-                        >
-                          {meta.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
-                    tracked through the normal ETD flow.
-                  </p>
-                  {manualShipmentStatus !== state.manualShipmentStatus && (
-                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-warning">
-                      <AlertTriangle className="size-3.5 shrink-0" />
-                      Will actually save as{" "}
-                      <Badge variant={SHIPMENT_STATUS_META[manualShipmentStatus].badgeVariant}>
-                        {SHIPMENT_STATUS_META[manualShipmentStatus].label}
-                      </Badge>{" "}
-                      — {SHIPMENT_STATUS_META[state.manualShipmentStatus].label}{" "}
-                      doesn&apos;t match the ETD already entered below.
+            {isFC && (
+              <div className="sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-semibold">Shipment Status</span>
+                {canSetShipmentStatusManually ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {STORABLE_SHIPMENT_STATUSES.map((status) => {
+                        const meta = SHIPMENT_STATUS_META[status];
+                        const active = state.manualShipmentStatus === status;
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => setField("manualShipmentStatus", status)}
+                            className={cn(
+                              active
+                                ? badgeVariants({ variant: meta.badgeVariant })
+                                : badgeVariants({ variant: "outline" }),
+                              "cursor-pointer transition-colors",
+                              !active && "text-muted-foreground hover:text-foreground"
+                            )}
+                            aria-pressed={active}
+                          >
+                            {meta.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Legacy record — set the status this vehicle actually reached, since it wasn&apos;t
+                      tracked through the normal ETD flow.
                     </p>
-                  )}
-                </>
-              ) : (
-                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
-                  {SHIPMENT_STATUS_META[shipmentStatus].label}
-                </Badge>
-              )}
-              {mode === "edit" && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Updates automatically — set or clear ETD below to move this between Pending and
-                  Booking Received.
-                </p>
-              )}
-            </div>
+                    {manualShipmentStatus !== state.manualShipmentStatus && (
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-warning">
+                        <AlertTriangle className="size-3.5 shrink-0" />
+                        Will actually save as{" "}
+                        <Badge variant={SHIPMENT_STATUS_META[manualShipmentStatus].badgeVariant}>
+                          {SHIPMENT_STATUS_META[manualShipmentStatus].label}
+                        </Badge>{" "}
+                        — {SHIPMENT_STATUS_META[state.manualShipmentStatus].label}{" "}
+                        doesn&apos;t match the ETD already entered below.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                    {SHIPMENT_STATUS_META[shipmentStatus].label}
+                  </Badge>
+                )}
+                {mode === "edit" && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Updates automatically — set or clear ETD below to move this between Pending and
+                    Booking Received.
+                  </p>
+                )}
+              </div>
+            )}
           </SectionCard>
 
           {/* ── Vehicle Information ────────────────────────────────── */}
@@ -860,43 +980,12 @@ export function VehicleForm({
               </Select>
               {fieldErrors.yom && <p className="mt-1 text-xs text-destructive">{fieldErrors.yom}</p>}
             </div>
-
-            <ComboboxCreate
-              id="auctionHall"
-              label="Auction Hall"
-              createLabel="auction hall"
-              value={state.auctionHall}
-              onChange={(value) => setField("auctionHall", value)}
-              search={searchAuctionHallsAction}
-              onCreate={createAuctionHallAction}
-              onRename={(option, name) => renameAuctionHallAction(option.id, name)}
-              error={fieldErrors.auctionHallId}
-            />
             <DateField
               id="purchaseDate"
               label="Purchase Date"
               value={state.purchaseDate}
               onChange={(value) => setField("purchaseDate", value)}
               error={fieldErrors.purchaseDate}
-            />
-            <TextField
-              id="auctionLotNo"
-              label="Auction Lot No"
-              value={state.auctionLotNo}
-              onChange={(value) => setField("auctionLotNo", value)}
-              maxLength={100}
-              error={fieldErrors.auctionLotNo}
-            />
-            <ComboboxCreate
-              id="customer"
-              label="Customer"
-              createLabel="customer"
-              value={state.customer}
-              onChange={(value) => setField("customer", value)}
-              search={searchCustomersAction}
-              onCreate={createCustomerAction}
-              onRename={(option, name) => renameCustomerAction(option.id, name)}
-              error={fieldErrors.customerId}
             />
             <CountrySelect
               id="destination"
@@ -905,11 +994,121 @@ export function VehicleForm({
               value={state.destination}
               onChange={(name) => setField("destination", name)}
             />
-            <TriStateToggle
-              label="Auction Bill Paid"
-              value={state.auctionBillPaid}
-              onChange={(value) => setField("auctionBillPaid", value)}
-            />
+
+            {!isFC && (
+              <div className="sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-semibold">Purchased Via</span>
+                <div className="inline-flex gap-1 rounded-md bg-muted p-1">
+                  {(
+                    [
+                      { value: "AUCTION_HALL", label: "Auction Hall" },
+                      { value: "SUPPLIER", label: "Supplier" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handlePurchaseSourceChange(option.value)}
+                      className={cn(
+                        "min-w-28 rounded-sm px-3 py-1.5 text-sm font-semibold transition-colors",
+                        state.purchaseSource === option.value
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(isFC || state.purchaseSource === "AUCTION_HALL") && (
+              <ComboboxCreate
+                id="auctionHall"
+                label="Auction Hall"
+                createLabel="auction hall"
+                value={state.auctionHall}
+                onChange={(value) => setField("auctionHall", value)}
+                search={searchAuctionHallsAction}
+                onCreate={createAuctionHallAction}
+                onRename={(option, name) => renameAuctionHallAction(option.id, name)}
+                error={fieldErrors.auctionHallId}
+              />
+            )}
+            {!isFC && state.purchaseSource === "SUPPLIER" && (
+              <ComboboxCreate
+                id="supplier"
+                label="Supplier"
+                createLabel="supplier"
+                value={state.supplier}
+                onChange={(value) => setField("supplier", value)}
+                search={searchSuppliersAction}
+                onCreate={createSupplierAction}
+                onRename={(option, name) => renameSupplierAction(option.id, name)}
+                error={fieldErrors.supplierId}
+              />
+            )}
+            {(isFC || state.purchaseSource === "AUCTION_HALL") && (
+              <TextField
+                id="auctionLotNo"
+                label="Auction Lot No"
+                value={state.auctionLotNo}
+                onChange={(value) => setField("auctionLotNo", value)}
+                maxLength={100}
+                error={fieldErrors.auctionLotNo}
+              />
+            )}
+            {isFC && (
+              <ComboboxCreate
+                id="customer"
+                label="Customer"
+                createLabel="customer"
+                value={state.customer}
+                onChange={(value) => setField("customer", value)}
+                search={searchCustomersAction}
+                onCreate={createCustomerAction}
+                onRename={(option, name) => renameCustomerAction(option.id, name)}
+                error={fieldErrors.customerId}
+              />
+            )}
+            {!isFC && (
+              <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                <YesNoToggle
+                  label="Partnership"
+                  value={state.hasPartnership}
+                  onChange={(value) =>
+                    setState((previous) => ({
+                      ...previous,
+                      hasPartnership: value,
+                      partnerName: value ? previous.partnerName : "",
+                    }))
+                  }
+                />
+                <TriStateToggle
+                  label="Bill Paid"
+                  value={state.auctionBillPaid}
+                  onChange={(value) => setField("auctionBillPaid", value)}
+                />
+              </div>
+            )}
+            {!isFC && state.hasPartnership && (
+              <TextField
+                id="partnerName"
+                label="Partner Name"
+                required
+                value={state.partnerName}
+                onChange={(value) => setField("partnerName", value)}
+                maxLength={200}
+                error={fieldErrors.partnerName}
+              />
+            )}
+            {isFC && (
+              <TriStateToggle
+                label="Bill Paid"
+                value={state.auctionBillPaid}
+                onChange={(value) => setField("auctionBillPaid", value)}
+              />
+            )}
           </SectionCard>
 
           {/* ── Transport & Logistics ──────────────────────────────── */}
@@ -1130,6 +1329,72 @@ export function VehicleForm({
             </SectionCard>
           )}
 
+          {/* ── Sold Details (FL only) ─────────────────────────────── */}
+          {!isFC && (
+            <SectionCard icon={Banknote} title="Sale Details">
+              <ComboboxCreate
+                id="customer"
+                label="Customer"
+                createLabel="customer"
+                value={state.customer}
+                onChange={(value) => setField("customer", value)}
+                search={searchCustomersAction}
+                onCreate={createCustomerAction}
+                onRename={(option, name) => renameCustomerAction(option.id, name)}
+                error={fieldErrors.customerId}
+              />
+              <DateField
+                id="deliveryDate"
+                label="Delivery Date"
+                value={state.deliveryDate}
+                onChange={(value) => setField("deliveryDate", value)}
+                error={fieldErrors.deliveryDate}
+              />
+              <div>
+                <Label htmlFor="sellingPrice" className="mb-1.5">
+                  Selling Price
+                </Label>
+                <InputGroup>
+                  <Select
+                    value={state.sellingPriceCurrency}
+                    onValueChange={(value) => setField("sellingPriceCurrency", value ?? "JPY")}
+                  >
+                    <SelectTrigger
+                      id="sellingPriceCurrency"
+                      className="w-auto shrink-0 rounded-none rounded-l-lg border-0 border-r border-input bg-transparent shadow-none focus-visible:ring-0"
+                    >
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOLD_CURRENCY_OPTIONS.map((currency) => (
+                        <SelectItem key={currency} value={currency} label={currency}>
+                          {currency}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InputGroupInput
+                    id="sellingPrice"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={state.sellingPriceText}
+                    onChange={(event) => setField("sellingPriceText", event.target.value)}
+                    aria-invalid={!!fieldErrors.sellingPrice}
+                  />
+                </InputGroup>
+                {fieldErrors.sellingPrice && (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.sellingPrice}</p>
+                )}
+              </div>
+              <YesNoToggle
+                label="Paid by Customer"
+                value={state.paidByCustomer}
+                onChange={(value) => setField("paidByCustomer", value)}
+              />
+            </SectionCard>
+          )}
+
           {/* ── Statuses & Flags ───────────────────────────────────── */}
           <SectionCard icon={ClipboardList} title="Statuses & Flags">
             <div>
@@ -1230,12 +1495,14 @@ export function VehicleForm({
                     : nextSerialPreview}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
-                {SHIPMENT_STATUS_META[shipmentStatus].label}
-              </Badge>
-            </div>
+            {isFC && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant={SHIPMENT_STATUS_META[shipmentStatus].badgeVariant}>
+                  {SHIPMENT_STATUS_META[shipmentStatus].label}
+                </Badge>
+              </div>
+            )}
           </SectionCard>
 
           {/* Operator's one editable field, outside the fieldset above so
@@ -1276,9 +1543,11 @@ export function VehicleForm({
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
                * shipments — same gating as the LC No field above. */}
-              {NAMED_DOCUMENT_TYPES.filter(
-                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
-              ).map((documentType) => (
+              {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
+                .filter(
+                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                )
+                .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="stage"
@@ -1304,9 +1573,11 @@ export function VehicleForm({
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
                * shipments — same gating as the LC No field above. */}
-              {NAMED_DOCUMENT_TYPES.filter(
-                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
-              ).map((documentType) => (
+              {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
+                .filter(
+                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                )
+                .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="persist"
