@@ -286,9 +286,7 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
                   onMouseLeave={transportHover.onLeave}
                   onClick={(_, i) => {
                     const entry = stats.transportByCompany[i];
-                    router.push(
-                      `/vehicles?transport=${entry.id}${stats.transportCompleteStatusId ? `&rowColour=${stats.transportCompleteStatusId}` : ""}`
-                    );
+                    router.push(`/vehicles?transport=${entry.id}`);
                   }}
                 />
                 <Bar
@@ -300,9 +298,7 @@ export function DashboardCharts({ stats }: DashboardChartsProps) {
                   onMouseLeave={transportHover.onLeave}
                   onClick={(_, i) => {
                     const entry = stats.transportByCompany[i];
-                    router.push(
-                      `/vehicles?transport=${entry.id}${stats.transportCompleteStatusId ? `&rowColourNot=${stats.transportCompleteStatusId}` : ""}`
-                    );
+                    router.push(`/vehicles?transport=${entry.id}`);
                   }}
                 />
               </BarChart>

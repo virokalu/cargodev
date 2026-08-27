@@ -39,6 +39,12 @@ export const env = {
   // not silently accept forged tokens.
   MOBILE_JWT_SECRET: requireEnv("MOBILE_JWT_SECRET"),
 
+  // CORS for the mobile Bearer-token API (/api/v1/*) — comma-separated
+  // origins allowed to call it from a browser context (Expo web, a
+  // WebView). Optional: falls back to common local dev origins (see
+  // proxy.ts) so mobile dev works without extra setup.
+  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS ?? "",
+
   // Phase 1 single org (safe fallback — matches prisma/seed.ts)
   ORG_ID: process.env.ORG_ID ?? "org_global_motors",
 

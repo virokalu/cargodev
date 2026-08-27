@@ -213,6 +213,12 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
             ecReceivedAt={ecReceivedAt}
             inspectionCompletedAt={inspectionCompletedAt}
           />
+          {canEditVehicle && (
+            <Link href={`/vehicles/${vehicle.serial}/edit`} className={cn(buttonVariants({ variant: "outline" }))}>
+              <Pencil className="mr-2 size-4" />
+              Edit
+            </Link>
+          )}
         </div>
       </div>
 
