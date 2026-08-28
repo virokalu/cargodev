@@ -55,6 +55,11 @@ export const env = {
   PUSHER_SECRET: process.env.PUSHER_SECRET ?? "",
   PUSHER_CLUSTER: process.env.PUSHER_CLUSTER ?? "ap1",
 
+  // Expo push notifications — optional. Push sending works without it (at
+  // Expo's default rate limits); setting it raises those limits and lets
+  // Expo's dashboard attribute sends to this project.
+  EXPO_ACCESS_TOKEN: process.env.EXPO_ACCESS_TOKEN ?? "",
+
   // Resend — optional until email notifications are wired up
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
 

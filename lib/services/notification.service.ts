@@ -11,6 +11,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { triggerUserEvent } from "@/lib/pusher-server";
+import { sendExpoPushNotifications } from "@/lib/expo-push";
+import { listDeviceTokensForUsers } from "@/lib/services/device-token.service";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -87,9 +89,11 @@ export async function emit(tx: TxClient, params: EmitParams): Promise<void> {
 
 /** Post-commit, best-effort real-time push — never awaited by callers, never
  * throws into the request path. The notification is already durably saved
- * by emit() regardless of whether this succeeds; a push failure (or Pusher
- * being unconfigured) just means the recipient sees it on next refresh
- * instead of live. */
+ * by emit() regardless of whether this succeeds; a delivery failure (or a
+ * channel being unconfigured) just means the recipient sees it on next
+ * refresh instead of live. Two channels today: Pusher (web app, in-app
+ * live update) and Expo (mobile app, OS-level push) — both fire from here,
+ * not from emit(), since neither belongs inside a DB transaction. */
 export function notifyRealtime(params: EmitParams): void {
   for (const userId of params.recipientUserIds) {
     triggerUserEvent(userId, "notification", {
@@ -99,6 +103,18 @@ export function notifyRealtime(params: EmitParams): void {
       vehicleId: params.vehicleId ?? null,
     }).catch((e) => console.error("Pusher trigger failed", e));
   }
+
+  sendMobilePush(params).catch((e) => console.error("Expo push failed", e));
+}
+
+async function sendMobilePush(params: EmitParams): Promise<void> {
+  const tokens = await listDeviceTokensForUsers(params.orgId, params.recipientUserIds);
+  if (tokens.length === 0) return;
+  await sendExpoPushNotifications(tokens, {
+    title: params.title,
+    body: params.body,
+    data: { event: params.event, vehicleId: params.vehicleId ?? null },
+  });
 }
 
 export interface NotificationListItem {
