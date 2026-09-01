@@ -39,12 +39,6 @@ export const env = {
   // not silently accept forged tokens.
   MOBILE_JWT_SECRET: requireEnv("MOBILE_JWT_SECRET"),
 
-  // CORS for the mobile Bearer-token API (/api/v1/*) — comma-separated
-  // origins allowed to call it from a browser context (Expo web, a
-  // WebView). Optional: falls back to common local dev origins (see
-  // proxy.ts) so mobile dev works without extra setup.
-  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS ?? "",
-
   // Phase 1 single org (safe fallback — matches prisma/seed.ts)
   ORG_ID: process.env.ORG_ID ?? "org_global_motors",
 
@@ -60,6 +54,11 @@ export const env = {
   PUSHER_KEY: process.env.PUSHER_KEY ?? "",
   PUSHER_SECRET: process.env.PUSHER_SECRET ?? "",
   PUSHER_CLUSTER: process.env.PUSHER_CLUSTER ?? "ap1",
+
+  // Expo push notifications — optional. Push sending works without it (at
+  // Expo's default rate limits); setting it raises those limits and lets
+  // Expo's dashboard attribute sends to this project.
+  EXPO_ACCESS_TOKEN: process.env.EXPO_ACCESS_TOKEN ?? "",
 
   // Resend — optional until email notifications are wired up
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",

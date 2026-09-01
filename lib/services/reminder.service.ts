@@ -26,6 +26,13 @@ const NOT_CANCELLED: Prisma.VehicleWhereInput = {
   NOT: { rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } } },
 };
 
+// Effective track (lib/vehicle-track.ts) — an FL vehicle converted to
+// export needs LC/ETD-approaching/missing-document reminders too, same as
+// any FC vehicle, from the moment it's converted.
+const TRACK_FC_OR_CONVERTED: Prisma.VehicleWhereInput = {
+  OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
+};
+
 const CRON_EVENTS: NotificationEvent[] = [
   "PAYMENT_REMINDER",
   "RIKSO_REMINDER",
@@ -149,7 +156,7 @@ async function runLcReminders(
     where: {
       org_id: orgId,
       deletedAt: null,
-      serialPrefix: "FC",
+      ...TRACK_FC_OR_CONVERTED,
       etd: { not: null },
       destination: { in: [...LC_OPEN_DESTINATIONS] },
       ...NOT_CANCELLED,
@@ -186,7 +193,7 @@ async function runEtdApproachingReminders(
     where: {
       org_id: orgId,
       deletedAt: null,
-      serialPrefix: "FC",
+      ...TRACK_FC_OR_CONVERTED,
       etd: { gte: target, lt: dayAfterTarget },
       ...NOT_CANCELLED,
     },
@@ -243,7 +250,7 @@ async function runMissingDocumentReminders(
     where: {
       org_id: orgId,
       deletedAt: null,
-      serialPrefix: "FC",
+      ...TRACK_FC_OR_CONVERTED,
       etd: { gte: target, lt: dayAfterTarget },
       ...NOT_CANCELLED,
     },

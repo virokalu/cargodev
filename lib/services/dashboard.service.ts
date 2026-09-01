@@ -2,13 +2,20 @@
 // query is org-scoped and excludes soft-deleted vehicles, same as the
 // vehicle list query layer (vehicle.service.ts).
 
-import type { ShipmentStatus, ShippingMethod } from "@prisma/client";
+import type { Prisma, ShipmentStatus, ShippingMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   computeEffectiveShipmentStatus,
   isCancelShipmentRowColour,
   CANCEL_SHIPMENT_ROW_COLOUR_NAMES,
 } from "@/lib/shipment-status";
+
+// Effective track (lib/vehicle-track.ts) — an FL vehicle converted to
+// export counts as FC in every FC-only KPI below, from the moment it's
+// converted, even though its serialPrefix never changes.
+const TRACK_FC_OR_CONVERTED: Prisma.VehicleWhereInput = {
+  OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
+};
 
 /** Every lookup-based distribution below carries an id alongside the display
  * name — the dashboard charts link each slice/bar straight to that exact
@@ -42,6 +49,7 @@ export interface DashboardStats {
   shipmentStatusDistribution: { status: ShipmentStatus; count: number }[];
   exportVolumeByDestination: { destination: string; count: number }[];
   transportByCompany: { id: string; company: string; complete: number; inProgress: number }[];
+  transportCompleteStatusId: string | null;
   vehicleLocationDistribution: IdNameCount[];
   transportByDistribution: IdNameCount[];
   freightAgentDistribution: IdNameCount[];
@@ -71,7 +79,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
 
   const [
     totalVehicles,
-    trackGroups,
+    fcCount,
     fcStatusRows,
     exportDestinationGroups,
     transportRows,
@@ -82,9 +90,12 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     unpaidBills,
   ] = await Promise.all([
     prisma.vehicle.count({ where: baseWhere }),
-    prisma.vehicle.groupBy({ by: ["serialPrefix"], where: baseWhere, _count: true }),
+    // Effective track (lib/vehicle-track.ts) — an FL vehicle converted to
+    // export counts as FC here too. flCount below is just totalVehicles
+    // minus this, so it stays correct without a second query.
+    prisma.vehicle.count({ where: { ...baseWhere, ...TRACK_FC_OR_CONVERTED } }),
     prisma.vehicle.findMany({
-      where: { ...baseWhere, serialPrefix: "FC" },
+      where: { ...baseWhere, ...TRACK_FC_OR_CONVERTED },
       select: {
         id: true,
         serial: true,
@@ -98,17 +109,14 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     }),
     prisma.vehicle.groupBy({
       by: ["destination"],
-      where: { ...baseWhere, serialPrefix: "FC", destination: { not: null } },
+      where: { ...baseWhere, ...TRACK_FC_OR_CONVERTED, destination: { not: null } },
       _count: true,
     }),
     prisma.vehicle.findMany({
       where: { ...baseWhere, transportById: { not: null } },
       select: {
-        serialPrefix: true,
-        shipmentStatus: true,
-        etd: true,
         transportBy: { select: { id: true, name: true } },
-        rowColourStatus: { select: { transportCellOnly: true } },
+        rowColourStatus: { select: { id: true, transportCellOnly: true } },
       },
     }),
     prisma.vehicle.findMany({
@@ -154,11 +162,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     }),
   ]);
 
-  const trackSplit = { fc: 0, fl: 0 };
-  for (const group of trackGroups) {
-    if (group.serialPrefix === "FC") trackSplit.fc = group._count;
-    else trackSplit.fl = group._count;
-  }
+  const trackSplit = { fc: fcCount, fl: totalVehicles - fcCount };
 
   // Shipment status is derived and has a known staleness window (the daily
   // cron hasn't flipped BOOKING_RECEIVED -> SHIPPED yet even though today is
@@ -201,24 +205,20 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     .map((group) => ({ destination: group.destination as string, count: group._count }))
     .sort((a, b) => b.count - a.count);
 
-  // Complete/In-Progress split by company. A vehicle counts as transported
-  // if EITHER signal says so: its FC shipment has actually shipped
-  // (computeEffectiveShipmentStatus, same read-time guard used for the
-  // Shipment Status pie above — cancelled is always false here since a
-  // cancelled deal was never "transported"), or it carries the
-  // manually-set Transport Complete row colour (the only signal FL
-  // vehicles have, since shipment status isn't tracked for FL). The bar
-  // segments link by company only (?transport=<id>) — not by row colour —
-  // so the drill-through always matches exactly what the bar counted.
+  // Complete/In-Progress split by company, plus the id of the org's
+  // Transport-Complete row colour status (captured off whichever row hits
+  // it first) — the dashboard's "Complete" bar segment links to
+  // ?transport=<id>&rowColour=<transportCompleteStatusId>, so both ids need
+  // to survive the tally, not just the display names.
   const transportTally = new Map<string, { id: string; company: string; complete: number; inProgress: number }>();
+  let transportCompleteStatusId: string | null = null;
   for (const row of transportRows) {
     const company = row.transportBy;
     if (!company) continue;
     const entry = transportTally.get(company.id) ?? { id: company.id, company: company.name, complete: 0, inProgress: 0 };
-    const shipped =
-      row.serialPrefix === "FC" && computeEffectiveShipmentStatus(row.shipmentStatus, row.etd, false) === "SHIPPED";
-    if (shipped || row.rowColourStatus?.transportCellOnly) {
+    if (row.rowColourStatus?.transportCellOnly) {
       entry.complete++;
+      transportCompleteStatusId ??= row.rowColourStatus.id;
     } else {
       entry.inProgress++;
     }
@@ -246,6 +246,7 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     shipmentStatusDistribution,
     exportVolumeByDestination,
     transportByCompany,
+    transportCompleteStatusId,
     vehicleLocationDistribution,
     transportByDistribution,
     freightAgentDistribution,
@@ -312,7 +313,7 @@ export async function getDashboardTrends(orgId: string): Promise<DashboardTrends
 
   const [fcDateRows, createdRows, docsRows] = await Promise.all([
     prisma.vehicle.findMany({
-      where: { ...baseWhere, serialPrefix: "FC" },
+      where: { ...baseWhere, ...TRACK_FC_OR_CONVERTED },
       select: { etd: true, eta: true },
     }),
     prisma.vehicle.findMany({ where: baseWhere, select: { createdAt: true } }),

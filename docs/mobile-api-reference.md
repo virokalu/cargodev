@@ -210,8 +210,39 @@ member's.
 
 - `GET /api/v1/notifications?limit=` — `limit` is 1–100, default 50.
 - `GET /api/v1/notifications/unread-count` — `{ count: number }`.
+- `POST /api/v1/notifications/:id/read` — marks one notification read. Idempotent — an already-read id, or one that doesn't belong to you, just no-ops (`{ read: true }` either way, never a 404 — same "don't leak what exists" reasoning as everywhere else).
+- `POST /api/v1/notifications/read-all` — marks every unread notification read for the calling user.
 
-Marking notifications read is a write — not part of this read-only API.
+Mirrors the web app's Notifications page exactly: list, unread count, mark
+one read, mark all read. The web page's real-time delivery (Pusher) and
+click-through-to-vehicle behavior are both client-side concerns — for
+mobile, real-time delivery is push notifications (device registration,
+tracked separately) rather than a live socket subscription, and
+click-through just means navigating to `GET /vehicles/:serial` using the
+notification's `vehicleSerial` field.
+
+## Push notifications (device tokens)
+
+Any authenticated staff role. Registers this device to receive OS-level
+push for the events listed above, delivered via Expo. `userId`/`orgId`
+always come from your access token — never send them in the body.
+
+- `POST /api/v1/device-tokens` — register or refresh this device's Expo
+  push token. Call it once after login, and again whenever the app starts
+  (Expo tokens can rotate). Body: `{ "expoPushToken": "ExponentPushToken[...]", "platform": "ios" | "android" }`.
+  Re-registering the same `expoPushToken` under a different signed-in user
+  (shared device, reinstalled app) reassigns it — the previous owner stops
+  getting push to that device. `400 VALIDATION` if the token isn't
+  recognized as a real Expo push token.
+- `DELETE /api/v1/device-tokens` — unregister a token, e.g. on sign-out so
+  a logged-out device stops receiving push. Body: `{ "expoPushToken": "..." }`.
+  Idempotent — an unknown or already-removed token still returns
+  `{ "unregistered": true }`.
+
+**Before wiring this up on the mobile side**: as of Expo SDK 53, remote
+push does not work inside Expo Go — you need a development build
+(`expo-dev-client`) to test it at all, on either platform. Push also isn't
+reliable in the iOS Simulator; test on a physical iPhone.
 
 ## Profile
 

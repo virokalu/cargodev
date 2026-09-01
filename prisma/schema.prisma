@@ -44,8 +44,12 @@ enum VehicleDocumentType {
   ED // Export Declaration
   BL // Bill of Lading (the scanned document — distinct from Vehicle.blNo, which is just the reference number)
   INSPECTION_REPORT
-  SHAKEN_SHO // Japanese vehicle inspection certificate (車検証)
+  SHAKEN_SHO // Japanese vehicle inspection certificate (車検証) — the vehicle's own
   FREIGHT_INVOICE
+  PURCHASE_INVOICE // FL only — invoice from whoever the vehicle was bought from. Accepts image or PDF (lib/validation/upload.schema.ts)
+  SALES_INVOICE // FL only — invoice issued when the vehicle is sold locally
+  CUSTOMER_SHAKEN_SHO // FL only — the customer's own shaken-sho, distinct from the vehicle's SHAKEN_SHO above
+  CASH_RECEIPT // FL only — accepts image or PDF, same as PURCHASE_INVOICE
   OTHER
 }
 
@@ -77,6 +81,7 @@ model Organization {
   vehicles         Vehicle[]
   brands           Brand[]
   auctionHalls     AuctionHall[]
+  suppliers        Supplier[]
   transportCos     TransportCompany[]
   vehicleLocations VehicleLocation[]
   freightAgents    FreightAgent[]
@@ -86,6 +91,7 @@ model Organization {
   notifications    Notification[]
   activityLogs     ActivityLog[]
   refreshTokens    RefreshToken[]
+  deviceTokens     DeviceToken[]
 }
 
 // ─────────────────────────────────────────────
@@ -124,6 +130,7 @@ model User {
   uploadedPhotos    VehiclePhoto[]
   uploadedDocuments VehicleDocument[]
   refreshTokens     RefreshToken[]
+  deviceTokens      DeviceToken[]
 
   @@unique([org_id, email])
   @@index([org_id, userType])
@@ -190,6 +197,20 @@ model Grade {
 }
 
 model AuctionHall {
+  id       String       @id @default(cuid())
+  org_id   String
+  name     String
+  org      Organization @relation(fields: [org_id], references: [id])
+  vehicles Vehicle[]
+
+  @@unique([org_id, name])
+}
+
+// FL only — an alternative source to Auction Hall for a locally-purchased
+// vehicle (Vehicle.auctionHallId and .supplierId are mutually exclusive,
+// enforced in vehicle.schema.ts). Same plain name-only lookup shape as
+// every other managed lookup in this file.
+model Supplier {
   id       String       @id @default(cuid())
   org_id   String
   name     String
@@ -277,6 +298,16 @@ model Vehicle {
   serialNumber Int
   serial       String // display string, e.g. "FC1024"
 
+  // FL vehicles that end up being exported instead of sold locally keep
+  // their FL-prefixed serial forever (re-numbering would erase real
+  // history and complicate the per-prefix counter) — this flag makes the
+  // vehicle *behave* as FC everywhere else instead. See
+  // lib/vehicle-track.ts's computeEffectiveTrack, the read-time
+  // counterpart to shipmentStatus's computeEffectiveShipmentStatus below.
+  // Always false for vehicles created as FC.
+  convertedToExport   Boolean   @default(false)
+  convertedToExportAt DateTime?
+
   // ── Core fields ────────────────────────────
   auctionItemNo String?
   chassisNo     String? // Unique per org (soft-warn on dup for legacy data — enforced in service)
@@ -289,7 +320,10 @@ model Vehicle {
   gradeId String?
 
   yom           Int? // Year of Manufacture
+  // FL only — mutually exclusive with supplierId below (enforced in
+  // vehicle.schema.ts), which source this vehicle was purchased through.
   auctionHallId String?
+  supplierId    String?
   purchaseDate  DateTime?
 
   // Shipment dates (FC vehicles only — FL vehicles hide these in the UI and service ignores them)
@@ -305,9 +339,19 @@ model Vehicle {
 
   blNo String? // Bill of Lading number
 
+  vesselName String? // FC only — applies to both RORO and Container shipments
+
+  // FL only — was this purchase made with a partner. Unlike the tri-state
+  // flags below, this is a plain Yes/No: whoever enters the vehicle always
+  // knows whether there was a partner, there's no realistic "not entered
+  // yet" state the way there is for e.g. auctionBillPaid on a
+  // freshly-created row. partnerName only means something when true.
+  hasPartnership Boolean @default(false)
+  partnerName    String?
+
   // Tri-state flags: null = not entered, true = Yes, false = No
   // NEVER default to false — null means "unknown", false means "No", these are different.
-  auctionBillPaid Boolean? // #15
+  auctionBillPaid Boolean? // #15 — labelled "Bill Paid" for FL, "Auction Bill Paid" for FC (vehicle-form.tsx); same column either way.
   logBook         Boolean? // #18
   extraKey        Boolean? // #19
 
@@ -342,6 +386,18 @@ model Vehicle {
   // (not the old append-only RemarkEntry thread). Same shape as docSentComment/jibaishake.
   vehicleRemark String?
 
+  // ── Sold Details (FL only) ─────────────────
+  // Populated once a local vehicle actually sells. deliveryDate/sellingPrice
+  // are plain optional fields like the rest of this model; paidByCustomer is
+  // nullable (not tri-state UI — see hasPartnership above for the same
+  // reasoning) so an untouched FL vehicle doesn't wrongly read as "not paid".
+  deliveryDate         DateTime?
+  paidByCustomer       Boolean?
+  sellingPrice         Decimal?  @db.Decimal(12, 2)
+  // Plain string, not an enum — a small UI-owned option list (JPY/LKR/USD),
+  // same convention as destination being free text rather than a DB enum.
+  sellingPriceCurrency String?
+
   rowColourStatusId String? // FK → RowColourStatus (nullable — no colour = no status set)
 
   // Soft delete — null = active. Every read path (table, edit, chassis-dup
@@ -357,6 +413,7 @@ model Vehicle {
   model           VehicleModelRef?  @relation(fields: [modelId], references: [id])
   grade           Grade?            @relation(fields: [gradeId], references: [id])
   auctionHall     AuctionHall?      @relation(fields: [auctionHallId], references: [id])
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
   customer        User?             @relation("CustomerVehicles", fields: [customerId], references: [id])
   transportBy     TransportCompany? @relation(fields: [transportById], references: [id])
   vehicleLocation VehicleLocation?  @relation(fields: [vehicleLocationId], references: [id])
@@ -377,6 +434,7 @@ model Vehicle {
   @@index([org_id, deletedAt])
   // Supports the vehicle list filter panel (each is a direct equality filter).
   @@index([org_id, auctionHallId])
+  @@index([org_id, supplierId])
   @@index([org_id, freightAgentId])
   @@index([org_id, packingAgentId])
   @@index([org_id, vehicleLocationId])
@@ -532,4 +590,42 @@ model RefreshToken {
 
   @@index([org_id, userId])
   @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────
+// PUSH NOTIFICATIONS — Expo device registration. One row per device (not
+// per user — a staff member can be logged into more than one phone/tablet,
+// and push has to reach all of them). notification.service.ts's
+// notifyRealtime() reads this table to fan out via expo-server-sdk
+// alongside its existing Pusher branch (lib/expo-push.ts).
+// ─────────────────────────────────────────────
+
+model DeviceToken {
+  id     String @id @default(cuid())
+  org_id String
+  userId String
+
+  // Expo's own push token format ("ExponentPushToken[...]"), validated at
+  // registration time with Expo.isExpoPushToken() (lib/services/device-
+  // token.service.ts) — not just a shape check, since a malformed token
+  // would silently fail every future send. Unique so re-registering the
+  // same physical device (token refresh, or a different staff member
+  // signing into a shared device) updates one row instead of accumulating
+  // duplicates that still point at whoever registered first.
+  expoPushToken String @unique
+
+  // "ios" | "android" — plain string, not an enum, same small-UI-owned-
+  // option-list convention as Vehicle.sellingPriceCurrency.
+  platform String
+
+  // Bumped on every re-registration (e.g. app foreground) — not currently
+  // used to expire anything, but gives a Settings-page "last seen" and a
+  // future cheap way to prune devices that stopped checking in.
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  org  Organization @relation(fields: [org_id], references: [id])
+  user User         @relation(fields: [userId], references: [id])
+
+  @@index([org_id, userId])
 }

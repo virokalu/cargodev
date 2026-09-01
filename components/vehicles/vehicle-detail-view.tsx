@@ -1,10 +1,12 @@
 // Vehicle detail page body (US-10). Server Component — everything here is
 // read-only display of server-fetched data; the only interactivity (photo
 // hero thumbnails, tabs) lives in small "use client" leaves
-// (vehicle-photo-hero.tsx, ui/tabs.tsx) that this composes. No Delete here —
-// that stays table-only; the Edit link, when `canEditVehicle` is true, is a
-// plain server-rendered <Link> to the edit page, same
-// Administrator/Manager/Operator whitelist as the table's Pencil icon.
+// (vehicle-photo-hero.tsx, ui/tabs.tsx) that this composes. No Delete here
+// by design — that lives on the table row only; this screen is look-only
+// except for the Edit button in the header, which just links to the edit
+// page (same role gate as the table's own Pencil icon) rather than being
+// an in-place editor itself.
+// The "Export PDF" button is also here, but it just triggers a server
 
 import Link from "next/link";
 import {
@@ -23,7 +25,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
@@ -34,7 +36,11 @@ import { ExportVehiclePdfButton } from "@/components/vehicles/export-vehicle-pdf
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
-import { DOCUMENT_TYPE_META, NAMED_DOCUMENT_TYPES } from "@/lib/constants/document-type";
+import {
+  DOCUMENT_TYPE_META,
+  NAMED_DOCUMENT_TYPES,
+  FL_NAMED_DOCUMENT_TYPES,
+} from "@/lib/constants/document-type";
 import { isCancelShipmentRowColour } from "@/lib/shipment-status";
 import {
   buildShipmentMilestones,
@@ -187,22 +193,27 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {vehicle.convertedToExport && (
+            <Badge variant="outline" className="text-sm">
+              Converted from FL
+            </Badge>
+          )}
           {isFC && (
             <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
             </Badge>
+          )}
+          {canEditVehicle && (
+            <Button variant="outline" nativeButton={false} render={<Link href={`/vehicles/${vehicle.serial}/edit`} />}>
+              <Pencil className="size-4" />
+              Edit
+            </Button>
           )}
           <ExportVehiclePdfButton
             vehicle={vehicle}
             ecReceivedAt={ecReceivedAt}
             inspectionCompletedAt={inspectionCompletedAt}
           />
-          {canEditVehicle && (
-            <Link href={`/vehicles/${vehicle.serial}/edit`} className={cn(buttonVariants({ variant: "outline" }))}>
-              <Pencil className="mr-2 size-4" />
-              Edit
-            </Link>
-          )}
         </div>
       </div>
 
@@ -257,10 +268,17 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                 <Field label="Grade" value={vehicle.grade?.name} />
                 <Field label="Year of Manufacture" value={vehicle.yom} />
                 <Field label="Auction Hall" value={vehicle.auctionHall?.name} />
+                {!isFC && <Field label="Supplier" value={vehicle.supplier?.name} />}
                 <Field label="Purchase Date" value={formatDate(vehicle.purchaseDate)} />
                 <Field label="Auction Lot No" value={vehicle.auctionLotNo} />
                 <Field label="Customer" value={vehicle.customer?.name} />
                 <Field label="Destination" value={vehicle.destination} />
+                {!isFC && (
+                  <Field
+                    label="Partnership"
+                    value={vehicle.hasPartnership ? vehicle.partnerName : "No"}
+                  />
+                )}
                 <Field label="Auction Bill Paid" value={<TriStateCell value={vehicle.auctionBillPaid} />} />
               </FieldGroup>
 
@@ -282,6 +300,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                   <Field label="ETD" value={formatDate(vehicle.etd)} />
                   <Field label="ETA" value={formatDate(vehicle.eta)} />
                   <Field label="BL No" value={vehicle.blNo} />
+                  <Field label="Vessel Name" value={vehicle.vesselName} />
                   <Field label="Forwarding Agent" value={vehicle.freightAgent?.name} />
                   <Field
                     label="RORO / Container"
@@ -308,6 +327,21 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                 </FieldGroup>
               )}
 
+              {!isFC && (
+                <FieldGroup title="Sale Details">
+                  <Field label="Delivery Date" value={formatDate(vehicle.deliveryDate)} />
+                  <Field label="Paid by Customer" value={vehicle.paidByCustomer === null ? null : vehicle.paidByCustomer ? "Yes" : "No"} />
+                  <Field
+                    label="Selling Price"
+                    value={
+                      vehicle.sellingPrice === null
+                        ? null
+                        : `${vehicle.sellingPrice.toLocaleString()} ${vehicle.sellingPriceCurrency ?? ""}`.trim()
+                    }
+                  />
+                </FieldGroup>
+              )}
+
               <FieldGroup title="Statuses & Flags">
                 <Field label="Row Colour Status" value={<RowColourCell status={vehicle.rowColourStatus} />} />
                 <Field label="Recycle Date" value={formatDate(vehicle.recycleDate)} />
@@ -318,9 +352,11 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
             <TabsContent value="documents" className="space-y-4 rounded-lg border p-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
                * shipments — same gating as the LC No field. */}
-              {NAMED_DOCUMENT_TYPES.filter(
-                (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
-              ).map((documentType) => (
+              {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
+                .filter(
+                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
+                )
+                .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
                   <VehicleDocumentList
                     mode="persist"
