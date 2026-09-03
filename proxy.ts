@@ -5,6 +5,11 @@
 // instead of importing lib/env.ts (which validates node-only secrets at
 // import time).
 //
+// Named `proxy.ts` (not `middleware.ts`) — Next.js 16 renamed Middleware to
+// Proxy. The old filename isn't just ignored on this version, it corrupts
+// the dev route table: every route under app/api/*, including ones outside
+// this file's own matcher, started 404ing until it was renamed.
+//
 // Read CORS_ALLOWED_ORIGINS from .env — comma-separated list of allowed
 // origins, e.g. http://localhost:19006,http://localhost:8081
 
@@ -32,7 +37,7 @@ function buildCorsHeaders(origin: string | null): Headers {
   return headers;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const corsHeaders = buildCorsHeaders(request.headers.get("origin"));
 
   // The browser's preflight check — Next.js has no default OPTIONS handler,

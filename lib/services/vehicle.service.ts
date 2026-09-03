@@ -17,7 +17,7 @@ import {
   vehicleUpdateSchema,
   flattenFieldErrors,
 } from "@/lib/validation/vehicle.schema";
-import { assignNextSerial, assignLegacySerial } from "@/lib/services/serial.service";
+import { assignNextSerial, assignLegacySerial, correctSerialNumber } from "@/lib/services/serial.service";
 import { computeEffectiveTrack } from "@/lib/vehicle-track";
 import * as activityLog from "@/lib/services/activity-log.service";
 import * as notificationService from "@/lib/services/notification.service";
@@ -1072,10 +1072,11 @@ export async function updateVehicleAuctionBillPaid(
   if (notification) notificationService.notifyRealtime(notification);
 }
 
-/** One-way — an FL vehicle that ends up being exported instead of sold
- * locally keeps its FL-prefixed serial forever (see lib/vehicle-track.ts's
+/** An FL vehicle that ends up being exported instead of sold locally keeps
+ * its FL-prefixed serial forever (see lib/vehicle-track.ts's
  * computeEffectiveTrack for why), but needs to behave as a full export
- * vehicle from this point on. Destination is collected here (rather than
+ * vehicle from this point on. Reversible via revertVehicleToLocal below,
+ * for an accidental conversion. Destination is collected here (rather than
  * left for staff to fill in later via the now-unlocked FC form) since it
  * only becomes meaningful the moment the vehicle stops being sold locally.
  * The StatusHistory row (fromStatus null, same as a fresh vehicle's very
@@ -1122,6 +1123,93 @@ export async function convertVehicleToExport(
       before: { convertedToExport: false, destination: existing.destination },
       after: { convertedToExport: true, destination },
     });
+  });
+}
+
+/** Reverses convertVehicleToExport, by request — despite that function's own
+ * "one-way" docs, staff need to undo an accidental conversion. Deliberately
+ * only flips convertedToExport back to false: every FC-only field this
+ * vehicle picked up while converted (ETD/ETA/BL, shipment status,
+ * StatusHistory rows) is left exactly as-is in the DB. Nothing needs
+ * clearing because every FC/FL check in this file (and the form/detail
+ * view) reads computeEffectiveTrack(), which goes back to reading "FL" the
+ * instant this flag flips — so those fields simply stop being shown or
+ * tracked. Re-running convertVehicleToExport later picks up cleanly since
+ * nothing here was cleared, and the old StatusHistory rows stay as an
+ * audit trail of when it was previously tracked. */
+export async function revertVehicleToLocal(orgId: string, actorId: string, id: string): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (existing.serialPrefix !== "FL") {
+    throw new ServiceError("VALIDATION", "Only local (FL) vehicles can be reverted to local.");
+  }
+  if (!existing.convertedToExport) {
+    throw new ServiceError("VALIDATION", "This vehicle hasn't been converted to export.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: { convertedToExport: false },
+    });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "REVERT_VEHICLE_TO_LOCAL",
+      entity: "Vehicle",
+      entityId: id,
+      before: { convertedToExport: true },
+      after: { convertedToExport: false },
+    });
+  });
+}
+
+/**
+ * Corrects a typo in the numeric part of a serial shortly after creation —
+ * the one documented exception to "serial is read-only after creation"
+ * (Tech Doc §3). Restricted to Administrator (see actions.ts): unlike a
+ * normal field edit, this rewrites SerialCounter state and the unique
+ * org+serial key other tables may already reference by value (ActivityLog
+ * snapshots, generated PDFs) keep showing the old serial, which is
+ * correct for those as a historical record. The prefix/track never
+ * changes, only serialNumber and the derived serial string.
+ */
+export async function correctVehicleSerialNumber(
+  orgId: string,
+  actorId: string,
+  id: string,
+  newNumber: number
+): Promise<{ serial: string }> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (!Number.isInteger(newNumber) || newNumber <= 0) {
+    throw new ServiceError("VALIDATION", "Serial number must be a positive whole number.");
+  }
+
+  const newSerial = `${existing.serialPrefix}${newNumber}`;
+  if (newSerial === existing.serial) {
+    throw new ServiceError("VALIDATION", "That's already this vehicle's serial number.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const { serial } = await correctSerialNumber(tx, orgId, existing.serialPrefix, newNumber, id);
+
+    await tx.vehicle.update({
+      where: { id },
+      data: { serialNumber: newNumber, serial },
+    });
+
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "CORRECT_VEHICLE_SERIAL",
+      entity: "Vehicle",
+      entityId: id,
+      before: { serial: existing.serial },
+      after: { serial },
+    });
+
+    return { serial };
   });
 }
 

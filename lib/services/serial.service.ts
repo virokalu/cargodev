@@ -79,6 +79,52 @@ export async function assignLegacySerial(
   return { serialNumber: manualNumber, serial };
 }
 
+/**
+ * Corrects a typo in a vehicle's already-assigned number — the one
+ * documented exception to "serial is read-only after creation" (see
+ * vehicle.service.ts's correctVehicleSerialNumber, which calls this from
+ * inside its own $transaction so the uniqueness check and counter bump
+ * never race another save). The prefix/track never changes, only the
+ * number. Same "bump the counter up, never down" rule as legacy entry:
+ * correcting to a lower number just back-fills without affecting the next
+ * auto-assigned serial. `excludeVehicleId` keeps this vehicle's own
+ * current row from tripping the uniqueness check against itself.
+ */
+export async function correctSerialNumber(
+  tx: TxClient,
+  orgId: string,
+  prefix: SerialPrefix,
+  newNumber: number,
+  excludeVehicleId: string
+): Promise<AssignedSerial> {
+  const serial = `${prefix}${newNumber}`;
+
+  const existing = await tx.vehicle.findUnique({
+    where: { org_id_serial: { org_id: orgId, serial } },
+    select: { id: true },
+  });
+  if (existing && existing.id !== excludeVehicleId) {
+    throw new ServiceError(
+      "CONFLICT",
+      `Serial ${serial} already exists.`,
+      { serialNumber: `Serial ${serial} already exists.` }
+    );
+  }
+
+  const counter = await tx.serialCounter.findUniqueOrThrow({
+    where: { org_id_prefix: { org_id: orgId, prefix } },
+  });
+
+  if (newNumber > counter.lastNumber) {
+    await tx.serialCounter.update({
+      where: { org_id_prefix: { org_id: orgId, prefix } },
+      data: { lastNumber: newNumber },
+    });
+  }
+
+  return { serialNumber: newNumber, serial };
+}
+
 /** Read-only preview of the next auto-assigned serial — no increment. Used by
  * the Add Vehicle form to show "Next serial: FC1024" as staff pick a track.
  * Staleness is acceptable: the real assignment at save time is still

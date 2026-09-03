@@ -5,7 +5,7 @@
 // .ts deleteVehicle): the row disappears from every list immediately, but
 // nothing is actually destroyed at the database level.
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { deleteVehicleAction } from "@/app/(dashboard)/vehicles/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 interface DeleteVehicleDialogProps {
   vehicleId: string;
@@ -31,6 +32,12 @@ export function DeleteVehicleDialog({ vehicleId, serial }: DeleteVehicleDialogPr
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Enter-to-confirm (triggerOnEnter below) fires whenever focus isn't on a
+  // button, so an accidental Enter right after opening would otherwise
+  // delete the vehicle before the user reads the dialog. Defaulting focus
+  // to Cancel makes that first Enter safe — Delete only fires once the user
+  // has deliberately moved focus onto it.
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   function handleDelete() {
     setError(null);
@@ -59,7 +66,10 @@ export function DeleteVehicleDialog({ vehicleId, serial }: DeleteVehicleDialogPr
       >
         <Trash2 className="size-4" />
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        initialFocus={cancelRef}
+        onKeyDown={(event) => { if (!isPending) triggerOnEnter(event, handleDelete); }}
+      >
         <DialogHeader>
           <DialogTitle>Delete {serial}?</DialogTitle>
           <DialogDescription>
@@ -69,7 +79,9 @@ export function DeleteVehicleDialog({ vehicleId, serial }: DeleteVehicleDialogPr
         </DialogHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" disabled={isPending} />}>Cancel</DialogClose>
+          <DialogClose render={<Button ref={cancelRef} variant="outline" disabled={isPending} />}>
+            Cancel
+          </DialogClose>
           <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
             {isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
             Delete
