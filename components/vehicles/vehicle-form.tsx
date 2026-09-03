@@ -56,7 +56,7 @@ import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-g
 import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
 import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { useBackToVehicles } from "@/components/vehicles/use-back-to-vehicles";
-import { cn } from "@/lib/utils";
+import { cn, triggerOnEnter } from "@/lib/utils";
 import { LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
@@ -721,7 +721,18 @@ export function VehicleForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      onKeyDown={(event) => {
+        // Enter submits from any plain text/number/date input on the page
+        // (see lib/utils.ts's triggerOnEnter for why this isn't a real
+        // <form> — this page has many Popover/Select/Combobox trigger
+        // buttons that would default to type="submit" inside one).
+        if (canEditFields && !submitting && !etaError) {
+          triggerOnEnter(event, handleSubmit, { requireInput: true });
+        }
+      }}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {mode === "edit" && <BackToVehiclesButton />}

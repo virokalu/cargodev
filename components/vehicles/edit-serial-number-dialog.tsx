@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { correctVehicleSerialNumberAction } from "@/app/(dashboard)/vehicles/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 interface EditSerialNumberDialogProps {
   vehicleId: string;
@@ -81,7 +82,11 @@ export function EditSerialNumberDialog({ vehicleId, serial }: EditSerialNumberDi
       <DialogTrigger render={<Button variant="ghost" size="icon" aria-label="Edit serial number" />}>
         <Pencil className="size-3.5" />
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onKeyDown={(event) => {
+          if (!isPending && numberInput.trim()) triggerOnEnter(event, handleSave, { requireInput: true });
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Correct Serial Number</DialogTitle>
           <DialogDescription>Are you sure you want to change {serial}&apos;s number?</DialogDescription>

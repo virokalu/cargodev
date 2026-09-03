@@ -24,6 +24,7 @@ import {
 import { CountrySelect } from "@/components/shared/country-select";
 import type { CountryOption } from "@/lib/constants/countries";
 import { convertVehicleToExportAction } from "@/app/(dashboard)/vehicles/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 interface ConvertToExportDialogProps {
   vehicleId: string;
@@ -63,7 +64,11 @@ export function ConvertToExportDialog({ vehicleId, serial, countries }: ConvertT
         <ArrowRightLeft className="size-4" />
         Convert to Export
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onKeyDown={(event) => {
+          if (!isPending && destination.trim()) triggerOnEnter(event, handleConvert);
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Convert {serial} to Export?</DialogTitle>
           <DialogDescription>Are you sure you want to convert {serial} to Export?</DialogDescription>

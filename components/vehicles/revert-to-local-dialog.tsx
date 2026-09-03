@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { revertVehicleToLocalAction } from "@/app/(dashboard)/vehicles/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 interface RevertToLocalDialogProps {
   vehicleId: string;
@@ -53,7 +54,7 @@ export function RevertToLocalDialog({ vehicleId, serial }: RevertToLocalDialogPr
         <ArrowLeftRight className="size-4" />
         Revert to Local
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent onKeyDown={(event) => { if (!isPending) triggerOnEnter(event, handleRevert); }}>
         <DialogHeader>
           <DialogTitle>Revert {serial} to Local?</DialogTitle>
           <DialogDescription>Are you sure you want to revert {serial} to Local?</DialogDescription>
