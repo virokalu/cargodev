@@ -26,7 +26,12 @@ import { cn } from "@/lib/utils";
 // string (not built from a shared constant) — Tailwind only picks up
 // arbitrary-value classes it can find as literal text — and both panes must
 // use the exact same value so their scrollTop values map 1:1 without scaling.
-export const PANE_SCROLL_CLASS = "max-h-[65vh] overflow-y-auto";
+// overscroll-y-none kills the native "rubber-band" bounce/stretch at the top
+// and bottom of each pane's scrollport (and stops an exhausted scroll from
+// chaining up to the outer page) — without it, scrolling past either edge
+// visibly overshoots and springs back, which reads as the table not staying
+// put.
+export const PANE_SCROLL_CLASS = "max-h-[65vh] overflow-y-auto overscroll-y-none";
 
 type Pane = "identity" | "detail";
 
@@ -34,6 +39,7 @@ interface VerticalScrollSync {
   identityRef: React.RefObject<HTMLDivElement | null>;
   detailRef: React.RefObject<HTMLDivElement | null>;
   isSyncingRef: React.RefObject<boolean>;
+  scrollTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>;
 }
 
 const VerticalScrollSyncContext = createContext<VerticalScrollSync | null>(null);
@@ -42,9 +48,10 @@ export function VerticalScrollSyncProvider({ children }: { children: React.React
   const identityRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const isSyncingRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
-    <VerticalScrollSyncContext.Provider value={{ identityRef, detailRef, isSyncingRef }}>
+    <VerticalScrollSyncContext.Provider value={{ identityRef, detailRef, isSyncingRef, scrollTimeoutRef }}>
       {children}
     </VerticalScrollSyncContext.Provider>
   );
@@ -56,12 +63,26 @@ export function VerticalScrollSyncProvider({ children }: { children: React.React
 export function useVerticalScrollSync(pane: Pane) {
   const ctx = useContext(VerticalScrollSyncContext);
   if (!ctx) throw new Error("useVerticalScrollSync must be used within VerticalScrollSyncProvider");
-  const { identityRef, detailRef, isSyncingRef } = ctx;
+  const { identityRef, detailRef, isSyncingRef, scrollTimeoutRef } = ctx;
   const ownRef = pane === "identity" ? identityRef : detailRef;
   const otherRef = pane === "identity" ? detailRef : identityRef;
 
   const onScroll = useCallback<React.UIEventHandler<HTMLDivElement>>(
     (event) => {
+      // Marks both panes as "actively scrolling" for the duration of this
+      // gesture (plain classList, not React state — scroll fires far too
+      // often to re-render on) so app/globals.css can suppress row hover.
+      // Without this, rows sliding vertically under a stationary cursor
+      // each fire a real mouseenter/mouseleave as they pass underneath,
+      // producing a visible highlight "wave" animating down the table.
+      identityRef.current?.classList.add("table-is-scrolling");
+      detailRef.current?.classList.add("table-is-scrolling");
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        identityRef.current?.classList.remove("table-is-scrolling");
+        detailRef.current?.classList.remove("table-is-scrolling");
+      }, 150);
+
       if (isSyncingRef.current) return;
       const other = otherRef.current;
       if (!other) return;
