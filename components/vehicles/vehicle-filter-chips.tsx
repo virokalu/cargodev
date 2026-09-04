@@ -7,7 +7,11 @@
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
-import type { TriStateFilterValue, VehicleListParams } from "@/lib/services/vehicle.service";
+import type {
+  TriStateFilterValue,
+  TwoStateFilterValue,
+  VehicleListParams,
+} from "@/lib/services/vehicle.service";
 import type { VehicleFilterSelections } from "@/components/vehicles/vehicle-filters-panel";
 
 interface VehicleFilterChipsProps {
@@ -22,6 +26,12 @@ const TRI_STATE_LABELS: Record<TriStateFilterValue, string> = {
   BLANK: "Not entered",
 };
 
+const TWO_STATE_LABELS: Record<TwoStateFilterValue, string> = {
+  ALL: "All",
+  YES: "Yes",
+  NO: "No",
+};
+
 export function VehicleFilterChips({ params, selected }: VehicleFilterChipsProps) {
   const router = useRouter();
 
@@ -31,6 +41,7 @@ export function VehicleFilterChips({ params, selected }: VehicleFilterChipsProps
   if (selected.model) chips.push({ key: "model", label: `Model: ${selected.model.name}`, clear: { modelId: "ALL", gradeId: "ALL" } });
   if (selected.grade) chips.push({ key: "grade", label: `Grade: ${selected.grade.name}`, clear: { gradeId: "ALL" } });
   if (selected.auctionHall) chips.push({ key: "hall", label: `Auction Hall: ${selected.auctionHall.name}`, clear: { auctionHallId: "ALL" } });
+  if (selected.supplier) chips.push({ key: "supplier", label: `Supplier: ${selected.supplier.name}`, clear: { supplierId: "ALL" } });
   if (selected.freightAgent) chips.push({ key: "agent", label: `Freight Agent: ${selected.freightAgent.name}`, clear: { freightAgentId: "ALL" } });
   if (selected.vehicleLocation) chips.push({ key: "location", label: `Vehicle Location: ${selected.vehicleLocation.name}`, clear: { vehicleLocationId: "ALL" } });
   if (selected.transportCompany) chips.push({ key: "transport", label: `Transport Company: ${selected.transportCompany.name}`, clear: { transportById: "ALL" } });
@@ -56,6 +67,34 @@ export function VehicleFilterChips({ params, selected }: VehicleFilterChipsProps
       key: "extraKey",
       label: `Extra Key: ${TRI_STATE_LABELS[params.extraKey]}`,
       clear: { extraKey: "ALL" },
+    });
+  }
+  if (params.hasPartnership !== "ALL") {
+    chips.push({
+      key: "partnership",
+      label: `Partnership: ${TWO_STATE_LABELS[params.hasPartnership]}`,
+      clear: { hasPartnership: "ALL" },
+    });
+  }
+  if (params.paidByCustomer !== "ALL") {
+    chips.push({
+      key: "paidByCustomer",
+      label: `Paid by Customer: ${TRI_STATE_LABELS[params.paidByCustomer]}`,
+      clear: { paidByCustomer: "ALL" },
+    });
+  }
+  if (params.sellingPriceCurrency !== "ALL") {
+    chips.push({
+      key: "currency",
+      label: `Sold Currency: ${params.sellingPriceCurrency}`,
+      clear: { sellingPriceCurrency: "ALL" },
+    });
+  }
+  if (params.convertedToExport !== "ALL") {
+    chips.push({
+      key: "converted",
+      label: `Converted from Local: ${TWO_STATE_LABELS[params.convertedToExport]}`,
+      clear: { convertedToExport: "ALL" },
     });
   }
 

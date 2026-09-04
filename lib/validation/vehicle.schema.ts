@@ -17,8 +17,18 @@ import type { ShipmentStatus } from "@/lib/constants/shipment-status";
 // Type-only imports — erased at compile time, so this doesn't create a real
 // runtime circular dependency even though vehicle.service.ts also imports
 // from this file (for vehicleCreateSchema/vehicleUpdateSchema).
-import type { VehicleListSortKey, TriStateFilterValue } from "@/lib/services/vehicle.service";
-import { SORT_KEYS, SHIPMENT_STATUSES, SHIPPING_METHODS, TRI_STATE_VALUES } from "@/lib/vehicle-list-url";
+import type {
+  VehicleListSortKey,
+  TriStateFilterValue,
+  TwoStateFilterValue,
+} from "@/lib/services/vehicle.service";
+import {
+  SORT_KEYS,
+  SHIPMENT_STATUSES,
+  SHIPPING_METHODS,
+  TRI_STATE_VALUES,
+  TWO_STATE_VALUES,
+} from "@/lib/vehicle-list-url";
 
 export { flattenFieldErrors };
 
@@ -292,6 +302,10 @@ const triStateOrAllEnum = z.enum(["ALL", ...TRI_STATE_VALUES] as [
   TriStateFilterValue,
   ...TriStateFilterValue[],
 ]);
+const twoStateOrAllEnum = z.enum(["ALL", ...TWO_STATE_VALUES] as [
+  TwoStateFilterValue,
+  ...TwoStateFilterValue[],
+]);
 
 export const vehicleListQuerySchema = z
   .object({
@@ -308,6 +322,7 @@ export const vehicleListQuerySchema = z
     model: idOrAll,
     grade: idOrAll,
     hall: idOrAll,
+    supplier: idOrAll,
     agent: idOrAll,
     packingAgent: idOrAll,
     location: idOrAll,
@@ -316,6 +331,10 @@ export const vehicleListQuerySchema = z
     billPaid: triStateOrAllEnum.default("ALL"),
     logBook: triStateOrAllEnum.default("ALL"),
     extraKey: triStateOrAllEnum.default("ALL"),
+    partnership: twoStateOrAllEnum.default("ALL"),
+    paidByCustomer: triStateOrAllEnum.default("ALL"),
+    currency: idOrAll,
+    converted: twoStateOrAllEnum.default("ALL"),
     sort: sortKeyEnum.default("serial"),
     dir: z.enum(["asc", "desc"]).default("desc"),
   })
@@ -333,6 +352,7 @@ export const vehicleListQuerySchema = z
     modelId: v.model,
     gradeId: v.grade,
     auctionHallId: v.hall,
+    supplierId: v.supplier,
     freightAgentId: v.agent,
     packingAgentId: v.packingAgent,
     vehicleLocationId: v.location,
@@ -341,6 +361,10 @@ export const vehicleListQuerySchema = z
     auctionBillPaid: v.billPaid,
     logBook: v.logBook,
     extraKey: v.extraKey,
+    hasPartnership: v.partnership,
+    paidByCustomer: v.paidByCustomer,
+    sellingPriceCurrency: v.currency,
+    convertedToExport: v.converted,
     sortBy: v.sort,
     sortDir: v.dir,
   }));

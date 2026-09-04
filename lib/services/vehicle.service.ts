@@ -1391,6 +1391,8 @@ export interface VehicleListParams {
   modelId: string | "ALL";
   gradeId: string | "ALL";
   auctionHallId: string | "ALL";
+  /** FL only — alternative to auctionHallId, mutually exclusive in the data. */
+  supplierId: string | "ALL";
   freightAgentId: string | "ALL";
   packingAgentId: string | "ALL";
   vehicleLocationId: string | "ALL";
@@ -1399,6 +1401,16 @@ export interface VehicleListParams {
   auctionBillPaid: TriStateFilterValue;
   logBook: TriStateFilterValue;
   extraKey: TriStateFilterValue;
+  /** FL only. */
+  hasPartnership: TwoStateFilterValue;
+  /** FL only — genuinely nullable in the DB (null until Sold Details is
+   * filled in), unlike hasPartnership above. */
+  paidByCustomer: TriStateFilterValue;
+  /** FL only. */
+  sellingPriceCurrency: string | "ALL";
+  /** FC only — separates native FC vehicles from ones that started as FL
+   * and got converted (lib/vehicle-track.ts). */
+  convertedToExport: TwoStateFilterValue;
   sortBy: VehicleListSortKey;
   sortDir: "asc" | "desc";
 }
@@ -1468,7 +1480,7 @@ export interface VehicleListResult {
  * pulled out once rather than copy-pasted three times. */
 function applyTriStateFilter(
   where: Prisma.VehicleWhereInput,
-  field: "auctionBillPaid" | "logBook" | "extraKey",
+  field: "auctionBillPaid" | "logBook" | "extraKey" | "paidByCustomer",
   value: TriStateFilterValue
 ): void {
   if (value === "YES") where[field] = true;
@@ -1513,6 +1525,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.modelId !== "ALL") where.modelId = params.modelId;
   if (params.gradeId !== "ALL") where.gradeId = params.gradeId;
   if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
+  if (params.supplierId !== "ALL") where.supplierId = params.supplierId;
   if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
   if (params.packingAgentId !== "ALL") where.packingAgentId = params.packingAgentId;
   if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
@@ -1521,13 +1534,18 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   applyTriStateFilter(where, "auctionBillPaid", params.auctionBillPaid);
   applyTriStateFilter(where, "logBook", params.logBook);
   applyTriStateFilter(where, "extraKey", params.extraKey);
+  if (params.hasPartnership !== "ALL") where.hasPartnership = params.hasPartnership === "YES";
+  applyTriStateFilter(where, "paidByCustomer", params.paidByCustomer);
+  if (params.sellingPriceCurrency !== "ALL") where.sellingPriceCurrency = params.sellingPriceCurrency;
+  if (params.convertedToExport !== "ALL") where.convertedToExport = params.convertedToExport === "YES";
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
-  // brand/model/grade, and customer name — everything else is a dedicated
-  // per-column filter, not free text. Customer also has its own dedicated
-  // filter dropdown (params.customerId above, search-as-you-type since the
-  // list can get large) — kept in search too so typing a customer's name
-  // works without opening that dropdown first.
+  // brand/model/grade, supplier, partner name, vessel name, and customer
+  // name — everything else is a dedicated per-column filter, not free text.
+  // Customer also has its own dedicated filter dropdown (params.customerId
+  // above, search-as-you-type since the list can get large) — kept in
+  // search too so typing a customer's name works without opening that
+  // dropdown first.
   const search = params.search.trim();
   if (search) {
     where.OR = [
@@ -1539,6 +1557,9 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
       { model: { brand: { name: { contains: search, mode: "insensitive" } } } },
       { grade: { name: { contains: search, mode: "insensitive" } } },
       { customer: { name: { contains: search, mode: "insensitive" } } },
+      { supplier: { name: { contains: search, mode: "insensitive" } } },
+      { partnerName: { contains: search, mode: "insensitive" } },
+      { vesselName: { contains: search, mode: "insensitive" } },
     ];
   }
 
@@ -1586,6 +1607,12 @@ function buildVehicleListOrderBy(
       return [{ docSentDate: sortDir }];
     case "recycleDate":
       return [{ recycleDate: sortDir }];
+    case "vesselName":
+      return [{ vesselName: sortDir }];
+    case "deliveryDate":
+      return [{ deliveryDate: sortDir }];
+    case "sellingPrice":
+      return [{ sellingPrice: sortDir }];
   }
 }
 
