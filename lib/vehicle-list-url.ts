@@ -6,6 +6,7 @@
 
 import type {
   TriStateFilterValue,
+  TwoStateFilterValue,
   VehicleListParams,
   VehicleListSortKey,
 } from "@/lib/services/vehicle.service";
@@ -28,6 +29,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   modelId: "ALL",
   gradeId: "ALL",
   auctionHallId: "ALL",
+  supplierId: "ALL",
   freightAgentId: "ALL",
   packingAgentId: "ALL",
   vehicleLocationId: "ALL",
@@ -36,6 +38,10 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   auctionBillPaid: "ALL",
   logBook: "ALL",
   extraKey: "ALL",
+  hasPartnership: "ALL",
+  paidByCustomer: "ALL",
+  sellingPriceCurrency: "ALL",
+  convertedToExport: "ALL",
   sortBy: "serial",
   sortDir: "desc",
 };
@@ -58,15 +64,26 @@ export const SORT_KEYS: VehicleListSortKey[] = [
   "massoDate",
   "docSentDate",
   "recycleDate",
+  "vesselName",
+  "deliveryDate",
+  "sellingPrice",
 ];
 
 export const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "BOOKING_RECEIVED", "SHIPPED", "CANCELLED"];
 export const SHIPPING_METHODS: ShippingMethod[] = ["RORO", "CONTAINER"];
 export const TRI_STATE_VALUES: TriStateFilterValue[] = ["YES", "NO", "BLANK"];
+export const TWO_STATE_VALUES: TwoStateFilterValue[] = ["YES", "NO"];
+export const SOLD_CURRENCIES = ["JPY", "LKR", "USD"];
 
 function parseTriState(value: string | undefined): TriStateFilterValue {
   return TRI_STATE_VALUES.includes(value as TriStateFilterValue)
     ? (value as TriStateFilterValue)
+    : "ALL";
+}
+
+function parseTwoState(value: string | undefined): TwoStateFilterValue {
+  return TWO_STATE_VALUES.includes(value as TwoStateFilterValue)
+    ? (value as TwoStateFilterValue)
     : "ALL";
 }
 
@@ -110,6 +127,7 @@ export function parseVehicleListParams(
     modelId: firstValue(searchParams.model) || "ALL",
     gradeId: firstValue(searchParams.grade) || "ALL",
     auctionHallId: firstValue(searchParams.hall) || "ALL",
+    supplierId: firstValue(searchParams.supplier) || "ALL",
     freightAgentId: firstValue(searchParams.agent) || "ALL",
     packingAgentId: firstValue(searchParams.packingAgent) || "ALL",
     vehicleLocationId: firstValue(searchParams.location) || "ALL",
@@ -120,6 +138,10 @@ export function parseVehicleListParams(
     auctionBillPaid: parseTriState(firstValue(searchParams.billPaid)),
     logBook: parseTriState(firstValue(searchParams.logBook)),
     extraKey: parseTriState(firstValue(searchParams.extraKey)),
+    hasPartnership: parseTwoState(firstValue(searchParams.partnership)),
+    paidByCustomer: parseTriState(firstValue(searchParams.paidByCustomer)),
+    sellingPriceCurrency: firstValue(searchParams.currency) || "ALL",
+    convertedToExport: parseTwoState(firstValue(searchParams.converted)),
     sortBy: SORT_KEYS.includes(sortBy as VehicleListSortKey)
       ? (sortBy as VehicleListSortKey)
       : VEHICLE_LIST_DEFAULTS.sortBy,
@@ -149,6 +171,7 @@ export function buildVehiclesHref(
   if (merged.modelId !== "ALL") query.set("model", merged.modelId);
   if (merged.gradeId !== "ALL") query.set("grade", merged.gradeId);
   if (merged.auctionHallId !== "ALL") query.set("hall", merged.auctionHallId);
+  if (merged.supplierId !== "ALL") query.set("supplier", merged.supplierId);
   if (merged.freightAgentId !== "ALL") query.set("agent", merged.freightAgentId);
   if (merged.packingAgentId !== "ALL") query.set("packingAgent", merged.packingAgentId);
   if (merged.vehicleLocationId !== "ALL") query.set("location", merged.vehicleLocationId);
@@ -157,6 +180,10 @@ export function buildVehiclesHref(
   if (merged.auctionBillPaid !== "ALL") query.set("billPaid", merged.auctionBillPaid);
   if (merged.logBook !== "ALL") query.set("logBook", merged.logBook);
   if (merged.extraKey !== "ALL") query.set("extraKey", merged.extraKey);
+  if (merged.hasPartnership !== "ALL") query.set("partnership", merged.hasPartnership);
+  if (merged.paidByCustomer !== "ALL") query.set("paidByCustomer", merged.paidByCustomer);
+  if (merged.sellingPriceCurrency !== "ALL") query.set("currency", merged.sellingPriceCurrency);
+  if (merged.convertedToExport !== "ALL") query.set("converted", merged.convertedToExport);
   if (merged.sortBy !== VEHICLE_LIST_DEFAULTS.sortBy) query.set("sort", merged.sortBy);
   if (merged.sortDir !== VEHICLE_LIST_DEFAULTS.sortDir) query.set("dir", merged.sortDir);
   if (merged.page !== VEHICLE_LIST_DEFAULTS.page) query.set("page", String(merged.page));

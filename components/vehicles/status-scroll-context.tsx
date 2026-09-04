@@ -88,7 +88,7 @@ export function StatusScrollDot({ status }: { status: ShipmentStatus }) {
       aria-hidden="true"
       title={meta.label}
       className={cn(
-        "inline-block size-2.5 shrink-0 rounded-full transition-all duration-300 ease-out",
+        "inline-block size-2.5 shrink-0 rounded-full",
         DOT_COLOR[meta.badgeVariant],
         visible ? "scale-100 opacity-100" : "scale-0 opacity-0"
       )}
