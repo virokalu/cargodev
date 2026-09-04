@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { Images } from "lucide-react";
+import { ImagePreviewDialog } from "@/components/shared/uploads/image-preview-dialog";
 import { cn } from "@/lib/utils";
 
 export function VehiclePhotoHero({ photos }: { photos: { id: string; url: string }[] }) {
@@ -26,12 +27,20 @@ export function VehiclePhotoHero({ photos }: { photos: { id: string; url: string
 
   return (
     <div className="space-y-2">
-      {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
-      <img
-        src={activePhoto.url}
-        alt=""
-        className="aspect-video w-full rounded-lg border object-cover"
-      />
+      <ImagePreviewDialog
+        title="Vehicle Photos"
+        images={photos.map((photo, i) => ({ url: photo.url, alt: `Vehicle photo ${i + 1}` }))}
+        initialIndex={selected}
+        triggerAriaLabel="View photo full size"
+        triggerClassName="block w-full"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
+        <img
+          src={activePhoto.url}
+          alt=""
+          className="aspect-video w-full rounded-lg border object-cover"
+        />
+      </ImagePreviewDialog>
       {photos.length > 1 && (
         <div className="flex gap-2 overflow-x-auto">
           {photos.map((photo, i) => (
