@@ -23,6 +23,7 @@ import {
   createCustomerFullAction,
   updateCustomerAction,
 } from "@/app/(dashboard)/customers/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 export interface CustomerFormValues {
   id: string;
@@ -147,7 +148,15 @@ function CustomerFormBody({
   }
 
   return (
-    <>
+    <div
+      onKeyDown={(event) => {
+        // Enter submits from any plain text input in the dialog (see
+        // lib/utils.ts's triggerOnEnter for why this isn't a real <form> —
+        // CountrySelect renders a trigger button that would default to
+        // type="submit" inside one).
+        if (!submitting) triggerOnEnter(event, handleSubmit, { requireInput: true });
+      }}
+    >
       <DialogHeader>
         <DialogTitle>{isEdit ? "Edit Customer" : "Add Customer"}</DialogTitle>
         <DialogDescription>
@@ -234,6 +243,6 @@ function CustomerFormBody({
           {isEdit ? "Save Changes" : "Add Customer"}
         </Button>
       </DialogFooter>
-    </>
+    </div>
   );
 }

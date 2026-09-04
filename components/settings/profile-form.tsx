@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { OwnProfile } from "@/lib/services/user.service";
 import { updateProfileDetailsAction, changePasswordAction } from "@/app/(dashboard)/settings/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 interface ProfileFormProps {
   profile: OwnProfile;
@@ -71,7 +72,15 @@ function ProfileDetailsCard({ profile }: { profile: OwnProfile }) {
   }
 
   return (
-    <Card>
+    <Card
+      onKeyDown={(event) => {
+        // Enter submits from any plain text input in this card only — the
+        // Password card below has its own independent handler, so Enter in
+        // one never triggers the other's save (see lib/utils.ts's
+        // triggerOnEnter for why this isn't a real <form>).
+        if (!submitting) triggerOnEnter(event, handleSubmit, { requireInput: true });
+      }}
+    >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-bold">
           <User className="size-5 text-primary" />
@@ -231,7 +240,14 @@ function PasswordCard({ email }: { email: string | null }) {
   }
 
   return (
-    <Card>
+    <Card
+      onKeyDown={(event) => {
+        // Enter submits from any plain text input in this card only — see
+        // the Profile Information card above for why each card has its own
+        // independent handler.
+        if (!submitting) triggerOnEnter(event, handleSubmit, { requireInput: true });
+      }}
+    >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-bold">
           <Lock className="size-5 text-primary" />
