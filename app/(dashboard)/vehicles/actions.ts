@@ -28,6 +28,9 @@ const STAFF_CAN_UPDATE_ROW_COLOUR = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as 
 const STAFF_CAN_ADD_VEHICLE_FILES = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
 const STAFF_CAN_UPDATE_AUCTION_BILL_PAID = ["ADMINISTRATOR", "MANAGER", "OPERATOR"] as const;
 const STAFF_CAN_DELETE = ["ADMINISTRATOR", "MANAGER"] as const;
+// Correcting a serial's number rewrites SerialCounter state directly —
+// tighter than the general edit-vehicle allow-list, Administrator only.
+const STAFF_CAN_CORRECT_SERIAL = ["ADMINISTRATOR"] as const;
 
 export type VehicleMutationResult =
   | { ok: true; id: string; serial: string }
@@ -76,6 +79,41 @@ export async function convertVehicleToExportAction(
     revalidatePath("/vehicles");
     revalidatePath("/vehicles/[serial]/edit", "page");
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+export async function revertVehicleToLocalAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await vehicleService.revertVehicleToLocal(user.orgId, user.id, id);
+    revalidatePath("/vehicles");
+    revalidatePath("/vehicles/[serial]/edit", "page");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+export async function correctVehicleSerialNumberAction(
+  id: string,
+  newNumber: number
+): Promise<{ ok: true; serial: string } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_CORRECT_SERIAL]);
+  try {
+    const { serial } = await vehicleService.correctVehicleSerialNumber(user.orgId, user.id, id, newNumber);
+    revalidatePath("/vehicles");
+    revalidatePath("/vehicles/[serial]/edit", "page");
+    return { ok: true, serial };
   } catch (error) {
     if (error instanceof ServiceError) {
       return { ok: false, message: error.message };

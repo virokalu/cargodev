@@ -226,8 +226,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                 {files.auctionSheetUrl ? (
                   <ImagePreviewDialog
                     title="Auction Sheet"
-                    src={files.auctionSheetUrl}
-                    alt="Auction sheet, full size"
+                    images={[{ url: files.auctionSheetUrl, alt: "Auction sheet, full size" }]}
                     triggerAriaLabel="View auction sheet full size"
                     triggerClassName="block w-full"
                   >

@@ -43,6 +43,8 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { ConvertToExportDialog } from "@/components/vehicles/convert-to-export-dialog";
+import { RevertToLocalDialog } from "@/components/vehicles/revert-to-local-dialog";
+import { EditSerialNumberDialog } from "@/components/vehicles/edit-serial-number-dialog";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
 import { DateField } from "@/components/shared/date-field";
@@ -54,7 +56,7 @@ import { VehiclePhotoGallery } from "@/components/shared/uploads/vehicle-photo-g
 import { VehicleDocumentList, type StagedDocument } from "@/components/shared/uploads/vehicle-document-list";
 import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { useBackToVehicles } from "@/components/vehicles/use-back-to-vehicles";
-import { cn } from "@/lib/utils";
+import { cn, triggerOnEnter } from "@/lib/utils";
 import { LC_OPEN_DESTINATIONS } from "@/lib/shipment-milestones";
 import type { CountryOption } from "@/lib/constants/countries";
 import type { FreightAgentOption, LookupOption } from "@/lib/services/lookup.service";
@@ -165,6 +167,10 @@ interface VehicleFormProps {
    * /vehicles/add page and createVehicleAction). Defaults to true so
    * Admin/Manager (and create mode) don't need to pass it explicitly. */
   canEditFields?: boolean;
+  /** Edit mode only — gates the serial-number typo-correction control
+   * (Administrator only, see actions.ts's STAFF_CAN_CORRECT_SERIAL).
+   * Defaults to false so callers must opt in explicitly. */
+  isAdmin?: boolean;
 }
 
 export interface FormState {
@@ -518,6 +524,7 @@ export function VehicleForm({
   rowColourStatuses,
   countries,
   canEditFields = true,
+  isAdmin = false,
 }: VehicleFormProps) {
   const backToVehicles = useBackToVehicles();
   const [state, setState] = useState<FormState>(() => ({
@@ -714,7 +721,18 @@ export function VehicleForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      onKeyDown={(event) => {
+        // Enter submits from any plain text/number/date input on the page
+        // (see lib/utils.ts's triggerOnEnter for why this isn't a real
+        // <form> — this page has many Popover/Select/Combobox trigger
+        // buttons that would default to type="submit" inside one).
+        if (canEditFields && !submitting && !etaError) {
+          triggerOnEnter(event, handleSubmit, { requireInput: true });
+        }
+      }}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {mode === "edit" && <BackToVehiclesButton />}
@@ -731,6 +749,9 @@ export function VehicleForm({
         </div>
         {mode === "edit" && existingTrack === "FL" && !existingConvertedToExport && canEditFields && (
           <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
+        )}
+        {mode === "edit" && existingConvertedToExport && canEditFields && (
+          <RevertToLocalDialog vehicleId={vehicleId!} serial={existingSerial!} />
         )}
       </div>
 
@@ -814,9 +835,14 @@ export function VehicleForm({
             {mode === "edit" ? (
               <div>
                 <span className="mb-1.5 block text-sm font-semibold">Serial No</span>
-                <Badge variant="outline" className="font-mono text-sm">
-                  {existingSerial}
-                </Badge>
+                <div className="flex items-center gap-1">
+                  <Badge variant="outline" className="font-mono text-sm">
+                    {existingSerial}
+                  </Badge>
+                  {isAdmin && (
+                    <EditSerialNumberDialog vehicleId={vehicleId!} serial={existingSerial!} />
+                  )}
+                </div>
               </div>
             ) : state.isLegacyEntry ? (
               <NumberField

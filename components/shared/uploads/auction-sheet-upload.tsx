@@ -63,8 +63,7 @@ export function AuctionSheetUpload(props: AuctionSheetUploadProps) {
           <div className="flex items-center gap-3">
             <ImagePreviewDialog
               title="Auction Sheet"
-              src={currentUrl}
-              alt="Auction sheet, full size"
+              images={[{ url: currentUrl, alt: "Auction sheet, full size" }]}
               triggerAriaLabel="View auction sheet full size"
               triggerClassName="shrink-0 rounded-md border border-border"
             >

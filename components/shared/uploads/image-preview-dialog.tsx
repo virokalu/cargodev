@@ -1,10 +1,17 @@
 "use client";
 
 // Full-size image viewer with a rotate control — shared by every place that
-// pops open an uploaded image at full size (currently both Auction Sheet
-// spots: the Add/Edit form's upload widget and the read-only detail page).
-// Rotation is view-only and resets on close: it never writes anything back,
+// pops open an uploaded image at full size (currently the Add/Edit form's
+// Auction Sheet upload widget, the detail page's Auction Sheet, and the
+// detail page's Vehicle Photos). Rotation is view-only and resets on close
+// (and on navigating to a different image): it never writes anything back,
 // it's just for reading a sheet that was scanned sideways or upside down.
+//
+// Always takes an `images` array — single-element for the two Auction Sheet
+// callers (which only ever show one image), multi-element for Vehicle
+// Photos. Arrow buttons and left/right keyboard navigation only render/
+// activate when there's more than one image, so the single-image callers
+// are unaffected.
 //
 // WHY the box/dialog resize themselves at 90°/270°: CSS `transform:
 // rotate()` only repaints the element — it never changes the layout box, so
@@ -21,15 +28,19 @@
 // pixel size with no constraint at all, which is what "image goes out of
 // the box" was.
 
-import { useEffect, useState } from "react";
-import { RotateCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ImagePreviewDialogProps {
   title: string;
-  src: string;
-  alt: string;
+  images: { url: string; alt: string }[];
+  /** Which image to open on — defaults to 0. Re-applied every time the
+   * dialog opens (not just on mount), since this component instance
+   * persists across multiple opens wherever the caller lets the "active"
+   * image change between them (e.g. VehiclePhotoHero's thumbnail strip). */
+  initialIndex?: number;
   triggerAriaLabel: string;
   triggerClassName?: string;
   /** The trigger's visual content — a small thumbnail in one place, a big
@@ -48,15 +59,18 @@ const FALLBACK_MAX_HEIGHT = "70vh";
 
 export function ImagePreviewDialog({
   title,
-  src,
-  alt,
+  images,
+  initialIndex = 0,
   triggerAriaLabel,
   triggerClassName,
   children,
 }: ImagePreviewDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [rotation, setRotation] = useState(0);
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
+  const hasMultiple = images.length > 1;
 
   useEffect(() => {
     function updateViewport() {
@@ -67,6 +81,29 @@ export function ImagePreviewDialog({
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
 
+  const showPrevious = useCallback(() => {
+    setCurrentIndex((previous) => (previous - 1 + images.length) % images.length);
+    setRotation(0);
+    setNatural(null);
+  }, [images.length]);
+
+  const showNext = useCallback(() => {
+    setCurrentIndex((previous) => (previous + 1) % images.length);
+    setRotation(0);
+    setNatural(null);
+  }, [images.length]);
+
+  useEffect(() => {
+    if (!open || !hasMultiple) return;
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === "ArrowLeft") showPrevious();
+      else if (event.key === "ArrowRight") showNext();
+    }
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [open, hasMultiple, showPrevious, showNext]);
+
+  const current = images[currentIndex];
   const isSideways = rotation === 90 || rotation === 270;
 
   // Dialog width is never set directly — DialogContent has its own padding
@@ -105,8 +142,11 @@ export function ImagePreviewDialog({
 
   return (
     <Dialog
-      onOpenChange={(open) => {
-        if (!open) {
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setCurrentIndex(initialIndex);
+        } else {
           setRotation(0);
           setNatural(null);
         }
@@ -119,7 +159,7 @@ export function ImagePreviewDialog({
         {children}
       </DialogTrigger>
       <DialogContent className={dialogClassName}>
-        <DialogTitle>{title}</DialogTitle>
+        <DialogTitle>{hasMultiple ? `${title} (${currentIndex + 1} of ${images.length})` : title}</DialogTitle>
         <div
           className="relative mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-muted/30"
           style={boxStyle}
@@ -134,10 +174,34 @@ export function ImagePreviewDialog({
           >
             <RotateCw className="size-4" />
           </Button>
+          {hasMultiple && (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon-sm"
+                className="absolute top-1/2 left-2 z-10 -translate-y-1/2 shadow"
+                onClick={showPrevious}
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon-sm"
+                className="absolute top-1/2 right-2 z-10 -translate-y-1/2 shadow"
+                onClick={showNext}
+                aria-label="Next image"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </>
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element -- external R2 URL, not a local asset */}
           <img
-            src={src}
-            alt={alt}
+            src={current.url}
+            alt={current.alt}
             onLoad={(event) => {
               const target = event.currentTarget;
               setNatural({ width: target.naturalWidth, height: target.naturalHeight });

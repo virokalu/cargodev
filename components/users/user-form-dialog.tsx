@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import type { StaffRole } from "@prisma/client";
 import { createStaffAction, updateStaffAction } from "@/app/(dashboard)/users/actions";
+import { triggerOnEnter } from "@/lib/utils";
 
 export interface StaffFormValues {
   id: string;
@@ -175,7 +176,15 @@ function UserFormBody({
   }
 
   return (
-    <>
+    <div
+      onKeyDown={(event) => {
+        // Enter submits from any plain text input in the dialog (see
+        // lib/utils.ts's triggerOnEnter for why this isn't a real <form> —
+        // the Role Select's trigger button would default to type="submit"
+        // inside one).
+        if (!submitting) triggerOnEnter(event, handleSubmit, { requireInput: true });
+      }}
+    >
       <DialogHeader>
         <DialogTitle>{isEdit ? "Edit User" : "Add User"}</DialogTitle>
         <DialogDescription>
@@ -321,6 +330,6 @@ function UserFormBody({
           {isEdit ? "Save Changes" : "Add User"}
         </Button>
       </DialogFooter>
-    </>
+    </div>
   );
 }

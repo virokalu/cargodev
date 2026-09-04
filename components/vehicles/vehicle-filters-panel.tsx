@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Car, ClipboardList, Filter, Truck, X } from "lucide-react";
+import { Banknote, Car, ClipboardList, Filter, Truck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -29,13 +29,15 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { FilterCombobox, type FilterOption } from "@/components/shared/filter-combobox";
 import { TriStateFilterSelect } from "@/components/vehicles/tri-state-filter-select";
-import { buildVehiclesHref, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
+import { TwoStateFilterSelect } from "@/components/vehicles/two-state-filter-select";
+import { buildVehiclesHref, SOLD_CURRENCIES, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
 import type { VehicleListParams } from "@/lib/services/vehicle.service";
 import {
   searchBrandsAction,
   searchModelsAction,
   searchGradesAction,
   searchAuctionHallsAction,
+  searchSuppliersAction,
   searchFreightAgentsAction,
   searchPackingAgentsAction,
   searchVehicleLocationsAction,
@@ -50,6 +52,7 @@ const PANEL_FILTER_KEYS = [
   "modelId",
   "gradeId",
   "auctionHallId",
+  "supplierId",
   "freightAgentId",
   "packingAgentId",
   "vehicleLocationId",
@@ -58,6 +61,10 @@ const PANEL_FILTER_KEYS = [
   "auctionBillPaid",
   "logBook",
   "extraKey",
+  "hasPartnership",
+  "paidByCustomer",
+  "sellingPriceCurrency",
+  "convertedToExport",
 ] as const satisfies readonly (keyof VehicleListParams)[];
 
 export interface VehicleFilterSelections {
@@ -68,6 +75,7 @@ export interface VehicleFilterSelections {
   model: FilterOption | null;
   grade: FilterOption | null;
   auctionHall: FilterOption | null;
+  supplier: FilterOption | null;
   freightAgent: FilterOption | null;
   packingAgent: FilterOption | null;
   vehicleLocation: FilterOption | null;
@@ -168,48 +176,64 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 allLabel="All auction halls"
               />
             </div>
-            <div>
-              <Label className="mb-1.5">Forwarding Agent</Label>
-              <FilterCombobox
-                value={selected.freightAgent}
-                onChange={(option) => push({ freightAgentId: option?.id ?? "ALL" })}
-                search={(query) => searchFreightAgentsAction(query)}
-                placeholder="All forwarding agents"
-                allLabel="All forwarding agents"
-              />
-            </div>
-            <div>
-              <Label className="mb-1.5">Packing Agent</Label>
-              <FilterCombobox
-                value={selected.packingAgent}
-                onChange={(option) => push({ packingAgentId: option?.id ?? "ALL" })}
-                search={(query) => searchPackingAgentsAction(query)}
-                placeholder="All packing agents"
-                allLabel="All packing agents"
-              />
-            </div>
-            <div>
-              <Label className="mb-1.5">RORO / Container</Label>
-              <Select
-                value={params.shippingMethod}
-                onValueChange={(value) =>
-                  push({ shippingMethod: value as VehicleListParams["shippingMethod"] })
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All">
-                    {(itemValue: string) =>
-                      itemValue === "ALL" ? "All" : itemValue === "RORO" ? "RORO" : "Container"
+            {params.track === "FL" && (
+              <div>
+                <Label className="mb-1.5">Supplier</Label>
+                <FilterCombobox
+                  value={selected.supplier}
+                  onChange={(option) => push({ supplierId: option?.id ?? "ALL" })}
+                  search={searchSuppliersAction}
+                  placeholder="All suppliers"
+                  allLabel="All suppliers"
+                />
+              </div>
+            )}
+            {params.track === "FC" && (
+              <>
+                <div>
+                  <Label className="mb-1.5">Forwarding Agent</Label>
+                  <FilterCombobox
+                    value={selected.freightAgent}
+                    onChange={(option) => push({ freightAgentId: option?.id ?? "ALL" })}
+                    search={(query) => searchFreightAgentsAction(query)}
+                    placeholder="All forwarding agents"
+                    allLabel="All forwarding agents"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1.5">Packing Agent</Label>
+                  <FilterCombobox
+                    value={selected.packingAgent}
+                    onChange={(option) => push({ packingAgentId: option?.id ?? "ALL" })}
+                    search={(query) => searchPackingAgentsAction(query)}
+                    placeholder="All packing agents"
+                    allLabel="All packing agents"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1.5">RORO / Container</Label>
+                  <Select
+                    value={params.shippingMethod}
+                    onValueChange={(value) =>
+                      push({ shippingMethod: value as VehicleListParams["shippingMethod"] })
                     }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL" label="All">All</SelectItem>
-                  <SelectItem value="RORO" label="RORO">RORO</SelectItem>
-                  <SelectItem value="CONTAINER" label="Container">Container</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All">
+                        {(itemValue: string) =>
+                          itemValue === "ALL" ? "All" : itemValue === "RORO" ? "RORO" : "Container"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" label="All">All</SelectItem>
+                      <SelectItem value="RORO" label="RORO">RORO</SelectItem>
+                      <SelectItem value="CONTAINER" label="Container">Container</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div>
               <Label className="mb-1.5">Vehicle Location</Label>
               <FilterCombobox
@@ -248,7 +272,50 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               value={params.extraKey}
               onChange={(value) => push({ extraKey: value })}
             />
+            {params.track === "FC" && (
+              <TwoStateFilterSelect
+                label="Converted from Local"
+                value={params.convertedToExport}
+                onChange={(value) => push({ convertedToExport: value })}
+              />
+            )}
           </SectionCard>
+
+          {params.track === "FL" && (
+            <SectionCard icon={Banknote} title="Sale Details" contentClassName="space-y-3">
+              <TwoStateFilterSelect
+                label="Partnership"
+                value={params.hasPartnership}
+                onChange={(value) => push({ hasPartnership: value })}
+              />
+              <TriStateFilterSelect
+                label="Paid by Customer"
+                value={params.paidByCustomer}
+                onChange={(value) => push({ paidByCustomer: value })}
+              />
+              <div>
+                <Label className="mb-1.5">Sold Currency</Label>
+                <Select
+                  value={params.sellingPriceCurrency}
+                  onValueChange={(value) => push({ sellingPriceCurrency: value ?? "ALL" })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All">
+                      {(itemValue: string) => (itemValue === "ALL" ? "All" : itemValue)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL" label="All">All</SelectItem>
+                    {SOLD_CURRENCIES.map((currency) => (
+                      <SelectItem key={currency} value={currency} label={currency}>
+                        {currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </SectionCard>
+          )}
         </div>
 
         <SheetFooter>

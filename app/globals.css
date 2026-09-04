@@ -254,17 +254,11 @@
   animation-name: onAutoFillStart;
 }
 
-/* Lets JS detect the exact moment a browser autofills a field — there's no
-   direct DOM event for it, but WebKit fires this animation when its autofill
-   styling applies, so an onAnimationStart listener can catch it. Used on
-   fields where a stale browser-saved credential must never be trusted (e.g.
-   "confirm your current password" on a change-password form) — see
-   components/settings/profile-form.tsx. */
-@keyframes onAutoFillStart {
-  from {}
-  to {}
-}
-
-.detect-autofill:-webkit-autofill {
-  animation-name: onAutoFillStart;
+/* Suppresses row hover while a vehicle table pane is actively scrolling —
+   without this, rows sliding vertically under a stationary cursor each
+   briefly fire native :hover/mouseenter as they pass underneath, producing
+   a visible highlight "wave" animating through the table on every scroll.
+   See components/vehicles/vertical-scroll-context.tsx. */
+.table-is-scrolling [data-slot="table-row"] {
+  pointer-events: none;
 }

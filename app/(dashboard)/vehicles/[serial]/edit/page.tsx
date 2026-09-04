@@ -74,6 +74,9 @@ export default async function EditVehiclePage({
   // tells VehicleForm to grey out and disable everything else.
   const user = await requireUser(["ADMINISTRATOR", "MANAGER", "OPERATOR"]);
   const canEditFields = user.role !== "OPERATOR";
+  // Correcting a serial's number rewrites SerialCounter state directly —
+  // tighter than the general edit-vehicle allow-list, Administrator only.
+  const isAdmin = user.role === "ADMINISTRATOR";
   const { serial } = await params;
 
   const [vehicle, rowColourStatuses] = await Promise.all([
@@ -108,6 +111,7 @@ export default async function EditVehiclePage({
       rowColourStatuses={rowColourStatuses}
       countries={COUNTRIES}
       canEditFields={canEditFields}
+      isAdmin={isAdmin}
     />
   );
 }

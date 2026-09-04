@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     model: q("model"),
     grade: q("grade"),
     hall: q("hall"),
+    supplier: q("supplier"),
     agent: q("agent"),
     packingAgent: q("packingAgent"),
     location: q("location"),
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest) {
     billPaid: q("billPaid"),
     logBook: q("logBook"),
     extraKey: q("extraKey"),
+    partnership: q("partnership"),
+    paidByCustomer: q("paidByCustomer"),
+    currency: q("currency"),
+    converted: q("converted"),
     sort: q("sort"),
     dir: q("dir"),
   };

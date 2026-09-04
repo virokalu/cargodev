@@ -17,7 +17,7 @@ import {
   vehicleUpdateSchema,
   flattenFieldErrors,
 } from "@/lib/validation/vehicle.schema";
-import { assignNextSerial, assignLegacySerial } from "@/lib/services/serial.service";
+import { assignNextSerial, assignLegacySerial, correctSerialNumber } from "@/lib/services/serial.service";
 import { computeEffectiveTrack } from "@/lib/vehicle-track";
 import * as activityLog from "@/lib/services/activity-log.service";
 import * as notificationService from "@/lib/services/notification.service";
@@ -1072,10 +1072,11 @@ export async function updateVehicleAuctionBillPaid(
   if (notification) notificationService.notifyRealtime(notification);
 }
 
-/** One-way — an FL vehicle that ends up being exported instead of sold
- * locally keeps its FL-prefixed serial forever (see lib/vehicle-track.ts's
+/** An FL vehicle that ends up being exported instead of sold locally keeps
+ * its FL-prefixed serial forever (see lib/vehicle-track.ts's
  * computeEffectiveTrack for why), but needs to behave as a full export
- * vehicle from this point on. Destination is collected here (rather than
+ * vehicle from this point on. Reversible via revertVehicleToLocal below,
+ * for an accidental conversion. Destination is collected here (rather than
  * left for staff to fill in later via the now-unlocked FC form) since it
  * only becomes meaningful the moment the vehicle stops being sold locally.
  * The StatusHistory row (fromStatus null, same as a fresh vehicle's very
@@ -1122,6 +1123,93 @@ export async function convertVehicleToExport(
       before: { convertedToExport: false, destination: existing.destination },
       after: { convertedToExport: true, destination },
     });
+  });
+}
+
+/** Reverses convertVehicleToExport, by request — despite that function's own
+ * "one-way" docs, staff need to undo an accidental conversion. Deliberately
+ * only flips convertedToExport back to false: every FC-only field this
+ * vehicle picked up while converted (ETD/ETA/BL, shipment status,
+ * StatusHistory rows) is left exactly as-is in the DB. Nothing needs
+ * clearing because every FC/FL check in this file (and the form/detail
+ * view) reads computeEffectiveTrack(), which goes back to reading "FL" the
+ * instant this flag flips — so those fields simply stop being shown or
+ * tracked. Re-running convertVehicleToExport later picks up cleanly since
+ * nothing here was cleared, and the old StatusHistory rows stay as an
+ * audit trail of when it was previously tracked. */
+export async function revertVehicleToLocal(orgId: string, actorId: string, id: string): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (existing.serialPrefix !== "FL") {
+    throw new ServiceError("VALIDATION", "Only local (FL) vehicles can be reverted to local.");
+  }
+  if (!existing.convertedToExport) {
+    throw new ServiceError("VALIDATION", "This vehicle hasn't been converted to export.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: { convertedToExport: false },
+    });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "REVERT_VEHICLE_TO_LOCAL",
+      entity: "Vehicle",
+      entityId: id,
+      before: { convertedToExport: true },
+      after: { convertedToExport: false },
+    });
+  });
+}
+
+/**
+ * Corrects a typo in the numeric part of a serial shortly after creation —
+ * the one documented exception to "serial is read-only after creation"
+ * (Tech Doc §3). Restricted to Administrator (see actions.ts): unlike a
+ * normal field edit, this rewrites SerialCounter state and the unique
+ * org+serial key other tables may already reference by value (ActivityLog
+ * snapshots, generated PDFs) keep showing the old serial, which is
+ * correct for those as a historical record. The prefix/track never
+ * changes, only serialNumber and the derived serial string.
+ */
+export async function correctVehicleSerialNumber(
+  orgId: string,
+  actorId: string,
+  id: string,
+  newNumber: number
+): Promise<{ serial: string }> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (!Number.isInteger(newNumber) || newNumber <= 0) {
+    throw new ServiceError("VALIDATION", "Serial number must be a positive whole number.");
+  }
+
+  const newSerial = `${existing.serialPrefix}${newNumber}`;
+  if (newSerial === existing.serial) {
+    throw new ServiceError("VALIDATION", "That's already this vehicle's serial number.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const { serial } = await correctSerialNumber(tx, orgId, existing.serialPrefix, newNumber, id);
+
+    await tx.vehicle.update({
+      where: { id },
+      data: { serialNumber: newNumber, serial },
+    });
+
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "CORRECT_VEHICLE_SERIAL",
+      entity: "Vehicle",
+      entityId: id,
+      before: { serial: existing.serial },
+      after: { serial },
+    });
+
+    return { serial };
   });
 }
 
@@ -1265,13 +1353,21 @@ export type VehicleListSortKey =
   | "nameChangeDeadline"
   | "massoDate"
   | "docSentDate"
-  | "recycleDate";
+  | "recycleDate"
+  | "vesselName"
+  | "deliveryDate"
+  | "sellingPrice";
 
 /** Tri-state filters need a 4th state beyond the field's own null/true/false —
  * "not filtering on this at all" is different from "filtering for blank"
  * (CLAUDE.md tri-state rule: null is a real, distinct value, never a stand-in
  * for "no filter applied"). */
 export type TriStateFilterValue = "ALL" | "YES" | "NO" | "BLANK";
+
+/** Same "not filtering" vs. "filtering" distinction as TriStateFilterValue,
+ * but for genuinely two-state fields (hasPartnership, convertedToExport) that
+ * are never null in the DB — no "not entered" state to represent. */
+export type TwoStateFilterValue = "ALL" | "YES" | "NO";
 
 export interface VehicleListParams {
   page: number;
@@ -1295,6 +1391,8 @@ export interface VehicleListParams {
   modelId: string | "ALL";
   gradeId: string | "ALL";
   auctionHallId: string | "ALL";
+  /** FL only — alternative to auctionHallId, mutually exclusive in the data. */
+  supplierId: string | "ALL";
   freightAgentId: string | "ALL";
   packingAgentId: string | "ALL";
   vehicleLocationId: string | "ALL";
@@ -1303,6 +1401,16 @@ export interface VehicleListParams {
   auctionBillPaid: TriStateFilterValue;
   logBook: TriStateFilterValue;
   extraKey: TriStateFilterValue;
+  /** FL only. */
+  hasPartnership: TwoStateFilterValue;
+  /** FL only — genuinely nullable in the DB (null until Sold Details is
+   * filled in), unlike hasPartnership above. */
+  paidByCustomer: TriStateFilterValue;
+  /** FL only. */
+  sellingPriceCurrency: string | "ALL";
+  /** FC only — separates native FC vehicles from ones that started as FL
+   * and got converted (lib/vehicle-track.ts). */
+  convertedToExport: TwoStateFilterValue;
   sortBy: VehicleListSortKey;
   sortDir: "asc" | "desc";
 }
@@ -1372,7 +1480,7 @@ export interface VehicleListResult {
  * pulled out once rather than copy-pasted three times. */
 function applyTriStateFilter(
   where: Prisma.VehicleWhereInput,
-  field: "auctionBillPaid" | "logBook" | "extraKey",
+  field: "auctionBillPaid" | "logBook" | "extraKey" | "paidByCustomer",
   value: TriStateFilterValue
 ): void {
   if (value === "YES") where[field] = true;
@@ -1417,6 +1525,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   if (params.modelId !== "ALL") where.modelId = params.modelId;
   if (params.gradeId !== "ALL") where.gradeId = params.gradeId;
   if (params.auctionHallId !== "ALL") where.auctionHallId = params.auctionHallId;
+  if (params.supplierId !== "ALL") where.supplierId = params.supplierId;
   if (params.freightAgentId !== "ALL") where.freightAgentId = params.freightAgentId;
   if (params.packingAgentId !== "ALL") where.packingAgentId = params.packingAgentId;
   if (params.vehicleLocationId !== "ALL") where.vehicleLocationId = params.vehicleLocationId;
@@ -1425,13 +1534,18 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   applyTriStateFilter(where, "auctionBillPaid", params.auctionBillPaid);
   applyTriStateFilter(where, "logBook", params.logBook);
   applyTriStateFilter(where, "extraKey", params.extraKey);
+  if (params.hasPartnership !== "ALL") where.hasPartnership = params.hasPartnership === "YES";
+  applyTriStateFilter(where, "paidByCustomer", params.paidByCustomer);
+  if (params.sellingPriceCurrency !== "ALL") where.sellingPriceCurrency = params.sellingPriceCurrency;
+  if (params.convertedToExport !== "ALL") where.convertedToExport = params.convertedToExport === "YES";
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
-  // brand/model/grade, and customer name — everything else is a dedicated
-  // per-column filter, not free text. Customer also has its own dedicated
-  // filter dropdown (params.customerId above, search-as-you-type since the
-  // list can get large) — kept in search too so typing a customer's name
-  // works without opening that dropdown first.
+  // brand/model/grade, supplier, partner name, vessel name, and customer
+  // name — everything else is a dedicated per-column filter, not free text.
+  // Customer also has its own dedicated filter dropdown (params.customerId
+  // above, search-as-you-type since the list can get large) — kept in
+  // search too so typing a customer's name works without opening that
+  // dropdown first.
   const search = params.search.trim();
   if (search) {
     where.OR = [
@@ -1443,6 +1557,9 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
       { model: { brand: { name: { contains: search, mode: "insensitive" } } } },
       { grade: { name: { contains: search, mode: "insensitive" } } },
       { customer: { name: { contains: search, mode: "insensitive" } } },
+      { supplier: { name: { contains: search, mode: "insensitive" } } },
+      { partnerName: { contains: search, mode: "insensitive" } },
+      { vesselName: { contains: search, mode: "insensitive" } },
     ];
   }
 
@@ -1455,10 +1572,15 @@ function buildVehicleListOrderBy(
 ): Prisma.VehicleOrderByWithRelationInput[] {
   switch (sortBy) {
     case "serial":
-      // serial is "FC" + a raw number, not zero-padded, so sorting the
-      // display string alone would put "FC10" before "FC9" — sort the real
-      // numeric column instead (grouped by prefix so FC/FL don't interleave).
-      return [{ serialPrefix: sortDir }, { serialNumber: sortDir }];
+      // Sort the real numeric column, not the display string (avoids "FC10"
+      // sorting before "FC9"). Deliberately NOT grouped by serialPrefix first
+      // — a vehicle converted to export (lib/vehicle-track.ts) keeps its
+      // original FL-prefixed serial forever, and grouping by prefix would
+      // permanently rank every converted vehicle above every native FC
+      // vehicle regardless of serial number, since FL's enum ordinal always
+      // beats FC's under "desc" — vehicles converted to export would get
+      // stuck at the top of the list forever.
+      return [{ serialNumber: sortDir }];
     case "chassisNo":
       return [{ chassisNo: sortDir }];
     case "model":
@@ -1485,6 +1607,12 @@ function buildVehicleListOrderBy(
       return [{ docSentDate: sortDir }];
     case "recycleDate":
       return [{ recycleDate: sortDir }];
+    case "vesselName":
+      return [{ vesselName: sortDir }];
+    case "deliveryDate":
+      return [{ deliveryDate: sortDir }];
+    case "sellingPrice":
+      return [{ sellingPrice: sortDir }];
   }
 }
 
