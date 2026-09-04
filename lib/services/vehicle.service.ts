@@ -1353,13 +1353,21 @@ export type VehicleListSortKey =
   | "nameChangeDeadline"
   | "massoDate"
   | "docSentDate"
-  | "recycleDate";
+  | "recycleDate"
+  | "vesselName"
+  | "deliveryDate"
+  | "sellingPrice";
 
 /** Tri-state filters need a 4th state beyond the field's own null/true/false —
  * "not filtering on this at all" is different from "filtering for blank"
  * (CLAUDE.md tri-state rule: null is a real, distinct value, never a stand-in
  * for "no filter applied"). */
 export type TriStateFilterValue = "ALL" | "YES" | "NO" | "BLANK";
+
+/** Same "not filtering" vs. "filtering" distinction as TriStateFilterValue,
+ * but for genuinely two-state fields (hasPartnership, convertedToExport) that
+ * are never null in the DB — no "not entered" state to represent. */
+export type TwoStateFilterValue = "ALL" | "YES" | "NO";
 
 export interface VehicleListParams {
   page: number;
@@ -1543,10 +1551,15 @@ function buildVehicleListOrderBy(
 ): Prisma.VehicleOrderByWithRelationInput[] {
   switch (sortBy) {
     case "serial":
-      // serial is "FC" + a raw number, not zero-padded, so sorting the
-      // display string alone would put "FC10" before "FC9" — sort the real
-      // numeric column instead (grouped by prefix so FC/FL don't interleave).
-      return [{ serialPrefix: sortDir }, { serialNumber: sortDir }];
+      // Sort the real numeric column, not the display string (avoids "FC10"
+      // sorting before "FC9"). Deliberately NOT grouped by serialPrefix first
+      // — a vehicle converted to export (lib/vehicle-track.ts) keeps its
+      // original FL-prefixed serial forever, and grouping by prefix would
+      // permanently rank every converted vehicle above every native FC
+      // vehicle regardless of serial number, since FL's enum ordinal always
+      // beats FC's under "desc" — vehicles converted to export would get
+      // stuck at the top of the list forever.
+      return [{ serialNumber: sortDir }];
     case "chassisNo":
       return [{ chassisNo: sortDir }];
     case "model":
