@@ -26,12 +26,15 @@ import { cn } from "@/lib/utils";
 // string (not built from a shared constant) — Tailwind only picks up
 // arbitrary-value classes it can find as literal text — and both panes must
 // use the exact same value so their scrollTop values map 1:1 without scaling.
-// overscroll-y-none kills the native "rubber-band" bounce/stretch at the top
-// and bottom of each pane's scrollport (and stops an exhausted scroll from
-// chaining up to the outer page) — without it, scrolling past either edge
-// visibly overshoots and springs back, which reads as the table not staying
-// put.
-export const PANE_SCROLL_CLASS = "max-h-[65vh] overflow-y-auto overscroll-y-none";
+// overscroll-none kills the native "rubber-band" bounce/stretch at every
+// edge of each pane's scrollport — top/bottom (vertical) and, since this
+// same div also carries the base Table component's own `overflow-x-auto`
+// for horizontal scroll, left/right too — and stops an exhausted scroll
+// from chaining up to the outer page. Without it, scrolling past any edge
+// visibly overshoots and springs back (extra blank space appearing past the
+// last column, in the horizontal case), which reads as the table not
+// staying put.
+export const PANE_SCROLL_CLASS = "max-h-[65vh] overflow-y-auto overscroll-none";
 
 type Pane = "identity" | "detail";
 
