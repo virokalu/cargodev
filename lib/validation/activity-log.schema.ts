@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { flattenFieldErrors } from "@/lib/validation/shared";
+import { paginationQuerySchema } from "@/lib/validation/pagination.schema";
 
 export { flattenFieldErrors };
 
@@ -19,8 +20,12 @@ const optionalDate = z
   .refine((v) => v === undefined || !Number.isNaN(v.getTime()), { message: "Invalid date" });
 
 export const activityLogListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  ...paginationQuerySchema.shape,
+  // entity/action are partial, case-insensitive matches (like every other
+  // free-text filter in this API) — a client can't know the exact stored
+  // string without a fixed enum backing it, so exact-match would be
+  // unusable without first calling GET /activity-log/filters. entityId/
+  // actorId stay exact: those are real ids, not searchable text.
   entity: z.string().trim().max(100).optional().transform(emptyToUndefined),
   entityId: z.string().trim().max(100).optional().transform(emptyToUndefined),
   actorId: z.string().trim().max(100).optional().transform(emptyToUndefined),
