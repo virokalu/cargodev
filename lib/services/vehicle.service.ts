@@ -8,7 +8,13 @@ import type { Prisma, SerialPrefix, ShipmentStatus, ShippingMethod, Vehicle } fr
 // lib/shipment-status.ts) — fields that hold an *effective* status use this
 // wider app-level type instead.
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
-import { SHIPMENT_STATUS_ORDER } from "@/lib/constants/shipment-status";
+import { SHIPMENT_STATUS_ORDER, SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
+// Value imports (not just types) from lib/vehicle-list-url.ts — safe despite
+// that module importing types back from here, since its import of this file
+// is `import type` only (erased at compile time, so there's no real runtime
+// cycle — same reasoning lib/validation/vehicle.schema.ts's header comment
+// already documents for the same pair of files).
+import { SHIPPING_METHODS, TRI_STATE_VALUES, TWO_STATE_VALUES, SOLD_CURRENCIES } from "@/lib/vehicle-list-url";
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/services/auth-guard";
@@ -1411,6 +1417,16 @@ export interface VehicleListParams {
   /** FC only — separates native FC vehicles from ones that started as FL
    * and got converted (lib/vehicle-track.ts). */
   convertedToExport: TwoStateFilterValue;
+  /** Inclusive date-range bounds on etd/eta — FC only in practice (FL
+   * vehicles never carry etd/eta), but not enforced here since a filter
+   * against an always-null field on FL rows is harmless (just matches
+   * nothing), same treatment every other FC-only filter gets. `null` means
+   * that bound isn't set; from/to are independent, so either can be set
+   * without the other. */
+  etdFrom: Date | null;
+  etdTo: Date | null;
+  etaFrom: Date | null;
+  etaTo: Date | null;
   sortBy: VehicleListSortKey;
   sortDir: "asc" | "desc";
 }
@@ -1538,6 +1554,18 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   applyTriStateFilter(where, "paidByCustomer", params.paidByCustomer);
   if (params.sellingPriceCurrency !== "ALL") where.sellingPriceCurrency = params.sellingPriceCurrency;
   if (params.convertedToExport !== "ALL") where.convertedToExport = params.convertedToExport === "YES";
+  if (params.etdFrom || params.etdTo) {
+    where.etd = {
+      ...(params.etdFrom ? { gte: params.etdFrom } : {}),
+      ...(params.etdTo ? { lte: params.etdTo } : {}),
+    };
+  }
+  if (params.etaFrom || params.etaTo) {
+    where.eta = {
+      ...(params.etaFrom ? { gte: params.etaFrom } : {}),
+      ...(params.etaTo ? { lte: params.etaTo } : {}),
+    };
+  }
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
   // brand/model/grade, supplier, partner name, vessel name, and customer
@@ -1805,4 +1833,49 @@ export async function listDistinctDestinations(orgId: string): Promise<string[]>
     orderBy: { destination: "asc" },
   });
   return rows.map((row) => row.destination).filter((d): d is string => d !== null);
+}
+
+export interface VehicleFilterOptions {
+  tracks: { value: SerialPrefix; label: string }[];
+  shipmentStatuses: { value: EffectiveShipmentStatus; label: string }[];
+  shippingMethods: ShippingMethod[];
+  // TRI_STATE_VALUES/TWO_STATE_VALUES (lib/vehicle-list-url.ts) are typed
+  // against the full TriStateFilterValue/TwoStateFilterValue unions (which
+  // also include "ALL", the "no filter selected" sentinel) even though
+  // their actual contents never include it — matching that type here
+  // rather than a hand-narrowed one keeps this in sync with the source
+  // arrays without a cast.
+  triStateValues: TriStateFilterValue[];
+  twoStateValues: TwoStateFilterValue[];
+  soldCurrencies: string[];
+}
+
+/** The fixed/enum option sets the vehicle list filter panel offers
+ * (components/vehicles/vehicle-filters-panel.tsx,
+ * vehicle-filters-bar.tsx) that aren't stored in the DB and so have no
+ * other lookup endpoint — a mobile client would otherwise have to
+ * hardcode these and risk drifting from the web app if they ever change.
+ * Not org-scoped (nothing here depends on org data) and takes no params —
+ * every value it returns is a compile-time constant already owned
+ * elsewhere in this codebase (lib/constants/shipment-status.ts,
+ * lib/vehicle-list-url.ts), just assembled into one response. Searchable
+ * lookups (brand/model/grade/auction hall/supplier/freight agent/packing
+ * agent/vehicle location/transport company) are deliberately NOT included
+ * here — those are DB-backed and paginated, so they stay on their own
+ * /api/v1/lookups/* search endpoints instead of being dumped in full. */
+export function getVehicleFilterOptions(): VehicleFilterOptions {
+  return {
+    tracks: [
+      { value: "FC", label: "FC — Export" },
+      { value: "FL", label: "FL — Local" },
+    ],
+    shipmentStatuses: SHIPMENT_STATUS_ORDER.map((value) => ({
+      value,
+      label: SHIPMENT_STATUS_META[value].label,
+    })),
+    shippingMethods: [...SHIPPING_METHODS],
+    triStateValues: [...TRI_STATE_VALUES],
+    twoStateValues: [...TWO_STATE_VALUES],
+    soldCurrencies: [...SOLD_CURRENCIES],
+  };
 }

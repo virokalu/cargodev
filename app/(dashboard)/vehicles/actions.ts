@@ -395,6 +395,16 @@ export async function addVehiclePhotoAction(vehicleId: string, url: string): Pro
   }
 }
 
+/** Fires one "N photos added" notification for a client-side upload batch
+ * — called once after every file in the batch has settled
+ * (components/shared/uploads/vehicle-photo-gallery.tsx), not per file.
+ * Same role gate as addVehiclePhotoAction above, since it's gating the same
+ * underlying action (adding photos), just the notification half of it. */
+export async function notifyPhotosAddedAction(vehicleId: string, count: number): Promise<void> {
+  const user = await requireUser([...STAFF_CAN_ADD_VEHICLE_FILES]);
+  await fileService.notifyPhotosAdded(user, vehicleId, count);
+}
+
 export async function deleteVehiclePhotoAction(vehicleId: string, photoId: string): Promise<FileMutationResult> {
   const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
   try {

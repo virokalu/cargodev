@@ -42,6 +42,15 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   paidByCustomer: "ALL",
   sellingPriceCurrency: "ALL",
   convertedToExport: "ALL",
+  // No web filter-bar control sets these yet — mobile-only for now (see
+  // vehicleListQuerySchema in lib/validation/vehicle.schema.ts), so
+  // parseVehicleListParams/buildVehiclesHref below don't round-trip them
+  // through the URL either. Defaults live here regardless since this object
+  // is typed against the full VehicleListParams shape.
+  etdFrom: null,
+  etdTo: null,
+  etaFrom: null,
+  etaTo: null,
   sortBy: "serial",
   sortDir: "desc",
 };
@@ -142,6 +151,11 @@ export function parseVehicleListParams(
     paidByCustomer: parseTriState(firstValue(searchParams.paidByCustomer)),
     sellingPriceCurrency: firstValue(searchParams.currency) || "ALL",
     convertedToExport: parseTwoState(firstValue(searchParams.converted)),
+    // Mobile-only for now — see the comment on VEHICLE_LIST_DEFAULTS above.
+    etdFrom: null,
+    etdTo: null,
+    etaFrom: null,
+    etaTo: null,
     sortBy: SORT_KEYS.includes(sortBy as VehicleListSortKey)
       ? (sortBy as VehicleListSortKey)
       : VEHICLE_LIST_DEFAULTS.sortBy,

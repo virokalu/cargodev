@@ -335,6 +335,15 @@ export const vehicleListQuerySchema = z
     paidByCustomer: triStateOrAllEnum.default("ALL"),
     currency: idOrAll,
     converted: twoStateOrAllEnum.default("ALL"),
+    // Inclusive date-range bounds on etd/eta — reuses the same optionalDate
+    // parser vehicleSharedFields uses for mutation bodies ("YYYY-MM-DD"
+    // string -> Date, undefined/empty -> null). No web filter-bar control
+    // sets these yet (see VEHICLE_LIST_DEFAULTS in lib/vehicle-list-url.ts)
+    // — mobile-only for now.
+    etdFrom: optionalDate,
+    etdTo: optionalDate,
+    etaFrom: optionalDate,
+    etaTo: optionalDate,
     sort: sortKeyEnum.default("serial"),
     dir: z.enum(["asc", "desc"]).default("desc"),
   })
@@ -365,6 +374,10 @@ export const vehicleListQuerySchema = z
     paidByCustomer: v.paidByCustomer,
     sellingPriceCurrency: v.currency,
     convertedToExport: v.converted,
+    etdFrom: v.etdFrom,
+    etdTo: v.etdTo,
+    etaFrom: v.etaFrom,
+    etaTo: v.etaTo,
     sortBy: v.sort,
     sortDir: v.dir,
   }));
