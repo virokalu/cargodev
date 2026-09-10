@@ -29,6 +29,7 @@ import {
   TRI_STATE_VALUES,
   TWO_STATE_VALUES,
 } from "@/lib/vehicle-list-url";
+import { paginationQuerySchema } from "@/lib/validation/pagination.schema";
 
 export { flattenFieldErrors };
 
@@ -309,8 +310,7 @@ const twoStateOrAllEnum = z.enum(["ALL", ...TWO_STATE_VALUES] as [
 
 export const vehicleListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(50),
+    ...paginationQuerySchema.shape,
     track: z.enum(["FC", "FL", "ALL"]).default("FC"),
     q: z.string().trim().max(200).default(""),
     status: z.array(shipmentStatusEnum).default([]),

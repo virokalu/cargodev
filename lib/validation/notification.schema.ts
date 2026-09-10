@@ -1,10 +1,10 @@
-// Query schema for GET /api/v1/notifications.
+// Query schema for GET /api/v1/notifications — real page/pageSize
+// pagination (same shape as vehicles/activity-log), not the old flat
+// `limit` cap that made anything past the first batch unreachable.
 
-import { z } from "zod";
+import { paginationQuerySchema } from "@/lib/validation/pagination.schema";
 import { flattenFieldErrors } from "@/lib/validation/shared";
 
 export { flattenFieldErrors };
 
-export const notificationListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
+export const notificationListQuerySchema = paginationQuerySchema;

@@ -133,26 +133,23 @@ export interface NotificationListItem {
   createdAt: Date;
 }
 
-export async function listNotifications(
-  orgId: string,
-  userId: string,
-  limit = 50
-): Promise<NotificationListItem[]> {
-  const rows = await prisma.notification.findMany({
-    where: { org_id: orgId, userId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      event: true,
-      title: true,
-      body: true,
-      isRead: true,
-      vehicleId: true,
-      createdAt: true,
-    },
-  });
+const NOTIFICATION_SELECT = {
+  id: true,
+  event: true,
+  title: true,
+  body: true,
+  isRead: true,
+  vehicleId: true,
+  createdAt: true,
+} satisfies Prisma.NotificationSelect;
 
+type NotificationRow = Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>;
+
+/** Resolves each row's vehicleId to a serial (Notification.vehicleId has no
+ * Prisma relation — see NotificationListItem's vehicleSerial doc below) in
+ * one batched lookup, shared by both listNotifications and its paginated
+ * counterpart so the resolution logic can't drift between the two. */
+async function attachVehicleSerials(rows: NotificationRow[]): Promise<NotificationListItem[]> {
   const vehicleIds = [...new Set(rows.map((r) => r.vehicleId).filter((id): id is string => id !== null))];
   const vehicles = vehicleIds.length
     ? await prisma.vehicle.findMany({ where: { id: { in: vehicleIds } }, select: { id: true, serial: true } })
@@ -163,6 +160,68 @@ export async function listNotifications(
     ...row,
     vehicleSerial: row.vehicleId ? (serialById.get(row.vehicleId) ?? null) : null,
   }));
+}
+
+/** Web app's Notifications page — most-recent-first, capped at `limit`, no
+ * further pages reachable. Kept as-is (signature and behavior unchanged)
+ * for that one caller; the mobile API uses listNotificationsPaginated
+ * below instead, which can actually reach everything past the first page. */
+export async function listNotifications(
+  orgId: string,
+  userId: string,
+  limit = 50
+): Promise<NotificationListItem[]> {
+  const rows = await prisma.notification.findMany({
+    where: { org_id: orgId, userId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: NOTIFICATION_SELECT,
+  });
+
+  return attachVehicleSerials(rows);
+}
+
+export interface NotificationListParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface NotificationListResult {
+  rows: NotificationListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/** Same shape as listActivityLog/listVehicles — real page/skip pagination,
+ * so a client can actually reach every notification a user has, not just
+ * the most recent capped batch listNotifications returns. */
+export async function listNotificationsPaginated(
+  orgId: string,
+  userId: string,
+  params: NotificationListParams
+): Promise<NotificationListResult> {
+  const skip = (params.page - 1) * params.pageSize;
+
+  const [total, rows] = await Promise.all([
+    prisma.notification.count({ where: { org_id: orgId, userId } }),
+    prisma.notification.findMany({
+      where: { org_id: orgId, userId },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: params.pageSize,
+      select: NOTIFICATION_SELECT,
+    }),
+  ]);
+
+  return {
+    rows: await attachVehicleSerials(rows),
+    total,
+    page: params.page,
+    pageSize: params.pageSize,
+    totalPages: Math.max(1, Math.ceil(total / params.pageSize)),
+  };
 }
 
 export async function countUnread(orgId: string, userId: string): Promise<number> {

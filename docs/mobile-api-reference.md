@@ -208,7 +208,7 @@ All require any authenticated staff role. Always scoped to the calling
 user — you only ever see your own notifications, never another staff
 member's.
 
-- `GET /api/v1/notifications?limit=` — `limit` is 1–100, default 50.
+- `GET /api/v1/notifications?page=&pageSize=` — real pagination (same shape as `/vehicles` and `/activity-log`): `page` ≥ 1 (default 1), `pageSize` 1–100 (default 50). Response `data`: `{ rows: NotificationListItem[], total, page, pageSize, totalPages }`. Previously capped at a flat `limit` with no way to reach anything past the first batch — fixed to real page/skip pagination so every notification a user has is reachable.
 - `GET /api/v1/notifications/unread-count` — `{ count: number }`.
 - `POST /api/v1/notifications/:id/read` — marks one notification read. Idempotent — an already-read id, or one that doesn't belong to you, just no-ops (`{ read: true }` either way, never a 404 — same "don't leak what exists" reasoning as everywhere else).
 - `POST /api/v1/notifications/read-all` — marks every unread notification read for the calling user.
@@ -258,12 +258,28 @@ reliable in the iOS Simulator; test on a physical iPhone.
 
 ## Activity Log
 
-- `GET /api/v1/activity-log` — **Administrator only**. `403 FORBIDDEN` for every other role.
+**Administrator only** on both endpoints below — `403 FORBIDDEN` for every
+other role. There's no web page for this yet (it's referenced in the schema
+and CLAUDE.md as a planned Admin screen, never built) — these two endpoints
+are the only place this data is exposed at all right now.
+
+### `GET /api/v1/activity-log/filters`
+
+No query params. Distinct `entity` and `action` values that actually appear
+in your org's log right now — call this first to build a filter
+dropdown/chip list, since `entity`/`action` are free-form strings (no fixed
+enum backs them; new values can appear as new mutation types are added)
+rather than something you could hardcode.
+
+Response `data`: `{ entities: string[], actions: string[] }`.
+
+### `GET /api/v1/activity-log`
 
 | Param | Type | Notes |
 |---|---|---|
 | `page`, `pageSize` | int | Same defaults as the vehicle list (1 / 50, max pageSize 100) |
-| `entity`, `entityId`, `actorId`, `action` | string | Exact-match filters, all optional |
+| `entity`, `action` | string | Partial, case-insensitive match — pass a value from `/activity-log/filters` (or any substring) |
+| `entityId`, `actorId` | string | Exact match — real ids (`entityId` is the mutated row's internal id, e.g. a vehicle's `id` field from `GET /vehicles/:serial`, not its serial; `actorId` is a staff id from `GET /staff`), not searchable text |
 | `dateFrom`, `dateTo` | `YYYY-MM-DD` | Inclusive range on `createdAt`, both optional |
 
 Response `data`: `{ rows: [{id, actorId, actorName, action, entity, entityId, before, after, createdAt}], total, page, pageSize, totalPages }`.
