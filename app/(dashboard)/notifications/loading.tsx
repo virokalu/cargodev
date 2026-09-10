@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeaderSkeleton } from "@/components/skeletons/skeleton-parts";
 
 // Mirrors NotificationList's shape: heading, "Mark all read" button, then
-// rows of icon + title/body + timestamp — shown while listNotifications()
+// rows of icon + title/body + timestamp — shown while listNotificationsPaginated()
 // resolves. Previously had no loading.tsx at all (nor does any ancestor
 // route), so this page just flashed blank while its data loaded.
 export default function NotificationsLoading() {

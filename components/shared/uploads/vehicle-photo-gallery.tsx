@@ -15,7 +15,11 @@ import { Images, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FileDropZone } from "@/components/shared/uploads/file-drop-zone";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
-import { addVehiclePhotoAction, deleteVehiclePhotoAction } from "@/app/(dashboard)/vehicles/actions";
+import {
+  addVehiclePhotoAction,
+  deleteVehiclePhotoAction,
+  notifyPhotosAddedAction,
+} from "@/app/(dashboard)/vehicles/actions";
 import type { VehiclePhotoListItem } from "@/lib/services/file.service";
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
@@ -23,7 +27,10 @@ const ACCEPT = "image/jpeg,image/png,image/webp";
 interface PhotoUploadRowProps {
   vehicleId?: string;
   file: File;
-  onSettled: () => void;
+  /** true once the file is actually persisted/staged; false if the upload
+   * failed — lets the parent count successes per batch for the "N photos
+   * added" notification below, without counting failed rows. */
+  onSettled: (success: boolean) => void;
   /** Stage mode only — called with the R2 URL once the upload finishes. */
   onStaged?: (url: string) => void;
 }
@@ -52,10 +59,10 @@ function PhotoUploadRow({ vehicleId, file, onSettled, onStaged }: PhotoUploadRow
         } else {
           onStaged?.(url);
         }
+        if (!controller.signal.aborted) onSettled(true);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!controller.signal.aborted) onSettled();
+      .catch(() => {
+        if (!controller.signal.aborted) onSettled(false);
       });
     return () => {
       controller.abort();
@@ -93,6 +100,14 @@ type VehiclePhotoGalleryProps =
 interface InFlightFile {
   id: string;
   file: File;
+  batchId: string;
+}
+
+interface UploadBatch {
+  /** Undefined in "stage" mode — no vehicle exists yet to notify about. */
+  vehicleId: string | undefined;
+  remaining: number;
+  succeeded: number;
 }
 
 export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
@@ -100,6 +115,13 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [inFlight, setInFlight] = useState<InFlightFile[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Bookkeeping only — doesn't drive any render on its own (inFlight above
+  // already re-renders as rows settle), so a ref instead of state. One
+  // entry per handleNewFiles call (a "batch" = whatever the user selected
+  // or dropped in one go); once every row in a batch has settled, fires a
+  // single "N photos added" notification instead of one per file — see
+  // notifyPhotosAddedAction.
+  const batchesRef = useRef<Map<string, UploadBatch>>(new Map());
 
   // Mirrors props.photos, but readable synchronously inside handleStaged —
   // see the comment there for why an onChange callback can't read
@@ -117,13 +139,22 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
 
   function handleNewFiles(files: File[]) {
     if (files.length === 0) return;
+    const batchId = crypto.randomUUID();
+    batchesRef.current.set(batchId, {
+      vehicleId: props.mode === "persist" ? props.vehicleId : undefined,
+      remaining: files.length,
+      succeeded: 0,
+    });
     // A stable id (independent of array position) keeps each row's React key
     // fixed for its whole lifetime. Keying by index instead would make every
     // still-uploading row's key shift down each time an earlier file finishes
     // and is spliced out of inFlight — React would then unmount+remount the
     // shifted rows, aborting their real upload mid-flight and restarting it
     // from scratch, which is what caused the repeated/duplicate uploads.
-    setInFlight((prev) => [...prev, ...files.map((file) => ({ id: crypto.randomUUID(), file }))]);
+    setInFlight((prev) => [
+      ...prev,
+      ...files.map((file) => ({ id: crypto.randomUUID(), file, batchId })),
+    ]);
   }
 
   function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -132,8 +163,21 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
     handleNewFiles(files);
   }
 
-  function handleRowSettled(id: string) {
+  function handleRowSettled(id: string, batchId: string, success: boolean) {
     setInFlight((prev) => prev.filter((f) => f.id !== id));
+
+    const batch = batchesRef.current.get(batchId);
+    if (!batch) return;
+    if (success) batch.succeeded += 1;
+    batch.remaining -= 1;
+    if (batch.remaining > 0) return;
+
+    batchesRef.current.delete(batchId);
+    if (batch.vehicleId && batch.succeeded > 0) {
+      notifyPhotosAddedAction(batch.vehicleId, batch.succeeded).catch((e) =>
+        console.error("Failed to send photo-batch notification", e)
+      );
+    }
   }
 
   // Reads/writes stagedPhotosRef instead of appending to props.photos
@@ -194,12 +238,12 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
 
         {inFlight.length > 0 && (
           <div className="space-y-1.5">
-            {inFlight.map(({ id, file }) => (
+            {inFlight.map(({ id, file, batchId }) => (
               <PhotoUploadRow
                 key={id}
                 vehicleId={props.mode === "persist" ? props.vehicleId : undefined}
                 file={file}
-                onSettled={() => handleRowSettled(id)}
+                onSettled={(success) => handleRowSettled(id, batchId, success)}
                 onStaged={props.mode === "stage" ? handleStaged : undefined}
               />
             ))}
