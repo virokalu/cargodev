@@ -73,12 +73,16 @@ export async function listActivityLog(
 ): Promise<ActivityLogListResult> {
   const where: Prisma.ActivityLogWhereInput = {
     org_id: orgId,
-    // Partial, case-insensitive — entity/action are free-form strings (no
-    // DB enum backs them, see the ActivityLog model comment), so a client
-    // can't know the exact stored casing/value without first calling
-    // listActivityLogFilterOptions below. entityId/actorId stay exact
-    // equality: those are real ids, not text a client would be searching.
-    ...(params.entity ? { entity: { contains: params.entity, mode: "insensitive" } } : {}),
+    // entity is exact, case-insensitive — a client is expected to source the
+    // value from listActivityLogFilterOptions below (the real distinct
+    // strings in this org's log) and treat entities as fixed, mutually
+    // exclusive categories (e.g. "Vehicle" vs "VehiclePhoto"). A substring
+    // match would break that: "VehiclePhoto" and "VehicleDocument" both
+    // contain "Vehicle", so filtering for just "Vehicle" would leak in
+    // photo/document rows too. action stays a partial match — it's used
+    // more like free-text search, and action names don't collide as
+    // substrings of each other the way the entity names do.
+    ...(params.entity ? { entity: { equals: params.entity, mode: "insensitive" } } : {}),
     ...(params.entityId ? { entityId: params.entityId } : {}),
     ...(params.actorId ? { actorId: params.actorId } : {}),
     ...(params.action ? { action: { contains: params.action, mode: "insensitive" } } : {}),
