@@ -126,13 +126,52 @@ value is treated as a client bug worth surfacing).
 | `track` | `FC`\|`FL`\|`ALL` | `FC` | |
 | `q` | string | `""` | Free-text search |
 | `status` | repeatable: `PENDING`\|`BOOKING_RECEIVED`\|`SHIPPED`\|`CANCELLED` | `[]` (no filter) | e.g. `?status=PENDING&status=SHIPPED` |
-| `destination`, `customer`, `rowColour`, `rowColourNot`, `brand`, `model`, `grade`, `hall`, `agent`, `packingAgent`, `location`, `transport` | id string or `ALL` | `ALL` | Lookup ids from the corresponding `/lookups/*` endpoint |
-| `method` | `RORO`\|`CONTAINER`\|`ALL` | `ALL` | |
-| `billPaid`, `logBook`, `extraKey` | `ALL`\|`YES`\|`NO`\|`BLANK` | `ALL` | Tri-state filters — `BLANK` means "field is null (not entered)" |
+| `destination`, `customer`, `rowColour`, `rowColourNot`, `brand`, `model`, `grade`, `hall`, `supplier`, `agent`, `packingAgent`, `location`, `transport`, `currency` | id string (or the currency code itself for `currency`) or `ALL` | `ALL` | Lookup ids from the corresponding `/lookups/*` endpoint. `supplier` is FL-only, `agent`/`packingAgent` are FC-only (mirrors the web filter panel — see `GET /vehicles/filter-options` below) |
+| `method` | `RORO`\|`CONTAINER`\|`ALL` | `ALL` | FC-only |
+| `billPaid`, `logBook`, `extraKey`, `paidByCustomer` | `ALL`\|`YES`\|`NO`\|`BLANK` | `ALL` | Tri-state filters — `BLANK` means "field is null (not entered)". `paidByCustomer` is FL-only |
+| `partnership`, `converted` | `ALL`\|`YES`\|`NO` | `ALL` | Two-state (no `BLANK` — always a real Yes/No on the underlying field). `partnership` is FL-only, `converted` (converted from Local to Export) is FC-only |
+| `etdFrom`, `etdTo`, `etaFrom`, `etaTo` | `YYYY-MM-DD` | unset | Inclusive date-range bounds on `etd`/`eta`. Either bound can be set without the other (open-ended range). FC-only in practice — FL vehicles never carry `etd`/`eta`, so these just match nothing on FL rows rather than erroring. Not available in the web app's filter bar yet — mobile-only for now |
 | `sort` | `serial`\|`chassisNo`\|`model`\|`yom`\|`shipmentStatus`\|`purchaseDate`\|`etd`\|`eta`\|`destination`\|`docsArrivedDate`\|`nameChangeDeadline`\|`massoDate`\|`docSentDate`\|`recycleDate` | `serial` | |
 | `dir` | `asc`\|`desc` | `desc` | |
 
 Response `data`: `{ rows: VehicleListRow[], total, page, pageSize, totalPages }`.
+
+### `GET /api/v1/vehicles/filter-options`
+
+The fixed/enum option sets the filter panel above offers — track, shipment
+status (with display labels), shipping method, the tri-state and two-state
+value sets, and sold currency codes. None of these are stored in the
+database, so unlike every other filter (which comes from a `/lookups/*`
+search endpoint) there's no other way to fetch them — call this once and
+cache it rather than hardcoding the values, so a future change to the web
+app's option list (e.g. a new currency) doesn't silently drift out of sync
+with your client.
+
+Response `data`:
+```json
+{
+  "tracks": [
+    { "value": "FC", "label": "FC — Export" },
+    { "value": "FL", "label": "FL — Local" }
+  ],
+  "shipmentStatuses": [
+    { "value": "PENDING", "label": "Pending" },
+    { "value": "BOOKING_RECEIVED", "label": "Booking Received" },
+    { "value": "SHIPPED", "label": "Shipped" },
+    { "value": "CANCELLED", "label": "Shipment Cancelled" }
+  ],
+  "shippingMethods": ["RORO", "CONTAINER"],
+  "triStateValues": ["YES", "NO", "BLANK"],
+  "twoStateValues": ["YES", "NO"],
+  "soldCurrencies": ["JPY", "LKR", "USD"]
+}
+```
+
+Searchable, DB-backed filters (brand, model, grade, auction hall, supplier,
+freight agent, packing agent, vehicle location, transport company,
+destination, row colour status, customer) are **not** included here — those
+stay on their own endpoints below since they're paginated/query-driven, not
+a fixed list.
 
 ### `GET /api/v1/vehicles/destinations`
 
@@ -179,6 +218,7 @@ optional `?q=` and returns up to 20 matches; every `:id` endpoint returns
 | Model (scoped to a brand) | `GET /lookups/models?brandId=&q=` (`brandId` required) | `GET /lookups/models/:id` |
 | Grade (scoped to a model) | `GET /lookups/grades?modelId=&q=` (`modelId` required) | `GET /lookups/grades/:id` |
 | Auction Hall | `GET /lookups/auction-halls?q=` | `GET /lookups/auction-halls/:id` |
+| Supplier — FL only, alternative to Auction Hall | `GET /lookups/suppliers?q=` | `GET /lookups/suppliers/:id` |
 | Transport Company | `GET /lookups/transport-companies?q=` | `GET /lookups/transport-companies/:id` |
 | Packing Agent | `GET /lookups/packing-agents?q=` | `GET /lookups/packing-agents/:id` |
 | Vehicle Location | `GET /lookups/vehicle-locations?q=` | `GET /lookups/vehicle-locations/:id` |
