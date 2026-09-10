@@ -126,13 +126,52 @@ value is treated as a client bug worth surfacing).
 | `track` | `FC`\|`FL`\|`ALL` | `FC` | |
 | `q` | string | `""` | Free-text search |
 | `status` | repeatable: `PENDING`\|`BOOKING_RECEIVED`\|`SHIPPED`\|`CANCELLED` | `[]` (no filter) | e.g. `?status=PENDING&status=SHIPPED` |
-| `destination`, `customer`, `rowColour`, `rowColourNot`, `brand`, `model`, `grade`, `hall`, `agent`, `packingAgent`, `location`, `transport` | id string or `ALL` | `ALL` | Lookup ids from the corresponding `/lookups/*` endpoint |
-| `method` | `RORO`\|`CONTAINER`\|`ALL` | `ALL` | |
-| `billPaid`, `logBook`, `extraKey` | `ALL`\|`YES`\|`NO`\|`BLANK` | `ALL` | Tri-state filters — `BLANK` means "field is null (not entered)" |
+| `destination`, `customer`, `rowColour`, `rowColourNot`, `brand`, `model`, `grade`, `hall`, `supplier`, `agent`, `packingAgent`, `location`, `transport`, `currency` | id string (or the currency code itself for `currency`) or `ALL` | `ALL` | Lookup ids from the corresponding `/lookups/*` endpoint. `supplier` is FL-only, `agent`/`packingAgent` are FC-only (mirrors the web filter panel — see `GET /vehicles/filter-options` below) |
+| `method` | `RORO`\|`CONTAINER`\|`ALL` | `ALL` | FC-only |
+| `billPaid`, `logBook`, `extraKey`, `paidByCustomer` | `ALL`\|`YES`\|`NO`\|`BLANK` | `ALL` | Tri-state filters — `BLANK` means "field is null (not entered)". `paidByCustomer` is FL-only |
+| `partnership`, `converted` | `ALL`\|`YES`\|`NO` | `ALL` | Two-state (no `BLANK` — always a real Yes/No on the underlying field). `partnership` is FL-only, `converted` (converted from Local to Export) is FC-only |
+| `etdFrom`, `etdTo`, `etaFrom`, `etaTo` | `YYYY-MM-DD` | unset | Inclusive date-range bounds on `etd`/`eta`. Either bound can be set without the other (open-ended range). FC-only in practice — FL vehicles never carry `etd`/`eta`, so these just match nothing on FL rows rather than erroring. Not available in the web app's filter bar yet — mobile-only for now |
 | `sort` | `serial`\|`chassisNo`\|`model`\|`yom`\|`shipmentStatus`\|`purchaseDate`\|`etd`\|`eta`\|`destination`\|`docsArrivedDate`\|`nameChangeDeadline`\|`massoDate`\|`docSentDate`\|`recycleDate` | `serial` | |
 | `dir` | `asc`\|`desc` | `desc` | |
 
 Response `data`: `{ rows: VehicleListRow[], total, page, pageSize, totalPages }`.
+
+### `GET /api/v1/vehicles/filter-options`
+
+The fixed/enum option sets the filter panel above offers — track, shipment
+status (with display labels), shipping method, the tri-state and two-state
+value sets, and sold currency codes. None of these are stored in the
+database, so unlike every other filter (which comes from a `/lookups/*`
+search endpoint) there's no other way to fetch them — call this once and
+cache it rather than hardcoding the values, so a future change to the web
+app's option list (e.g. a new currency) doesn't silently drift out of sync
+with your client.
+
+Response `data`:
+```json
+{
+  "tracks": [
+    { "value": "FC", "label": "FC — Export" },
+    { "value": "FL", "label": "FL — Local" }
+  ],
+  "shipmentStatuses": [
+    { "value": "PENDING", "label": "Pending" },
+    { "value": "BOOKING_RECEIVED", "label": "Booking Received" },
+    { "value": "SHIPPED", "label": "Shipped" },
+    { "value": "CANCELLED", "label": "Shipment Cancelled" }
+  ],
+  "shippingMethods": ["RORO", "CONTAINER"],
+  "triStateValues": ["YES", "NO", "BLANK"],
+  "twoStateValues": ["YES", "NO"],
+  "soldCurrencies": ["JPY", "LKR", "USD"]
+}
+```
+
+Searchable, DB-backed filters (brand, model, grade, auction hall, supplier,
+freight agent, packing agent, vehicle location, transport company,
+destination, row colour status, customer) are **not** included here — those
+stay on their own endpoints below since they're paginated/query-driven, not
+a fixed list.
 
 ### `GET /api/v1/vehicles/destinations`
 
@@ -179,6 +218,7 @@ optional `?q=` and returns up to 20 matches; every `:id` endpoint returns
 | Model (scoped to a brand) | `GET /lookups/models?brandId=&q=` (`brandId` required) | `GET /lookups/models/:id` |
 | Grade (scoped to a model) | `GET /lookups/grades?modelId=&q=` (`modelId` required) | `GET /lookups/grades/:id` |
 | Auction Hall | `GET /lookups/auction-halls?q=` | `GET /lookups/auction-halls/:id` |
+| Supplier — FL only, alternative to Auction Hall | `GET /lookups/suppliers?q=` | `GET /lookups/suppliers/:id` |
 | Transport Company | `GET /lookups/transport-companies?q=` | `GET /lookups/transport-companies/:id` |
 | Packing Agent | `GET /lookups/packing-agents?q=` | `GET /lookups/packing-agents/:id` |
 | Vehicle Location | `GET /lookups/vehicle-locations?q=` | `GET /lookups/vehicle-locations/:id` |
@@ -208,7 +248,7 @@ All require any authenticated staff role. Always scoped to the calling
 user — you only ever see your own notifications, never another staff
 member's.
 
-- `GET /api/v1/notifications?limit=` — `limit` is 1–100, default 50.
+- `GET /api/v1/notifications?page=&pageSize=` — real pagination (same shape as `/vehicles` and `/activity-log`): `page` ≥ 1 (default 1), `pageSize` 1–100 (default 50). Response `data`: `{ rows: NotificationListItem[], total, page, pageSize, totalPages }`. Previously capped at a flat `limit` with no way to reach anything past the first batch — fixed to real page/skip pagination so every notification a user has is reachable.
 - `GET /api/v1/notifications/unread-count` — `{ count: number }`.
 - `POST /api/v1/notifications/:id/read` — marks one notification read. Idempotent — an already-read id, or one that doesn't belong to you, just no-ops (`{ read: true }` either way, never a 404 — same "don't leak what exists" reasoning as everywhere else).
 - `POST /api/v1/notifications/read-all` — marks every unread notification read for the calling user.
@@ -258,12 +298,28 @@ reliable in the iOS Simulator; test on a physical iPhone.
 
 ## Activity Log
 
-- `GET /api/v1/activity-log` — **Administrator only**. `403 FORBIDDEN` for every other role.
+**Administrator only** on both endpoints below — `403 FORBIDDEN` for every
+other role. There's no web page for this yet (it's referenced in the schema
+and CLAUDE.md as a planned Admin screen, never built) — these two endpoints
+are the only place this data is exposed at all right now.
+
+### `GET /api/v1/activity-log/filters`
+
+No query params. Distinct `entity` and `action` values that actually appear
+in your org's log right now — call this first to build a filter
+dropdown/chip list, since `entity`/`action` are free-form strings (no fixed
+enum backs them; new values can appear as new mutation types are added)
+rather than something you could hardcode.
+
+Response `data`: `{ entities: string[], actions: string[] }`.
+
+### `GET /api/v1/activity-log`
 
 | Param | Type | Notes |
 |---|---|---|
 | `page`, `pageSize` | int | Same defaults as the vehicle list (1 / 50, max pageSize 100) |
-| `entity`, `entityId`, `actorId`, `action` | string | Exact-match filters, all optional |
+| `entity`, `action` | string | Partial, case-insensitive match — pass a value from `/activity-log/filters` (or any substring) |
+| `entityId`, `actorId` | string | Exact match — real ids (`entityId` is the mutated row's internal id, e.g. a vehicle's `id` field from `GET /vehicles/:serial`, not its serial; `actorId` is a staff id from `GET /staff`), not searchable text |
 | `dateFrom`, `dateTo` | `YYYY-MM-DD` | Inclusive range on `createdAt`, both optional |
 
 Response `data`: `{ rows: [{id, actorId, actorName, action, entity, entityId, before, after, createdAt}], total, page, pageSize, totalPages }`.

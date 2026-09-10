@@ -73,10 +73,19 @@ export async function listActivityLog(
 ): Promise<ActivityLogListResult> {
   const where: Prisma.ActivityLogWhereInput = {
     org_id: orgId,
-    ...(params.entity ? { entity: params.entity } : {}),
+    // entity is exact, case-insensitive — a client is expected to source the
+    // value from listActivityLogFilterOptions below (the real distinct
+    // strings in this org's log) and treat entities as fixed, mutually
+    // exclusive categories (e.g. "Vehicle" vs "VehiclePhoto"). A substring
+    // match would break that: "VehiclePhoto" and "VehicleDocument" both
+    // contain "Vehicle", so filtering for just "Vehicle" would leak in
+    // photo/document rows too. action stays a partial match — it's used
+    // more like free-text search, and action names don't collide as
+    // substrings of each other the way the entity names do.
+    ...(params.entity ? { entity: { equals: params.entity, mode: "insensitive" } } : {}),
     ...(params.entityId ? { entityId: params.entityId } : {}),
     ...(params.actorId ? { actorId: params.actorId } : {}),
-    ...(params.action ? { action: params.action } : {}),
+    ...(params.action ? { action: { contains: params.action, mode: "insensitive" } } : {}),
     ...(params.dateFrom || params.dateTo
       ? {
           createdAt: {
@@ -126,5 +135,39 @@ export async function listActivityLog(
     page: params.page,
     pageSize: params.pageSize,
     totalPages: Math.max(1, Math.ceil(total / params.pageSize)),
+  };
+}
+
+export interface ActivityLogFilterOptions {
+  entities: string[];
+  actions: string[];
+}
+
+/** Distinct entity/action values that actually appear in this org's log —
+ * lets a client build a filter dropdown/chip list without hardcoding the
+ * full set (which isn't a fixed enum) or guessing exact strings to pass to
+ * listActivityLog's entity/action contains-filters above. Same reasoning
+ * reports.service.ts uses for its own dropdown options: derived from real
+ * data, not an assumed universe, so a filter never offers a value that
+ * would return zero rows. */
+export async function listActivityLogFilterOptions(orgId: string): Promise<ActivityLogFilterOptions> {
+  const [entityRows, actionRows] = await Promise.all([
+    prisma.activityLog.findMany({
+      where: { org_id: orgId },
+      select: { entity: true },
+      distinct: ["entity"],
+      orderBy: { entity: "asc" },
+    }),
+    prisma.activityLog.findMany({
+      where: { org_id: orgId },
+      select: { action: true },
+      distinct: ["action"],
+      orderBy: { action: "asc" },
+    }),
+  ]);
+
+  return {
+    entities: entityRows.map((row) => row.entity),
+    actions: actionRows.map((row) => row.action),
   };
 }
