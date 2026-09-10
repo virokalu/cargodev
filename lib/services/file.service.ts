@@ -157,14 +157,23 @@ export async function setAuctionSheet(
   return { auctionSheetUrl: result.auctionSheetUrl! };
 }
 
+// No per-photo notification here — a multi-file upload calls this once per
+// file as each one finishes (components/shared/uploads/vehicle-photo-
+// gallery.tsx runs every selected file as its own independent upload, since
+// they can finish seconds apart), so emitting inside this function would
+// mean "5 images uploaded" fans out as 5 separate "a photo was added"
+// notifications. Still writes its own ActivityLog entry per photo (full
+// audit granularity, unaffected by this) — only the *notification* is
+// batched, via notifyPhotosAdded below, called once after every upload in
+// a client-side batch has settled.
 export async function addVehiclePhoto(
   actor: SessionUser,
   vehicleId: string,
   url: string
 ): Promise<VehiclePhotoListItem> {
-  const vehicle = await getOwnedVehicle(actor.orgId, vehicleId);
+  await getOwnedVehicle(actor.orgId, vehicleId);
 
-  const { photo, notification } = await prisma.$transaction(async (tx) => {
+  const photo = await prisma.$transaction(async (tx) => {
     const photo = await tx.vehiclePhoto.create({
       data: { vehicleId, url, uploadedById: actor.id },
       include: { uploadedBy: { select: { name: true } } },
@@ -177,23 +186,41 @@ export async function addVehiclePhoto(
       entityId: photo.id,
       after: { url },
     });
+    return photo;
+  });
 
+  return { id: photo.id, url: photo.url, uploaderName: photo.uploadedBy.name, createdAt: photo.createdAt };
+}
+
+/** One notification for a whole batch of photos added together (e.g. "5
+ * photos added" instead of 5 separate pings) — called once by the client
+ * after every upload in a batch has settled, not from inside
+ * addVehiclePhoto itself. There's no single mutation to pair this
+ * notification with atomically the way emit()'s own doc comment describes
+ * (each photo in the batch is already its own independently-committed
+ * mutation by the time this fires), so this just runs the same
+ * list-recipients-then-emit steps addVehiclePhoto used to run inline, in
+ * their own short transaction. No-ops for a batch where nothing actually
+ * succeeded. */
+export async function notifyPhotosAdded(actor: SessionUser, vehicleId: string, count: number): Promise<void> {
+  if (count <= 0) return;
+  const vehicle = await getOwnedVehicle(actor.orgId, vehicleId);
+
+  const notification = await prisma.$transaction(async (tx) => {
     const recipientUserIds = await notificationService.listNotifiableStaffIds(tx, actor.orgId, actor.id);
     const notification: notificationService.EmitParams = {
       orgId: actor.orgId,
       event: "DOCUMENT_UPLOADED",
-      title: "Photo added",
-      body: `${actor.name} added a photo to ${vehicle.serial}.`,
+      title: count === 1 ? "Photo added" : "Photos added",
+      body: `${actor.name} added ${count} ${count === 1 ? "photo" : "photos"} to ${vehicle.serial}.`,
       vehicleId,
       recipientUserIds,
     };
     await notificationService.emit(tx, notification);
-
-    return { photo, notification };
+    return notification;
   });
 
   notificationService.notifyRealtime(notification);
-  return { id: photo.id, url: photo.url, uploaderName: photo.uploadedBy.name, createdAt: photo.createdAt };
 }
 
 export async function deleteVehiclePhoto(actor: SessionUser, vehicleId: string, photoId: string): Promise<void> {
