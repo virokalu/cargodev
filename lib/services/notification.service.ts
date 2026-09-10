@@ -146,9 +146,8 @@ const NOTIFICATION_SELECT = {
 type NotificationRow = Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>;
 
 /** Resolves each row's vehicleId to a serial (Notification.vehicleId has no
- * Prisma relation — see NotificationListItem's vehicleSerial doc below) in
- * one batched lookup, shared by both listNotifications and its paginated
- * counterpart so the resolution logic can't drift between the two. */
+ * Prisma relation — see NotificationListItem's vehicleSerial doc above) in
+ * one batched lookup. */
 async function attachVehicleSerials(rows: NotificationRow[]): Promise<NotificationListItem[]> {
   const vehicleIds = [...new Set(rows.map((r) => r.vehicleId).filter((id): id is string => id !== null))];
   const vehicles = vehicleIds.length
@@ -162,24 +161,10 @@ async function attachVehicleSerials(rows: NotificationRow[]): Promise<Notificati
   }));
 }
 
-/** Web app's Notifications page — most-recent-first, capped at `limit`, no
- * further pages reachable. Kept as-is (signature and behavior unchanged)
- * for that one caller; the mobile API uses listNotificationsPaginated
- * below instead, which can actually reach everything past the first page. */
-export async function listNotifications(
-  orgId: string,
-  userId: string,
-  limit = 50
-): Promise<NotificationListItem[]> {
-  const rows = await prisma.notification.findMany({
-    where: { org_id: orgId, userId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: NOTIFICATION_SELECT,
-  });
-
-  return attachVehicleSerials(rows);
-}
+// Shared by the web Notifications page (app/(dashboard)/notifications) and
+// its "Load More" Server Action — one page's worth of rows per fetch,
+// rather than the old capped-at-50-with-no-way-to-reach-more design.
+export const NOTIFICATIONS_PAGE_SIZE = 20;
 
 export interface NotificationListParams {
   page: number;
@@ -194,9 +179,9 @@ export interface NotificationListResult {
   totalPages: number;
 }
 
-/** Same shape as listActivityLog/listVehicles — real page/skip pagination,
- * so a client can actually reach every notification a user has, not just
- * the most recent capped batch listNotifications returns. */
+/** Same shape as listActivityLog/listVehicles — real page/skip pagination.
+ * Used by both the web app's Notifications page (page 1 on first load, then
+ * one page per "Load More" click) and the mobile API. */
 export async function listNotificationsPaginated(
   orgId: string,
   userId: string,
