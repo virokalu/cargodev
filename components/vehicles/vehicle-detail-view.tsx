@@ -284,7 +284,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
               <FieldGroup title="Transport & Logistics">
                 <Field label="Transport By" value={vehicle.transportBy?.name} />
                 <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
-                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
+                <Field label="Tracking Number" value={vehicle.trackingNumber} />
                 <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
                 <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
                 <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />

@@ -371,10 +371,9 @@ model Vehicle {
   vanningDate       DateTime? // Container only — when the vehicle was loaded into its container; drives the Loaded shipment milestone
   containerNumber   String? // Container only
 
-  massoDate  DateTime? // Deregistration (抹消) date
-  billNumber String?
-  lcNo       String?
-  trackingNo String?
+  massoDate      DateTime? // Deregistration (抹消) date
+  trackingNumber String? // Was named "Bill Number" — staff always used it to record the shipment tracking number, never a real bill number, so it was renamed to match (the old, separate FC-only "Tracking No" field was dropped as unused).
+  lcNo           String?
 
   docSentDate    DateTime? // #30
   docSentComment String?

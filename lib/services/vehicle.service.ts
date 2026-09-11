@@ -77,7 +77,6 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
-  const trackingNo = isFC ? input.trackingNo : null;
   // Packing agent, vanning date, and container number only ever apply to
   // Container shipments — same strip-regardless-of-what-was-posted
   // treatment as the fields above.
@@ -195,12 +194,11 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         packingAgentId,
         vanningDate,
         containerNumber,
-        trackingNo,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
         massoDate: input.massoDate,
-        billNumber: input.billNumber,
+        trackingNumber: input.trackingNumber,
         lcNo: input.lcNo,
         docsArrivedDate: input.docsArrivedDate,
 
@@ -456,12 +454,11 @@ export interface VehicleDetailData {
   packingAgent: LookupRef | null;
   vanningDate: Date | null;
   containerNumber: string | null;
-  trackingNo: string | null;
 
   transportBy: LookupRef | null;
   vehicleLocation: LookupRef | null;
   massoDate: Date | null;
-  billNumber: string | null;
+  trackingNumber: string | null;
   lcNo: string | null;
   docsArrivedDate: Date | null;
 
@@ -524,9 +521,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       shippingMethod: true,
       vanningDate: true,
       containerNumber: true,
-      trackingNo: true,
       massoDate: true,
-      billNumber: true,
+      trackingNumber: true,
       lcNo: true,
       docsArrivedDate: true,
       auctionBillPaid: true,
@@ -618,11 +614,10 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     packingAgent: vehicle.packingAgent,
     vanningDate: vehicle.vanningDate,
     containerNumber: vehicle.containerNumber,
-    trackingNo: vehicle.trackingNo,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
     massoDate: vehicle.massoDate,
-    billNumber: vehicle.billNumber,
+    trackingNumber: vehicle.trackingNumber,
     lcNo: vehicle.lcNo,
     docsArrivedDate: vehicle.docsArrivedDate,
     auctionBillPaid: vehicle.auctionBillPaid,
@@ -750,7 +745,6 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
-  const trackingNo = isFC ? input.trackingNo : null;
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
   const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
   const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
@@ -849,12 +843,11 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         packingAgentId,
         vanningDate,
         containerNumber,
-        trackingNo,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
         massoDate: input.massoDate,
-        billNumber: input.billNumber,
+        trackingNumber: input.trackingNumber,
         lcNo: input.lcNo,
         docsArrivedDate: input.docsArrivedDate,
 
@@ -1459,7 +1452,6 @@ export interface VehicleListRow {
   packingAgentName: string | null;
   vanningDate: Date | null;
   containerNumber: string | null;
-  trackingNo: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
   auctionBillPaid: boolean | null;
@@ -1468,7 +1460,7 @@ export interface VehicleListRow {
   docsArrivedDate: Date | null;
   nameChangeDeadline: Date | null;
   massoDate: Date | null;
-  billNumber: string | null;
+  trackingNumber: string | null;
   lcNo: string | null;
   docSentDate: Date | null;
   docSentComment: string | null;
@@ -1671,14 +1663,13 @@ const VEHICLE_LIST_SELECT = {
   shippingMethod: true,
   vanningDate: true,
   containerNumber: true,
-  trackingNo: true,
   auctionBillPaid: true,
   logBook: true,
   extraKey: true,
   docsArrivedDate: true,
   nameChangeDeadline: true,
   massoDate: true,
-  billNumber: true,
+  trackingNumber: true,
   lcNo: true,
   docSentDate: true,
   docSentComment: true,
@@ -1730,7 +1721,6 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     packingAgentName: v.packingAgent?.name ?? null,
     vanningDate: v.vanningDate,
     containerNumber: v.containerNumber,
-    trackingNo: v.trackingNo,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,
     auctionBillPaid: v.auctionBillPaid,
@@ -1739,7 +1729,7 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     docsArrivedDate: v.docsArrivedDate,
     nameChangeDeadline: v.nameChangeDeadline,
     massoDate: v.massoDate,
-    billNumber: v.billNumber,
+    trackingNumber: v.trackingNumber,
     lcNo: v.lcNo,
     docSentDate: v.docSentDate,
     docSentComment: v.docSentComment,

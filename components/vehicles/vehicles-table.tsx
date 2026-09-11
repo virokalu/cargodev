@@ -292,7 +292,6 @@ const SCROLL_COLUMNS: {
     render: (row) => row.vesselName ?? "—",
   },
   { key: "lcNo", header: "LC No", tracks: ["FC"], render: (row) => row.lcNo ?? "—" },
-  { key: "trackingNo", header: "Tracking No", tracks: ["FC"], render: (row) => row.trackingNo ?? "—" },
   {
     key: "docSentComment",
     header: "Doc Sent Remark",
@@ -336,7 +335,7 @@ const SCROLL_COLUMNS: {
         "—"
       ),
   },
-  { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
+  { key: "trackingNumber", header: "Tracking Number", render: (row) => row.trackingNumber ?? "—" },
   {
     key: "deliveryDate",
     header: "Delivery Date",

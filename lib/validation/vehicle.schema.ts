@@ -117,7 +117,6 @@ const vehicleSharedFields = {
   vesselName: optionalText(100),
   freightAgentId: optionalId,
   shippingMethod: z.enum(["RORO", "CONTAINER"]).nullable().optional(),
-  trackingNo: optionalText(100),
   // Only meaningful when shippingMethod = CONTAINER — vehicle.service nulls
   // it out otherwise, same treatment as the other FC-only shipping fields.
   packingAgentId: optionalId,
@@ -127,7 +126,7 @@ const vehicleSharedFields = {
   transportById: optionalId,
   vehicleLocationId: optionalId,
   massoDate: optionalDate,
-  billNumber: optionalText(100),
+  trackingNumber: optionalText(100),
   lcNo: optionalText(100),
   docsArrivedDate: optionalDate,
 

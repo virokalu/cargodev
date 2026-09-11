@@ -80,9 +80,8 @@ The colour value is data, not code — admins can adjust colours without a deplo
 | 23 | Freight Agent | managed lookup + capabilities | Each agent flagged as offering RORO and/or Container |
 | 24 | RORO / Container | enum per vehicle | Validated against the chosen agent's capabilities |
 | 25 | Masso Date | date | Deregistration (抹消) date |
-| 26 | Bill Number | text | — |
+| 26 | Tracking Number | text | **Renamed 2026-09-11** — was "Bill Number", but staff always used it to record the shipment tracking number, so the field was renamed to match. The old, separate FC-only "Tracking No" field (formerly #28) was dropped as unused. Available on both FC and FL. |
 | 27 | LC No | text | — |
-| 28 | Tracking No | text | — |
 | 29 | Vehicle Remark | free text | **Changed 2026-07-26** — superseded the original append-only `RemarkEntry` thread design; a single overwritable `vehicleRemark` textarea covered actual usage better than a growing conversation log. Later edits replace the note, no author/timestamp history (§6). |
 | 30 | Doc Sent to Client | date **+ optional comment** | Two columns: `doc_sent_date`, `doc_sent_comment` |
 | 31 | Recycle | date | Confirmed as a date field (`recycle_date DateTime?`) |

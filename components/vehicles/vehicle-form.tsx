@@ -222,12 +222,11 @@ export interface FormState {
   packingAgent: ComboboxOption | null;
   vanningDate: string | null;
   containerNumber: string;
-  trackingNo: string;
 
   transportBy: ComboboxOption | null;
   vehicleLocation: ComboboxOption | null;
   massoDate: string | null;
-  billNumber: string;
+  trackingNumber: string;
   lcNo: string;
   docsArrivedDate: string | null;
 
@@ -285,12 +284,11 @@ const INITIAL_STATE: FormState = {
   packingAgent: null,
   vanningDate: null,
   containerNumber: "",
-  trackingNo: "",
 
   transportBy: null,
   vehicleLocation: null,
   massoDate: null,
-  billNumber: "",
+  trackingNumber: "",
   lcNo: "",
   docsArrivedDate: null,
 
@@ -360,12 +358,11 @@ function buildPayload(state: FormState) {
     packingAgentId: state.packingAgent?.id ?? null,
     vanningDate: state.vanningDate,
     containerNumber: state.containerNumber,
-    trackingNo: state.trackingNo,
 
     transportById: state.transportBy?.id ?? null,
     vehicleLocationId: state.vehicleLocation?.id ?? null,
     massoDate: state.massoDate,
-    billNumber: state.billNumber,
+    trackingNumber: state.trackingNumber,
     lcNo: state.lcNo,
     docsArrivedDate: state.docsArrivedDate,
 
@@ -1164,16 +1161,6 @@ export function VehicleForm({
               onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
               error={fieldErrors.vehicleLocationId}
             />
-            {isFC && (
-              <TextField
-                id="trackingNo"
-                label="Tracking No"
-                value={state.trackingNo}
-                onChange={(value) => setField("trackingNo", value)}
-                maxLength={100}
-                error={fieldErrors.trackingNo}
-              />
-            )}
             <DateField
               id="docsArrivedDate"
               label="Docs Arrived Date"
@@ -1213,12 +1200,12 @@ export function VehicleForm({
               error={fieldErrors.docSentDate}
             />
             <TextField
-              id="billNumber"
-              label="Bill Number"
-              value={state.billNumber}
-              onChange={(value) => setField("billNumber", value)}
+              id="trackingNumber"
+              label="Tracking Number"
+              value={state.trackingNumber}
+              onChange={(value) => setField("trackingNumber", value)}
               maxLength={100}
-              error={fieldErrors.billNumber}
+              error={fieldErrors.trackingNumber}
             />
             <div className="sm:col-span-2">
               <Label htmlFor="docSentComment" className="mb-1.5">
