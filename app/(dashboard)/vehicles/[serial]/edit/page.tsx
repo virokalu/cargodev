@@ -37,6 +37,10 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
     packingAgent: vehicle.packingAgent,
     vanningDate: toDateInputValue(vehicle.vanningDate),
     containerNumber: vehicle.containerNumber ?? "",
+    hasInspection: vehicle.hasInspection,
+    inspectionDate: toDateInputValue(vehicle.inspectionDate),
+    inspectionCompany: vehicle.inspectionCompany,
+    inspectionLocation: vehicle.inspectionLocation,
 
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,

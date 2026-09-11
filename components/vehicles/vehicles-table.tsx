@@ -293,6 +293,30 @@ const SCROLL_COLUMNS: {
   },
   { key: "lcNo", header: "LC No", tracks: ["FC"], render: (row) => row.lcNo ?? "—" },
   {
+    key: "hasInspection",
+    header: "Inspection",
+    tracks: ["FC"],
+    render: (row) => (row.hasInspection ? "Yes" : "No"),
+  },
+  {
+    key: "inspectionDate",
+    header: "Inspection Date",
+    tracks: ["FC"],
+    render: (row) => formatDate(row.inspectionDate),
+  },
+  {
+    key: "inspectionCompany",
+    header: "Inspection Company",
+    tracks: ["FC"],
+    render: (row) => row.inspectionCompanyName ?? "—",
+  },
+  {
+    key: "inspectionLocation",
+    header: "Inspection Location",
+    tracks: ["FC"],
+    render: (row) => row.inspectionLocationName ?? "—",
+  },
+  {
     key: "docSentComment",
     header: "Doc Sent Remark",
     render: (row) =>

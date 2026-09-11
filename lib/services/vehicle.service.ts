@@ -83,6 +83,10 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
   const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
   const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
+  const hasInspection = isFC ? input.hasInspection : false;
+  const inspectionDate = isFC ? input.inspectionDate : null;
+  const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
+  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
 
   // Freight agent capability re-check — server never trusts the client alone
   // to have filtered the RORO/Container options (CLAUDE.md rule 4).
@@ -194,6 +198,10 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         packingAgentId,
         vanningDate,
         containerNumber,
+        hasInspection,
+        inspectionDate,
+        inspectionCompanyId,
+        inspectionLocationId,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
@@ -458,6 +466,10 @@ export interface VehicleDetailData {
   packingAgent: LookupRef | null;
   vanningDate: Date | null;
   containerNumber: string | null;
+  hasInspection: boolean;
+  inspectionDate: Date | null;
+  inspectionCompany: LookupRef | null;
+  inspectionLocation: LookupRef | null;
 
   transportBy: LookupRef | null;
   vehicleLocation: LookupRef | null;
@@ -526,6 +538,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       shippingMethod: true,
       vanningDate: true,
       containerNumber: true,
+      hasInspection: true,
+      inspectionDate: true,
       massoDate: true,
       trackingNumber: true,
       lcNo: true,
@@ -549,6 +563,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
       rowColourStatus: { select: { id: true, name: true, colour: true } },
+      inspectionCompany: { select: { id: true, name: true } },
+      inspectionLocation: { select: { id: true, name: true } },
     },
   });
 
@@ -624,6 +640,10 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     packingAgent: vehicle.packingAgent,
     vanningDate: vehicle.vanningDate,
     containerNumber: vehicle.containerNumber,
+    hasInspection: vehicle.hasInspection,
+    inspectionDate: vehicle.inspectionDate,
+    inspectionCompany: vehicle.inspectionCompany,
+    inspectionLocation: vehicle.inspectionLocation,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
     massoDate: vehicle.massoDate,
@@ -759,6 +779,10 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
   const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
   const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
+  const hasInspection = isFC ? input.hasInspection : false;
+  const inspectionDate = isFC ? input.inspectionDate : null;
+  const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
+  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
 
   if (shippingMethod && freightAgentId) {
     const agent = await prisma.freightAgent.findUnique({ where: { id: freightAgentId } });
@@ -854,6 +878,10 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         packingAgentId,
         vanningDate,
         containerNumber,
+        hasInspection,
+        inspectionDate,
+        inspectionCompanyId,
+        inspectionLocationId,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
@@ -1538,6 +1566,10 @@ export interface VehicleListRow {
   packingAgentName: string | null;
   vanningDate: Date | null;
   containerNumber: string | null;
+  hasInspection: boolean;
+  inspectionDate: Date | null;
+  inspectionCompanyName: string | null;
+  inspectionLocationName: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
   auctionBillPaid: boolean | null;
@@ -1757,6 +1789,8 @@ const VEHICLE_LIST_SELECT = {
   shippingMethod: true,
   vanningDate: true,
   containerNumber: true,
+  hasInspection: true,
+  inspectionDate: true,
   auctionBillPaid: true,
   logBook: true,
   extraKey: true,
@@ -1781,6 +1815,8 @@ const VEHICLE_LIST_SELECT = {
   transportBy: { select: { name: true } },
   vehicleLocation: { select: { name: true } },
   rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
+  inspectionCompany: { select: { name: true } },
+  inspectionLocation: { select: { name: true } },
 } satisfies Prisma.VehicleSelect;
 
 type VehicleListRawRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_LIST_SELECT }>;
@@ -1816,6 +1852,10 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     packingAgentName: v.packingAgent?.name ?? null,
     vanningDate: v.vanningDate,
     containerNumber: v.containerNumber,
+    hasInspection: v.hasInspection,
+    inspectionDate: v.inspectionDate,
+    inspectionCompanyName: v.inspectionCompany?.name ?? null,
+    inspectionLocationName: v.inspectionLocation?.name ?? null,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,
     auctionBillPaid: v.auctionBillPaid,

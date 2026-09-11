@@ -328,6 +328,16 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                   {LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "") && (
                     <Field label="LC No" value={vehicle.lcNo} />
                   )}
+                  <Field label="Inspection" value={vehicle.hasInspection ? "Yes" : "No"} />
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Date" value={formatDate(vehicle.inspectionDate)} />
+                  )}
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Company" value={vehicle.inspectionCompany?.name} />
+                  )}
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Location" value={vehicle.inspectionLocation?.name} />
+                  )}
                 </FieldGroup>
               )}
 
@@ -355,10 +365,13 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
 
             <TabsContent value="documents" className="space-y-4 rounded-lg border p-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field. */}
+               * shipments — same gating as the LC No field. Inspection
+               * Report only applies once Inspection = Yes. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")) &&
+                    (documentType !== "INSPECTION_REPORT" || vehicle.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>

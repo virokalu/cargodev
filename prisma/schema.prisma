@@ -77,21 +77,23 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   // Relations
-  users            User[]
-  vehicles         Vehicle[]
-  brands           Brand[]
-  auctionHalls     AuctionHall[]
-  suppliers        Supplier[]
-  transportCos     TransportCompany[]
-  vehicleLocations VehicleLocation[]
-  freightAgents    FreightAgent[]
-  packingAgents    PackingAgent[]
-  rowStatuses      RowColourStatus[]
-  serialCounters   SerialCounter[]
-  notifications    Notification[]
-  activityLogs     ActivityLog[]
-  refreshTokens    RefreshToken[]
-  deviceTokens     DeviceToken[]
+  users               User[]
+  vehicles            Vehicle[]
+  brands              Brand[]
+  auctionHalls        AuctionHall[]
+  suppliers           Supplier[]
+  transportCos        TransportCompany[]
+  vehicleLocations    VehicleLocation[]
+  freightAgents       FreightAgent[]
+  packingAgents       PackingAgent[]
+  rowStatuses         RowColourStatus[]
+  serialCounters      SerialCounter[]
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+  refreshTokens       RefreshToken[]
+  deviceTokens        DeviceToken[]
+  inspectionCompanies InspectionCompany[]
+  inspectionLocations InspectionLocation[]
 }
 
 // ─────────────────────────────────────────────
@@ -230,6 +232,26 @@ model TransportCompany {
   @@unique([org_id, name])
 }
 
+model InspectionCompany {
+  id       String       @id @default(cuid())
+  org_id   String
+  name     String
+  org      Organization @relation(fields: [org_id], references: [id])
+  vehicles Vehicle[]
+
+  @@unique([org_id, name])
+}
+
+model InspectionLocation {
+  id       String       @id @default(cuid())
+  org_id   String
+  name     String
+  org      Organization @relation(fields: [org_id], references: [id])
+  vehicles Vehicle[]
+
+  @@unique([org_id, name])
+}
+
 model VehicleLocation {
   id       String       @id @default(cuid())
   org_id   String
@@ -348,6 +370,19 @@ model Vehicle {
 
   vesselName String? // FC only — applies to both RORO and Container shipments
 
+  // FC only — whether this vehicle needs/had an inspection. Plain Yes/No,
+  // same reasoning as hasPartnership below (whoever enters the vehicle
+  // always knows). The Inspection Report itself is a VehicleDocument row
+  // (documentType INSPECTION_REPORT), not a column here — this flag just
+  // controls whether that upload slot and the fields below are shown; it
+  // deliberately doesn't affect the separate, pre-existing "Inspection
+  // Completed" shipment-timeline milestone, which keeps inferring itself
+  // from the document upload alone (lib/shipment-milestones.ts).
+  hasInspection        Boolean   @default(false)
+  inspectionDate       DateTime?
+  inspectionCompanyId  String?
+  inspectionLocationId String?
+
   // FL only — was this purchase made with a partner. Unlike the tri-state
   // flags below, this is a plain Yes/No: whoever enters the vehicle always
   // knows whether there was a partner, there's no realistic "not entered
@@ -415,17 +450,19 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   // ── Relations ──────────────────────────────
-  org             Organization      @relation(fields: [org_id], references: [id])
-  model           VehicleModelRef?  @relation(fields: [modelId], references: [id])
-  grade           Grade?            @relation(fields: [gradeId], references: [id])
-  auctionHall     AuctionHall?      @relation(fields: [auctionHallId], references: [id])
-  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
-  customer        User?             @relation("CustomerVehicles", fields: [customerId], references: [id])
-  transportBy     TransportCompany? @relation(fields: [transportById], references: [id])
-  vehicleLocation VehicleLocation?  @relation(fields: [vehicleLocationId], references: [id])
-  freightAgent    FreightAgent?     @relation(fields: [freightAgentId], references: [id])
-  packingAgent    PackingAgent?     @relation(fields: [packingAgentId], references: [id])
-  rowColourStatus RowColourStatus?  @relation(fields: [rowColourStatusId], references: [id])
+  org                Organization        @relation(fields: [org_id], references: [id])
+  model              VehicleModelRef?    @relation(fields: [modelId], references: [id])
+  grade              Grade?              @relation(fields: [gradeId], references: [id])
+  auctionHall        AuctionHall?        @relation(fields: [auctionHallId], references: [id])
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
+  customer           User?               @relation("CustomerVehicles", fields: [customerId], references: [id])
+  transportBy        TransportCompany?   @relation(fields: [transportById], references: [id])
+  vehicleLocation    VehicleLocation?    @relation(fields: [vehicleLocationId], references: [id])
+  freightAgent       FreightAgent?       @relation(fields: [freightAgentId], references: [id])
+  packingAgent       PackingAgent?       @relation(fields: [packingAgentId], references: [id])
+  rowColourStatus    RowColourStatus?    @relation(fields: [rowColourStatusId], references: [id])
+  inspectionCompany  InspectionCompany?  @relation(fields: [inspectionCompanyId], references: [id])
+  inspectionLocation InspectionLocation? @relation(fields: [inspectionLocationId], references: [id])
 
   photos        VehiclePhoto[]
   documents     VehicleDocument[]
@@ -444,6 +481,8 @@ model Vehicle {
   @@index([org_id, freightAgentId])
   @@index([org_id, packingAgentId])
   @@index([org_id, vehicleLocationId])
+  @@index([org_id, inspectionCompanyId])
+  @@index([org_id, inspectionLocationId])
   @@index([org_id, modelId])
   @@index([org_id, gradeId])
   @@index([org_id, destination])

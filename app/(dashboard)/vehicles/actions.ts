@@ -312,6 +312,40 @@ export async function renameTransportCompanyAction(id: string, name: string) {
   return renamed;
 }
 
+export async function searchInspectionCompaniesAction(query: string) {
+  const user = await requireUser();
+  return lookupService.searchInspectionCompanies(user.orgId, query);
+}
+
+export async function createInspectionCompanyAction(name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.findOrCreateInspectionCompany(user.orgId, name);
+}
+
+export async function renameInspectionCompanyAction(id: string, name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const renamed = await lookupService.renameInspectionCompany(user.orgId, id, name);
+  revalidatePath("/vehicles");
+  return renamed;
+}
+
+export async function searchInspectionLocationsAction(query: string) {
+  const user = await requireUser();
+  return lookupService.searchInspectionLocations(user.orgId, query);
+}
+
+export async function createInspectionLocationAction(name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  return lookupService.findOrCreateInspectionLocation(user.orgId, name);
+}
+
+export async function renameInspectionLocationAction(id: string, name: string) {
+  const user = await requireUser([...STAFF_CAN_WRITE]);
+  const renamed = await lookupService.renameInspectionLocation(user.orgId, id, name);
+  revalidatePath("/vehicles");
+  return renamed;
+}
+
 export async function searchVehicleLocationsAction(query: string) {
   const user = await requireUser();
   return lookupService.searchVehicleLocations(user.orgId, query);

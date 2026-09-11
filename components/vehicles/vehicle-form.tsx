@@ -112,6 +112,12 @@ import {
   searchPackingAgentsAction,
   createPackingAgentAction,
   renamePackingAgentAction,
+  searchInspectionCompaniesAction,
+  createInspectionCompanyAction,
+  renameInspectionCompanyAction,
+  searchInspectionLocationsAction,
+  createInspectionLocationAction,
+  renameInspectionLocationAction,
   searchCustomersAction,
   createCustomerAction,
   renameCustomerAction,
@@ -229,6 +235,12 @@ export interface FormState {
   packingAgent: ComboboxOption | null;
   vanningDate: string | null;
   containerNumber: string;
+  // FC only. Plain Yes/No like hasPartnership below — inspectionDate/
+  // inspectionCompany/inspectionLocation only matter when true.
+  hasInspection: boolean;
+  inspectionDate: string | null;
+  inspectionCompany: ComboboxOption | null;
+  inspectionLocation: ComboboxOption | null;
 
   transportBy: ComboboxOption | null;
   vehicleLocation: ComboboxOption | null;
@@ -291,6 +303,10 @@ const INITIAL_STATE: FormState = {
   packingAgent: null,
   vanningDate: null,
   containerNumber: "",
+  hasInspection: false,
+  inspectionDate: null,
+  inspectionCompany: null,
+  inspectionLocation: null,
 
   transportBy: null,
   vehicleLocation: null,
@@ -365,6 +381,10 @@ function buildPayload(state: FormState) {
     packingAgentId: state.packingAgent?.id ?? null,
     vanningDate: state.vanningDate,
     containerNumber: state.containerNumber,
+    hasInspection: state.hasInspection,
+    inspectionDate: state.inspectionDate,
+    inspectionCompanyId: state.inspectionCompany?.id ?? null,
+    inspectionLocationId: state.inspectionLocation?.id ?? null,
 
     transportById: state.transportBy?.id ?? null,
     vehicleLocationId: state.vehicleLocation?.id ?? null,
@@ -1370,6 +1390,54 @@ export function VehicleForm({
                   error={fieldErrors.lcNo}
                 />
               )}
+              <YesNoToggle
+                label="Inspection"
+                value={state.hasInspection}
+                onChange={(value) =>
+                  setState((previous) => ({
+                    ...previous,
+                    hasInspection: value,
+                    inspectionDate: value ? previous.inspectionDate : null,
+                    inspectionCompany: value ? previous.inspectionCompany : null,
+                    inspectionLocation: value ? previous.inspectionLocation : null,
+                  }))
+                }
+              />
+              {state.hasInspection && (
+                <DateField
+                  id="inspectionDate"
+                  label="Inspection Date"
+                  value={state.inspectionDate}
+                  onChange={(value) => setField("inspectionDate", value)}
+                  error={fieldErrors.inspectionDate}
+                />
+              )}
+              {state.hasInspection && (
+                <ComboboxCreate
+                  id="inspectionCompany"
+                  label="Inspection Company"
+                  createLabel="inspection company"
+                  value={state.inspectionCompany}
+                  onChange={(value) => setField("inspectionCompany", value)}
+                  search={searchInspectionCompaniesAction}
+                  onCreate={createInspectionCompanyAction}
+                  onRename={(option, name) => renameInspectionCompanyAction(option.id, name)}
+                  error={fieldErrors.inspectionCompanyId}
+                />
+              )}
+              {state.hasInspection && (
+                <ComboboxCreate
+                  id="inspectionLocation"
+                  label="Inspection Location"
+                  createLabel="inspection location"
+                  value={state.inspectionLocation}
+                  onChange={(value) => setField("inspectionLocation", value)}
+                  search={searchInspectionLocationsAction}
+                  onCreate={createInspectionLocationAction}
+                  onRename={(option, name) => renameInspectionLocationAction(option.id, name)}
+                  error={fieldErrors.inspectionLocationId}
+                />
+              )}
             </SectionCard>
           )}
 
@@ -1586,10 +1654,14 @@ export function VehicleForm({
           {mode === "create" && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field above. */}
+               * shipments — same gating as the LC No field above. Inspection
+               * Report only applies once Inspection = Yes — same gating as
+               * the Inspection fields above. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)) &&
+                    (documentType !== "INSPECTION_REPORT" || state.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
@@ -1616,10 +1688,14 @@ export function VehicleForm({
           {mode === "edit" && files && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field above. */}
+               * shipments — same gating as the LC No field above. Inspection
+               * Report only applies once Inspection = Yes — same gating as
+               * the Inspection fields above. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)) &&
+                    (documentType !== "INSPECTION_REPORT" || state.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
