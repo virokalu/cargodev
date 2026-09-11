@@ -1568,8 +1568,9 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   }
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
-  // brand/model/grade, supplier, partner name, vessel name, and customer
-  // name — everything else is a dedicated per-column filter, not free text.
+  // brand/model/grade, supplier, partner name, vessel name, BL/LC number,
+  // and customer name — everything else is a dedicated per-column filter,
+  // not free text.
   // Customer also has its own dedicated filter dropdown (params.customerId
   // above, search-as-you-type since the list can get large) — kept in
   // search too so typing a customer's name works without opening that
@@ -1588,6 +1589,8 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
       { supplier: { name: { contains: search, mode: "insensitive" } } },
       { partnerName: { contains: search, mode: "insensitive" } },
       { vesselName: { contains: search, mode: "insensitive" } },
+      { blNo: { contains: search, mode: "insensitive" } },
+      { lcNo: { contains: search, mode: "insensitive" } },
     ];
   }
 
