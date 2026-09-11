@@ -104,6 +104,40 @@ export async function revertVehicleToLocalAction(
   }
 }
 
+export async function convertVehicleToLocalAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await vehicleService.convertVehicleToLocal(user.orgId, user.id, id);
+    revalidatePath("/vehicles");
+    revalidatePath("/vehicles/[serial]/edit", "page");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
+export async function revertVehicleToExportAction(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await requireUser([...STAFF_CAN_EDIT_VEHICLE]);
+  try {
+    await vehicleService.revertVehicleToExport(user.orgId, user.id, id);
+    revalidatePath("/vehicles");
+    revalidatePath("/vehicles/[serial]/edit", "page");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+}
+
 export async function correctVehicleSerialNumberAction(
   id: string,
   newNumber: number

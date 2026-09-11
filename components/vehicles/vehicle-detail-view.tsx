@@ -198,6 +198,11 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
               Converted from FL
             </Badge>
           )}
+          {vehicle.convertedToLocal && (
+            <Badge variant="outline" className="text-sm">
+              Converted from FC
+            </Badge>
+          )}
           {isFC && (
             <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}

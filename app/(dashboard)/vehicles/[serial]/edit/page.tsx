@@ -98,13 +98,14 @@ export default async function EditVehiclePage({
       // form's internal useState initializer only runs once per mount, so a
       // prop change alone wouldn't flip isFC on for the newly-converted
       // vehicle.
-      key={`${vehicle.id}-${vehicle.convertedToExport}`}
+      key={`${vehicle.id}-${vehicle.convertedToExport}-${vehicle.convertedToLocal}`}
       mode="edit"
       vehicleId={vehicle.id}
       existingSerial={vehicle.serial}
       existingTrack={vehicle.track}
       existingShipmentStatus={vehicle.shipmentStatus}
       existingConvertedToExport={vehicle.convertedToExport}
+      existingConvertedToLocal={vehicle.convertedToLocal}
       initialValues={toFormValues(vehicle)}
       files={files}
       rowColourStatuses={rowColourStatuses}

@@ -334,6 +334,7 @@ export const vehicleListQuerySchema = z
     paidByCustomer: triStateOrAllEnum.default("ALL"),
     currency: idOrAll,
     converted: twoStateOrAllEnum.default("ALL"),
+    convertedLocal: twoStateOrAllEnum.default("ALL"),
     // Inclusive date-range bounds on etd/eta — reuses the same optionalDate
     // parser vehicleSharedFields uses for mutation bodies ("YYYY-MM-DD"
     // string -> Date, undefined/empty -> null). No web filter-bar control
@@ -373,6 +374,7 @@ export const vehicleListQuerySchema = z
     paidByCustomer: v.paidByCustomer,
     sellingPriceCurrency: v.currency,
     convertedToExport: v.converted,
+    convertedToLocal: v.convertedLocal,
     etdFrom: v.etdFrom,
     etdTo: v.etdTo,
     etaFrom: v.etaFrom,

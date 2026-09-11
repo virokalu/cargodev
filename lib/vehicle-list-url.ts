@@ -43,6 +43,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   paidByCustomer: "ALL",
   sellingPriceCurrency: "ALL",
   convertedToExport: "ALL",
+  convertedToLocal: "ALL",
   etdFrom: null,
   etdTo: null,
   etaFrom: null,
@@ -158,6 +159,7 @@ export function parseVehicleListParams(
     paidByCustomer: parseTriState(firstValue(searchParams.paidByCustomer)),
     sellingPriceCurrency: firstValue(searchParams.currency) || "ALL",
     convertedToExport: parseTwoState(firstValue(searchParams.converted)),
+    convertedToLocal: parseTwoState(firstValue(searchParams.convertedLocal)),
     etdFrom: parseDateParam(firstValue(searchParams.etdFrom)),
     etdTo: parseDateParam(firstValue(searchParams.etdTo)),
     etaFrom: parseDateParam(firstValue(searchParams.etaFrom)),
@@ -204,6 +206,7 @@ export function buildVehiclesHref(
   if (merged.paidByCustomer !== "ALL") query.set("paidByCustomer", merged.paidByCustomer);
   if (merged.sellingPriceCurrency !== "ALL") query.set("currency", merged.sellingPriceCurrency);
   if (merged.convertedToExport !== "ALL") query.set("converted", merged.convertedToExport);
+  if (merged.convertedToLocal !== "ALL") query.set("convertedLocal", merged.convertedToLocal);
   if (merged.etdFrom) query.set("etdFrom", toDateInputValue(merged.etdFrom)!);
   if (merged.etdTo) query.set("etdTo", toDateInputValue(merged.etdTo)!);
   if (merged.etaFrom) query.set("etaFrom", toDateInputValue(merged.etaFrom)!);

@@ -67,6 +67,7 @@ const PANEL_FILTER_KEYS = [
   "paidByCustomer",
   "sellingPriceCurrency",
   "convertedToExport",
+  "convertedToLocal",
   "etdFrom",
   "etdTo",
   "etaFrom",
@@ -319,6 +320,13 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 label="Converted from Local"
                 value={params.convertedToExport}
                 onChange={(value) => push({ convertedToExport: value })}
+              />
+            )}
+            {params.track === "FL" && (
+              <TwoStateFilterSelect
+                label="Converted from Export"
+                value={params.convertedToLocal}
+                onChange={(value) => push({ convertedToLocal: value })}
               />
             )}
           </SectionCard>

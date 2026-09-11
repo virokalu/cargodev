@@ -44,6 +44,8 @@ import { SectionCard } from "@/components/shared/section-card";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { ConvertToExportDialog } from "@/components/vehicles/convert-to-export-dialog";
 import { RevertToLocalDialog } from "@/components/vehicles/revert-to-local-dialog";
+import { ConvertToLocalDialog } from "@/components/vehicles/convert-to-local-dialog";
+import { RevertToExportDialog } from "@/components/vehicles/revert-to-export-dialog";
 import { EditSerialNumberDialog } from "@/components/vehicles/edit-serial-number-dialog";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
@@ -147,6 +149,11 @@ interface VehicleFormProps {
    * converted to export. Combined with existingTrack === "FL", this decides
    * whether the header shows the one-way "Convert to Export" button. */
   existingConvertedToExport?: boolean;
+  /** Mirror of existingConvertedToExport above — whether this (originally
+   * FC) vehicle has already been converted to local. Combined with
+   * existingTrack === "FC", this decides whether the header shows the
+   * "Convert to Local" button. */
+  existingConvertedToLocal?: boolean;
   /** Prefills FormState in edit mode; ignored in create mode. */
   initialValues?: Partial<FormState>;
   /** Create mode only — the next-serial preview shown before a track/legacy
@@ -514,6 +521,7 @@ export function VehicleForm({
   existingTrack,
   existingShipmentStatus,
   existingConvertedToExport,
+  existingConvertedToLocal,
   initialValues,
   nextFcSerial,
   nextFlSerial,
@@ -744,11 +752,23 @@ export function VehicleForm({
             </p>
           </div>
         </div>
-        {mode === "edit" && existingTrack === "FL" && !existingConvertedToExport && canEditFields && (
-          <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
-        )}
+        {mode === "edit" &&
+          existingTrack === "FL" &&
+          !existingConvertedToExport &&
+          !existingConvertedToLocal &&
+          canEditFields && (
+            <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
+          )}
         {mode === "edit" && existingConvertedToExport && canEditFields && (
           <RevertToLocalDialog vehicleId={vehicleId!} serial={existingSerial!} />
+        )}
+        {mode === "edit" &&
+          existingTrack === "FC" &&
+          !existingConvertedToLocal &&
+          !existingConvertedToExport &&
+          canEditFields && <ConvertToLocalDialog vehicleId={vehicleId!} serial={existingSerial!} />}
+        {mode === "edit" && existingConvertedToLocal && canEditFields && (
+          <RevertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} />
         )}
       </div>
 

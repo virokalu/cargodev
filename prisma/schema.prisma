@@ -308,6 +308,13 @@ model Vehicle {
   convertedToExport   Boolean   @default(false)
   convertedToExportAt DateTime?
 
+  // Mirror of convertedToExport above — a native FC vehicle that ends up
+  // being sold locally instead of exported keeps its FC-prefixed serial
+  // forever, but behaves as FL everywhere else from this point on. Always
+  // false for vehicles created as FL.
+  convertedToLocal   Boolean   @default(false)
+  convertedToLocalAt DateTime?
+
   // ── Core fields ────────────────────────────
   auctionItemNo String?
   chassisNo     String? // Unique per org (soft-warn on dup for legacy data — enforced in service)
