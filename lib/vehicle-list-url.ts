@@ -12,6 +12,7 @@ import type {
 } from "@/lib/services/vehicle.service";
 import type { ShipmentStatus } from "@/lib/constants/shipment-status";
 import type { ShippingMethod } from "@prisma/client";
+import { toDateInputValue } from "@/lib/utils";
 
 export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   page: 1,
@@ -42,11 +43,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   paidByCustomer: "ALL",
   sellingPriceCurrency: "ALL",
   convertedToExport: "ALL",
-  // No web filter-bar control sets these yet — mobile-only for now (see
-  // vehicleListQuerySchema in lib/validation/vehicle.schema.ts), so
-  // parseVehicleListParams/buildVehiclesHref below don't round-trip them
-  // through the URL either. Defaults live here regardless since this object
-  // is typed against the full VehicleListParams shape.
+  convertedToLocal: "ALL",
   etdFrom: null,
   etdTo: null,
   etaFrom: null,
@@ -107,6 +104,17 @@ function allValues(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value];
 }
 
+/** "YYYY-MM-DD" -> Date for the etdFrom/etdTo/etaFrom/etaTo params, or null
+ * — mirrors optionalDate's parsing in lib/validation/vehicle.schema.ts. The
+ * reverse direction (Date -> "YYYY-MM-DD", for building hrefs and feeding
+ * DateField) is lib/utils.ts's existing toDateInputValue — no need for a
+ * second copy of that here. */
+export function parseDateParam(value: string | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** Parses raw Next.js searchParams into safe, clamped query params — the URL
  * is user-editable, so enum values, sort keys and numbers are never trusted
  * as-is (falls back to defaults instead of erroring). */
@@ -151,11 +159,11 @@ export function parseVehicleListParams(
     paidByCustomer: parseTriState(firstValue(searchParams.paidByCustomer)),
     sellingPriceCurrency: firstValue(searchParams.currency) || "ALL",
     convertedToExport: parseTwoState(firstValue(searchParams.converted)),
-    // Mobile-only for now — see the comment on VEHICLE_LIST_DEFAULTS above.
-    etdFrom: null,
-    etdTo: null,
-    etaFrom: null,
-    etaTo: null,
+    convertedToLocal: parseTwoState(firstValue(searchParams.convertedLocal)),
+    etdFrom: parseDateParam(firstValue(searchParams.etdFrom)),
+    etdTo: parseDateParam(firstValue(searchParams.etdTo)),
+    etaFrom: parseDateParam(firstValue(searchParams.etaFrom)),
+    etaTo: parseDateParam(firstValue(searchParams.etaTo)),
     sortBy: SORT_KEYS.includes(sortBy as VehicleListSortKey)
       ? (sortBy as VehicleListSortKey)
       : VEHICLE_LIST_DEFAULTS.sortBy,
@@ -198,6 +206,11 @@ export function buildVehiclesHref(
   if (merged.paidByCustomer !== "ALL") query.set("paidByCustomer", merged.paidByCustomer);
   if (merged.sellingPriceCurrency !== "ALL") query.set("currency", merged.sellingPriceCurrency);
   if (merged.convertedToExport !== "ALL") query.set("converted", merged.convertedToExport);
+  if (merged.convertedToLocal !== "ALL") query.set("convertedLocal", merged.convertedToLocal);
+  if (merged.etdFrom) query.set("etdFrom", toDateInputValue(merged.etdFrom)!);
+  if (merged.etdTo) query.set("etdTo", toDateInputValue(merged.etdTo)!);
+  if (merged.etaFrom) query.set("etaFrom", toDateInputValue(merged.etaFrom)!);
+  if (merged.etaTo) query.set("etaTo", toDateInputValue(merged.etaTo)!);
   if (merged.sortBy !== VEHICLE_LIST_DEFAULTS.sortBy) query.set("sort", merged.sortBy);
   if (merged.sortDir !== VEHICLE_LIST_DEFAULTS.sortDir) query.set("dir", merged.sortDir);
   if (merged.page !== VEHICLE_LIST_DEFAULTS.page) query.set("page", String(merged.page));

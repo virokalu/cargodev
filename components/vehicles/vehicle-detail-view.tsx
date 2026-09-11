@@ -198,6 +198,11 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
               Converted from FL
             </Badge>
           )}
+          {vehicle.convertedToLocal && (
+            <Badge variant="outline" className="text-sm">
+              Converted from FC
+            </Badge>
+          )}
           {isFC && (
             <Badge variant={SHIPMENT_STATUS_META[vehicle.shipmentStatus].badgeVariant} className="text-sm">
               {SHIPMENT_STATUS_META[vehicle.shipmentStatus].label}
@@ -284,7 +289,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
               <FieldGroup title="Transport & Logistics">
                 <Field label="Transport By" value={vehicle.transportBy?.name} />
                 <Field label="Vehicle Location" value={vehicle.vehicleLocation?.name} />
-                {isFC && <Field label="Tracking No" value={vehicle.trackingNo} />}
+                <Field label="Tracking Number" value={vehicle.trackingNumber} />
                 <Field label="Docs Arrived Date" value={formatDate(vehicle.docsArrivedDate)} />
                 <Field label="Name Change Deadline" value={formatDate(vehicle.nameChangeDeadline)} />
                 <Field label="Extra Key" value={<TriStateCell value={vehicle.extraKey} />} />
@@ -323,6 +328,16 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                   {LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "") && (
                     <Field label="LC No" value={vehicle.lcNo} />
                   )}
+                  <Field label="Inspection" value={vehicle.hasInspection ? "Yes" : "No"} />
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Date" value={formatDate(vehicle.inspectionDate)} />
+                  )}
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Company" value={vehicle.inspectionCompany?.name} />
+                  )}
+                  {vehicle.hasInspection && (
+                    <Field label="Inspection Location" value={vehicle.inspectionLocation?.name} />
+                  )}
                 </FieldGroup>
               )}
 
@@ -350,10 +365,13 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
 
             <TabsContent value="documents" className="space-y-4 rounded-lg border p-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field. */}
+               * shipments — same gating as the LC No field. Inspection
+               * Report only applies once Inspection = Yes. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(vehicle.destination ?? "")) &&
+                    (documentType !== "INSPECTION_REPORT" || vehicle.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>

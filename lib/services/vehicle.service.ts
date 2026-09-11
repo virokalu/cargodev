@@ -77,13 +77,16 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
-  const trackingNo = isFC ? input.trackingNo : null;
   // Packing agent, vanning date, and container number only ever apply to
   // Container shipments — same strip-regardless-of-what-was-posted
   // treatment as the fields above.
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
   const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
   const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
+  const hasInspection = isFC ? input.hasInspection : false;
+  const inspectionDate = isFC ? input.inspectionDate : null;
+  const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
+  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
 
   // Freight agent capability re-check — server never trusts the client alone
   // to have filtered the RORO/Container options (CLAUDE.md rule 4).
@@ -195,12 +198,15 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         packingAgentId,
         vanningDate,
         containerNumber,
-        trackingNo,
+        hasInspection,
+        inspectionDate,
+        inspectionCompanyId,
+        inspectionLocationId,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
         massoDate: input.massoDate,
-        billNumber: input.billNumber,
+        trackingNumber: input.trackingNumber,
         lcNo: input.lcNo,
         docsArrivedDate: input.docsArrivedDate,
 
@@ -421,6 +427,10 @@ export interface VehicleDetailData {
   // the "Convert to Export" button (only offered once, to a still-FL,
   // not-yet-converted vehicle).
   convertedToExport: boolean;
+  // Mirror of convertedToExport above — combined with track === "FC" this
+  // is how the edit page decides whether to show the "Convert to Local"
+  // button (only offered once, to a still-FC, not-yet-converted vehicle).
+  convertedToLocal: boolean;
   shipmentStatus: EffectiveShipmentStatus;
 
   auctionItemNo: string | null;
@@ -456,12 +466,15 @@ export interface VehicleDetailData {
   packingAgent: LookupRef | null;
   vanningDate: Date | null;
   containerNumber: string | null;
-  trackingNo: string | null;
+  hasInspection: boolean;
+  inspectionDate: Date | null;
+  inspectionCompany: LookupRef | null;
+  inspectionLocation: LookupRef | null;
 
   transportBy: LookupRef | null;
   vehicleLocation: LookupRef | null;
   massoDate: Date | null;
-  billNumber: string | null;
+  trackingNumber: string | null;
   lcNo: string | null;
   docsArrivedDate: Date | null;
 
@@ -504,6 +517,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       serial: true,
       serialPrefix: true,
       convertedToExport: true,
+      convertedToLocal: true,
       shipmentStatus: true,
       auctionItemNo: true,
       chassisNo: true,
@@ -524,9 +538,10 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       shippingMethod: true,
       vanningDate: true,
       containerNumber: true,
-      trackingNo: true,
+      hasInspection: true,
+      inspectionDate: true,
       massoDate: true,
-      billNumber: true,
+      trackingNumber: true,
       lcNo: true,
       docsArrivedDate: true,
       auctionBillPaid: true,
@@ -548,6 +563,8 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       transportBy: { select: { id: true, name: true } },
       vehicleLocation: { select: { id: true, name: true } },
       rowColourStatus: { select: { id: true, name: true, colour: true } },
+      inspectionCompany: { select: { id: true, name: true } },
+      inspectionLocation: { select: { id: true, name: true } },
     },
   });
 
@@ -574,13 +591,18 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
         })
       : null;
 
-  const effectiveTrack = computeEffectiveTrack(vehicle.serialPrefix, vehicle.convertedToExport);
+  const effectiveTrack = computeEffectiveTrack(
+    vehicle.serialPrefix,
+    vehicle.convertedToExport,
+    vehicle.convertedToLocal
+  );
 
   return {
     id: vehicle.id,
     serial: vehicle.serial,
     track: effectiveTrack,
     convertedToExport: vehicle.convertedToExport,
+    convertedToLocal: vehicle.convertedToLocal,
     // Same "computed guard on read" the vehicles table uses (see
     // computeEffectiveShipmentStatus above) — without it, this page shows
     // the raw stored status, which reads BOOKING_RECEIVED until the daily
@@ -618,11 +640,14 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     packingAgent: vehicle.packingAgent,
     vanningDate: vehicle.vanningDate,
     containerNumber: vehicle.containerNumber,
-    trackingNo: vehicle.trackingNo,
+    hasInspection: vehicle.hasInspection,
+    inspectionDate: vehicle.inspectionDate,
+    inspectionCompany: vehicle.inspectionCompany,
+    inspectionLocation: vehicle.inspectionLocation,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
     massoDate: vehicle.massoDate,
-    billNumber: vehicle.billNumber,
+    trackingNumber: vehicle.trackingNumber,
     lcNo: vehicle.lcNo,
     docsArrivedDate: vehicle.docsArrivedDate,
     auctionBillPaid: vehicle.auctionBillPaid,
@@ -743,17 +768,21 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   // what's posted. Uses the effective track (lib/vehicle-track.ts), not the
   // raw serialPrefix, so a vehicle converted to export stops having its
   // shipping fields stripped from the moment it's converted.
-  const isFC = computeEffectiveTrack(existing.serialPrefix, existing.convertedToExport) === "FC";
+  const isFC =
+    computeEffectiveTrack(existing.serialPrefix, existing.convertedToExport, existing.convertedToLocal) === "FC";
   const etd = isFC ? input.etd : null;
   const eta = isFC ? input.eta : null;
   const blNo = isFC ? input.blNo : null;
   const vesselName = isFC ? input.vesselName : null;
   const freightAgentId = isFC ? input.freightAgentId : null;
   const shippingMethod = isFC ? input.shippingMethod : null;
-  const trackingNo = isFC ? input.trackingNo : null;
   const packingAgentId = shippingMethod === "CONTAINER" ? input.packingAgentId : null;
   const vanningDate = shippingMethod === "CONTAINER" ? input.vanningDate : null;
   const containerNumber = shippingMethod === "CONTAINER" ? input.containerNumber : null;
+  const hasInspection = isFC ? input.hasInspection : false;
+  const inspectionDate = isFC ? input.inspectionDate : null;
+  const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
+  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
 
   if (shippingMethod && freightAgentId) {
     const agent = await prisma.freightAgent.findUnique({ where: { id: freightAgentId } });
@@ -849,12 +878,15 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         packingAgentId,
         vanningDate,
         containerNumber,
-        trackingNo,
+        hasInspection,
+        inspectionDate,
+        inspectionCompanyId,
+        inspectionLocationId,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
         massoDate: input.massoDate,
-        billNumber: input.billNumber,
+        trackingNumber: input.trackingNumber,
         lcNo: input.lcNo,
         docsArrivedDate: input.docsArrivedDate,
 
@@ -1170,6 +1202,75 @@ export async function revertVehicleToLocal(orgId: string, actorId: string, id: s
   });
 }
 
+/** Mirror of convertVehicleToExport above — a native FC vehicle that ends
+ * up being sold locally instead of exported keeps its FC-prefixed serial
+ * forever, but needs to behave as a full local vehicle from this point on.
+ * Reversible via revertVehicleToExport below. Unlike convertVehicleToExport,
+ * no destination is collected (that's an FC-only concept) and no
+ * StatusHistory row is written: an FC-rooted vehicle already has real
+ * shipment-status history from before any conversion, so there's no
+ * "tracking begins" moment to mark — it just stops being read once
+ * computeEffectiveTrack starts returning "FL" for it. */
+export async function convertVehicleToLocal(orgId: string, actorId: string, id: string): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (existing.serialPrefix !== "FC") {
+    throw new ServiceError("VALIDATION", "Only export (FC) vehicles can be converted to local.");
+  }
+  if (existing.convertedToLocal) {
+    throw new ServiceError("VALIDATION", "This vehicle has already been converted to local.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: { convertedToLocal: true, convertedToLocalAt: new Date() },
+    });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "CONVERT_VEHICLE_TO_LOCAL",
+      entity: "Vehicle",
+      entityId: id,
+      before: { convertedToLocal: false },
+      after: { convertedToLocal: true },
+    });
+  });
+}
+
+/** Reverses convertVehicleToLocal, by request — same "undo an accidental
+ * conversion" reasoning as revertVehicleToLocal above. Deliberately only
+ * flips convertedToLocal back to false: nothing needs clearing, since every
+ * FC/FL check in this file (and the form/detail view) reads
+ * computeEffectiveTrack(), which goes back to reading "FC" the instant this
+ * flag flips. */
+export async function revertVehicleToExport(orgId: string, actorId: string, id: string): Promise<void> {
+  const existing = await assertVehicleInOrg(orgId, id);
+
+  if (existing.serialPrefix !== "FC") {
+    throw new ServiceError("VALIDATION", "Only export (FC) vehicles can be reverted to export.");
+  }
+  if (!existing.convertedToLocal) {
+    throw new ServiceError("VALIDATION", "This vehicle hasn't been converted to local.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: { convertedToLocal: false },
+    });
+    await activityLog.record(tx, {
+      orgId,
+      actorId,
+      action: "REVERT_VEHICLE_TO_EXPORT",
+      entity: "Vehicle",
+      entityId: id,
+      before: { convertedToLocal: true },
+      after: { convertedToLocal: false },
+    });
+  });
+}
+
 /**
  * Corrects a typo in the numeric part of a serial shortly after creation —
  * the one documented exception to "serial is read-only after creation"
@@ -1243,6 +1344,7 @@ export async function runDailyShipmentStatusTransitions(orgId: string): Promise<
       org_id: orgId,
       deletedAt: null,
       OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
+      convertedToLocal: false,
       shipmentStatus: "BOOKING_RECEIVED",
       etd: { lt: today },
     },
@@ -1297,6 +1399,7 @@ export async function runDailyShipmentStatusTransitions(orgId: string): Promise<
 // exclusion on the other three branches.
 const CANCELLED_WHERE: Prisma.VehicleWhereInput = {
   OR: [{ serialPrefix: "FC" }, { convertedToExport: true }],
+  convertedToLocal: false,
   rowColourStatus: { name: { in: [...CANCEL_SHIPMENT_ROW_COLOUR_NAMES] } },
 };
 
@@ -1417,6 +1520,9 @@ export interface VehicleListParams {
   /** FC only — separates native FC vehicles from ones that started as FL
    * and got converted (lib/vehicle-track.ts). */
   convertedToExport: TwoStateFilterValue;
+  /** FL only — mirror of convertedToExport above, for vehicles that started
+   * as FC and got converted to local. */
+  convertedToLocal: TwoStateFilterValue;
   /** Inclusive date-range bounds on etd/eta — FC only in practice (FL
    * vehicles never carry etd/eta), but not enforced here since a filter
    * against an always-null field on FL rows is harmless (just matches
@@ -1436,6 +1542,7 @@ export interface VehicleListRow {
   serial: string;
   track: SerialPrefix;
   convertedToExport: boolean;
+  convertedToLocal: boolean;
   chassisNo: string | null;
   brandName: string | null;
   modelName: string | null;
@@ -1459,7 +1566,10 @@ export interface VehicleListRow {
   packingAgentName: string | null;
   vanningDate: Date | null;
   containerNumber: string | null;
-  trackingNo: string | null;
+  hasInspection: boolean;
+  inspectionDate: Date | null;
+  inspectionCompanyName: string | null;
+  inspectionLocationName: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
   auctionBillPaid: boolean | null;
@@ -1468,7 +1578,7 @@ export interface VehicleListRow {
   docsArrivedDate: Date | null;
   nameChangeDeadline: Date | null;
   massoDate: Date | null;
-  billNumber: string | null;
+  trackingNumber: string | null;
   lcNo: string | null;
   docSentDate: Date | null;
   docSentComment: string | null;
@@ -1514,13 +1624,19 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   const andConditions: Prisma.VehicleWhereInput[] = [];
 
   // Effective track (lib/vehicle-track.ts) — a vehicle converted to export
-  // belongs in the "FC — Export" list from that point on, even though its
-  // serialPrefix (and serial string) never changes.
+  // (or to local, the mirror direction) belongs in that track's list from
+  // that point on, even though its serialPrefix (and serial string) never
+  // changes.
   if (params.track === "FC") {
     andConditions.push({ OR: [{ serialPrefix: "FC" }, { convertedToExport: true }] });
+    andConditions.push({ convertedToLocal: false });
   } else if (params.track === "FL") {
-    where.serialPrefix = "FL";
-    where.convertedToExport = false;
+    andConditions.push({
+      OR: [
+        { serialPrefix: "FL", convertedToExport: false },
+        { serialPrefix: "FC", convertedToLocal: true },
+      ],
+    });
   }
   if (params.shipmentStatus.length > 0) {
     // Multiple selected statuses are OR'd together (matches "PENDING or
@@ -1554,6 +1670,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   applyTriStateFilter(where, "paidByCustomer", params.paidByCustomer);
   if (params.sellingPriceCurrency !== "ALL") where.sellingPriceCurrency = params.sellingPriceCurrency;
   if (params.convertedToExport !== "ALL") where.convertedToExport = params.convertedToExport === "YES";
+  if (params.convertedToLocal !== "ALL") where.convertedToLocal = params.convertedToLocal === "YES";
   if (params.etdFrom || params.etdTo) {
     where.etd = {
       ...(params.etdFrom ? { gte: params.etdFrom } : {}),
@@ -1568,8 +1685,9 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   }
 
   // US-08: free-text search matches serial, chassis, auction item/lot no,
-  // brand/model/grade, supplier, partner name, vessel name, and customer
-  // name — everything else is a dedicated per-column filter, not free text.
+  // brand/model/grade, supplier, partner name, vessel name, BL/LC number,
+  // and customer name — everything else is a dedicated per-column filter,
+  // not free text.
   // Customer also has its own dedicated filter dropdown (params.customerId
   // above, search-as-you-type since the list can get large) — kept in
   // search too so typing a customer's name works without opening that
@@ -1588,6 +1706,8 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
       { supplier: { name: { contains: search, mode: "insensitive" } } },
       { partnerName: { contains: search, mode: "insensitive" } },
       { vesselName: { contains: search, mode: "insensitive" } },
+      { blNo: { contains: search, mode: "insensitive" } },
+      { lcNo: { contains: search, mode: "insensitive" } },
     ];
   }
 
@@ -1649,6 +1769,7 @@ const VEHICLE_LIST_SELECT = {
   serial: true,
   serialPrefix: true,
   convertedToExport: true,
+  convertedToLocal: true,
   chassisNo: true,
   auctionItemNo: true,
   auctionLotNo: true,
@@ -1668,14 +1789,15 @@ const VEHICLE_LIST_SELECT = {
   shippingMethod: true,
   vanningDate: true,
   containerNumber: true,
-  trackingNo: true,
+  hasInspection: true,
+  inspectionDate: true,
   auctionBillPaid: true,
   logBook: true,
   extraKey: true,
   docsArrivedDate: true,
   nameChangeDeadline: true,
   massoDate: true,
-  billNumber: true,
+  trackingNumber: true,
   lcNo: true,
   docSentDate: true,
   docSentComment: true,
@@ -1693,17 +1815,20 @@ const VEHICLE_LIST_SELECT = {
   transportBy: { select: { name: true } },
   vehicleLocation: { select: { name: true } },
   rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
+  inspectionCompany: { select: { name: true } },
+  inspectionLocation: { select: { name: true } },
 } satisfies Prisma.VehicleSelect;
 
 type VehicleListRawRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_LIST_SELECT }>;
 
 function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
-  const effectiveTrack = computeEffectiveTrack(v.serialPrefix, v.convertedToExport);
+  const effectiveTrack = computeEffectiveTrack(v.serialPrefix, v.convertedToExport, v.convertedToLocal);
   return {
     id: v.id,
     serial: v.serial,
     track: effectiveTrack,
     convertedToExport: v.convertedToExport,
+    convertedToLocal: v.convertedToLocal,
     chassisNo: v.chassisNo,
     brandName: v.model?.brand.name ?? null,
     modelName: v.model?.name ?? null,
@@ -1727,7 +1852,10 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     packingAgentName: v.packingAgent?.name ?? null,
     vanningDate: v.vanningDate,
     containerNumber: v.containerNumber,
-    trackingNo: v.trackingNo,
+    hasInspection: v.hasInspection,
+    inspectionDate: v.inspectionDate,
+    inspectionCompanyName: v.inspectionCompany?.name ?? null,
+    inspectionLocationName: v.inspectionLocation?.name ?? null,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,
     auctionBillPaid: v.auctionBillPaid,
@@ -1736,7 +1864,7 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     docsArrivedDate: v.docsArrivedDate,
     nameChangeDeadline: v.nameChangeDeadline,
     massoDate: v.massoDate,
-    billNumber: v.billNumber,
+    trackingNumber: v.trackingNumber,
     lcNo: v.lcNo,
     docSentDate: v.docSentDate,
     docSentComment: v.docSentComment,

@@ -117,17 +117,24 @@ const vehicleSharedFields = {
   vesselName: optionalText(100),
   freightAgentId: optionalId,
   shippingMethod: z.enum(["RORO", "CONTAINER"]).nullable().optional(),
-  trackingNo: optionalText(100),
   // Only meaningful when shippingMethod = CONTAINER — vehicle.service nulls
   // it out otherwise, same treatment as the other FC-only shipping fields.
   packingAgentId: optionalId,
   vanningDate: optionalDate,
   containerNumber: optionalText(100),
 
+  // FC only — plain boolean like hasPartnership below (not tri-state).
+  // inspectionDate/inspectionCompanyId/inspectionLocationId only mean
+  // something when true; vehicle.service nulls them out otherwise.
+  hasInspection: z.boolean().optional().default(false),
+  inspectionDate: optionalDate,
+  inspectionCompanyId: optionalId,
+  inspectionLocationId: optionalId,
+
   transportById: optionalId,
   vehicleLocationId: optionalId,
   massoDate: optionalDate,
-  billNumber: optionalText(100),
+  trackingNumber: optionalText(100),
   lcNo: optionalText(100),
   docsArrivedDate: optionalDate,
 
@@ -335,6 +342,7 @@ export const vehicleListQuerySchema = z
     paidByCustomer: triStateOrAllEnum.default("ALL"),
     currency: idOrAll,
     converted: twoStateOrAllEnum.default("ALL"),
+    convertedLocal: twoStateOrAllEnum.default("ALL"),
     // Inclusive date-range bounds on etd/eta — reuses the same optionalDate
     // parser vehicleSharedFields uses for mutation bodies ("YYYY-MM-DD"
     // string -> Date, undefined/empty -> null). No web filter-bar control
@@ -374,6 +382,7 @@ export const vehicleListQuerySchema = z
     paidByCustomer: v.paidByCustomer,
     sellingPriceCurrency: v.currency,
     convertedToExport: v.converted,
+    convertedToLocal: v.convertedLocal,
     etdFrom: v.etdFrom,
     etdTo: v.etdTo,
     etaFrom: v.etaFrom,
