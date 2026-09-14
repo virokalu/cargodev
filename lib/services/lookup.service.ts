@@ -374,6 +374,120 @@ export async function renameTransportCompany(
   });
 }
 
+// ── Inspection Company (FC only) ────────────────────────────────────────
+
+export async function searchInspectionCompanies(orgId: string, query: string): Promise<LookupOption[]> {
+  return prisma.inspectionCompany.findMany({
+    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+    take: SEARCH_LIMIT,
+  });
+}
+
+/** Resolves a single inspection company's label for the vehicle filter panel. */
+export async function getInspectionCompanyById(orgId: string, id: string): Promise<LookupOption | null> {
+  const company = await prisma.inspectionCompany.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return company ?? null;
+}
+
+export async function findOrCreateInspectionCompany(orgId: string, name: string): Promise<LookupOption> {
+  const trimmed = name.trim();
+  const existing = await prisma.inspectionCompany.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" } },
+    select: { id: true, name: true },
+  });
+  if (existing) return existing;
+  return prisma.inspectionCompany.create({
+    data: { org_id: orgId, name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
+export async function renameInspectionCompany(
+  orgId: string,
+  id: string,
+  newName: string
+): Promise<LookupOption> {
+  const trimmed = newName.trim();
+  const current = await prisma.inspectionCompany.findUnique({ where: { id } });
+  assertBelongsToOrg(orgId, current, "Inspection company not found.");
+
+  const duplicate = await prisma.inspectionCompany.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" }, id: { not: id } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new ServiceError("CONFLICT", `An inspection company named "${trimmed}" already exists.`);
+  }
+
+  return prisma.inspectionCompany.update({
+    where: { id },
+    data: { name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
+// ── Inspection Location (FC only) ───────────────────────────────────────
+
+export async function searchInspectionLocations(orgId: string, query: string): Promise<LookupOption[]> {
+  return prisma.inspectionLocation.findMany({
+    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+    take: SEARCH_LIMIT,
+  });
+}
+
+/** Resolves a single inspection location's label for the vehicle filter panel. */
+export async function getInspectionLocationById(orgId: string, id: string): Promise<LookupOption | null> {
+  const location = await prisma.inspectionLocation.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, name: true },
+  });
+  return location ?? null;
+}
+
+export async function findOrCreateInspectionLocation(orgId: string, name: string): Promise<LookupOption> {
+  const trimmed = name.trim();
+  const existing = await prisma.inspectionLocation.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" } },
+    select: { id: true, name: true },
+  });
+  if (existing) return existing;
+  return prisma.inspectionLocation.create({
+    data: { org_id: orgId, name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
+export async function renameInspectionLocation(
+  orgId: string,
+  id: string,
+  newName: string
+): Promise<LookupOption> {
+  const trimmed = newName.trim();
+  const current = await prisma.inspectionLocation.findUnique({ where: { id } });
+  assertBelongsToOrg(orgId, current, "Inspection location not found.");
+
+  const duplicate = await prisma.inspectionLocation.findFirst({
+    where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" }, id: { not: id } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new ServiceError("CONFLICT", `An inspection location named "${trimmed}" already exists.`);
+  }
+
+  return prisma.inspectionLocation.update({
+    where: { id },
+    data: { name: trimmed },
+    select: { id: true, name: true },
+  });
+}
+
 // ── Packing Agent (only relevant when shippingMethod = CONTAINER) ─────────
 
 export async function searchPackingAgents(orgId: string, query: string): Promise<LookupOption[]> {

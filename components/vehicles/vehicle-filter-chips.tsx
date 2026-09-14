@@ -7,6 +7,7 @@
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { buildVehiclesHref } from "@/lib/vehicle-list-url";
+import { formatDate } from "@/lib/utils";
 import type {
   TriStateFilterValue,
   TwoStateFilterValue,
@@ -95,6 +96,22 @@ export function VehicleFilterChips({ params, selected }: VehicleFilterChipsProps
       key: "converted",
       label: `Converted from Local: ${TWO_STATE_LABELS[params.convertedToExport]}`,
       clear: { convertedToExport: "ALL" },
+    });
+  }
+  if (params.etdFrom || params.etdTo) {
+    chips.push({
+      key: "etd",
+      // formatDate falls back to "—" for null, which already reads fine as
+      // an open-ended range boundary (e.g. "ETD: — to Jul 21, 2026").
+      label: `ETD: ${formatDate(params.etdFrom)} to ${formatDate(params.etdTo)}`,
+      clear: { etdFrom: null, etdTo: null },
+    });
+  }
+  if (params.etaFrom || params.etaTo) {
+    chips.push({
+      key: "eta",
+      label: `ETA: ${formatDate(params.etaFrom)} to ${formatDate(params.etaTo)}`,
+      clear: { etaFrom: null, etaTo: null },
     });
   }
 

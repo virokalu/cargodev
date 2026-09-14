@@ -28,6 +28,7 @@ import { RowColourStatusCell } from "@/components/vehicles/row-colour-status-cel
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
+import { VehicleRemarkCell } from "@/components/vehicles/vehicle-remark-cell";
 import { DeleteVehicleDialog } from "@/components/vehicles/delete-vehicle-dialog";
 import { StatusScrollProvider, DetailPaneTable, StatusScrollDot } from "@/components/vehicles/status-scroll-context";
 import { VerticalScrollSyncProvider, IdentityPaneTable } from "@/components/vehicles/vertical-scroll-context";
@@ -66,7 +67,7 @@ interface VehiclesTableProps {
 
 // Serial No / Chassis No / Model & Grade / Actions are the fields staff use
 // to spot a vehicle at a glance, so they need to stay visible at all times —
-// but at their full desktop widths (116/150/220/116px, 602px combined) they
+// but at their full desktop widths (116/150/220/148px, 634px combined) they
 // alone are wider than a phone screen. Rather than shrink their font/content
 // to fit (tried first — cells got too cramped to read), this renders them as
 // their own separate <table> in a fixed-width pane that scrolls
@@ -76,11 +77,16 @@ interface VehiclesTableProps {
 // pane to see all four columns, and scroll the right pane separately to see
 // the rest — they don't move together, by design (that's what makes this
 // different from a single table with `position: sticky` columns, which was
-// the previous, rejected approach). The pane's sm:w-[602px] below (116 + 150
-// + 220 + 116) has to be a literal class string, not built from a shared
+// the previous, rejected approach). The pane's sm:w-[634px] below (116 + 150
+// + 220 + 148) has to be a literal class string, not built from a shared
 // constant — Tailwind only picks up arbitrary-value classes it can find as
-// static text. Actions is 116px (not 84px) to fit three icon buttons (View/
-// Edit/Delete) instead of two — size-7 (28px) each + gaps + the status dot.
+// static text. Actions is 148px (not 84px) to fit four icon buttons (View/
+// Vehicle Remark/Edit/Delete, the latter always shown even for an empty
+// remark — see vehicle-remark-cell.tsx) instead of two — size-7 (28px) each
+// + gaps + the status dot. Sized for the max case since a shared <table>
+// column can't vary its width per row — a narrower column would've forced
+// the whole pane to scroll horizontally, the exact bug the "Converted"
+// badge caused earlier.
 
 // Two independent <table> elements can't share row heights automatically —
 // each sizes its own rows from its own content. The detail columns are all
@@ -286,7 +292,30 @@ const SCROLL_COLUMNS: {
     render: (row) => row.vesselName ?? "—",
   },
   { key: "lcNo", header: "LC No", tracks: ["FC"], render: (row) => row.lcNo ?? "—" },
-  { key: "trackingNo", header: "Tracking No", tracks: ["FC"], render: (row) => row.trackingNo ?? "—" },
+  {
+    key: "hasInspection",
+    header: "Inspection",
+    tracks: ["FC"],
+    render: (row) => (row.hasInspection ? "Yes" : "No"),
+  },
+  {
+    key: "inspectionDate",
+    header: "Inspection Date",
+    tracks: ["FC"],
+    render: (row) => formatDate(row.inspectionDate),
+  },
+  {
+    key: "inspectionCompany",
+    header: "Inspection Company",
+    tracks: ["FC"],
+    render: (row) => row.inspectionCompanyName ?? "—",
+  },
+  {
+    key: "inspectionLocation",
+    header: "Inspection Location",
+    tracks: ["FC"],
+    render: (row) => row.inspectionLocationName ?? "—",
+  },
   {
     key: "docSentComment",
     header: "Doc Sent Remark",
@@ -330,7 +359,7 @@ const SCROLL_COLUMNS: {
         "—"
       ),
   },
-  { key: "billNumber", header: "Bill Number", render: (row) => row.billNumber ?? "—" },
+  { key: "trackingNumber", header: "Tracking Number", render: (row) => row.trackingNumber ?? "—" },
   {
     key: "deliveryDate",
     header: "Delivery Date",
@@ -399,7 +428,7 @@ export function VehiclesTable({
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
                 full desktop size always, its own independent horizontal scroll. */}
-            <div className="w-[50vw] shrink-0 border-r sm:w-[602px]">
+            <div className="w-[50vw] shrink-0 border-r sm:w-[634px]">
               <IdentityPaneTable>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
@@ -412,7 +441,7 @@ export function VehiclesTable({
                     <TableHead className="sticky top-0 z-10 w-[220px] min-w-[220px] bg-muted font-semibold">
                       <SortableHeader label="Model / Grade" sortKey="model" params={params} />
                     </TableHead>
-                    <TableHead className="sticky top-0 z-10 w-[116px] min-w-[116px] bg-muted font-semibold">Actions</TableHead>
+                    <TableHead className="sticky top-0 z-10 w-[148px] min-w-[148px] bg-muted text-center font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -475,6 +504,7 @@ export function VehiclesTable({
                               >
                                 <Eye className="size-4" />
                               </Link>
+                              <VehicleRemarkCell serial={row.serial} remark={row.vehicleRemark} />
                               {canEditVehicle && (
                                 <Link
                                   href={`/vehicles/${row.serial}/edit`}

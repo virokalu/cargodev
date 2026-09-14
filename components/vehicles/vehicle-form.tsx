@@ -44,6 +44,8 @@ import { SectionCard } from "@/components/shared/section-card";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
 import { ConvertToExportDialog } from "@/components/vehicles/convert-to-export-dialog";
 import { RevertToLocalDialog } from "@/components/vehicles/revert-to-local-dialog";
+import { ConvertToLocalDialog } from "@/components/vehicles/convert-to-local-dialog";
+import { RevertToExportDialog } from "@/components/vehicles/revert-to-export-dialog";
 import { EditSerialNumberDialog } from "@/components/vehicles/edit-serial-number-dialog";
 import { AuctionBillPaidCell } from "@/components/vehicles/auction-bill-paid-cell";
 import { TriStateToggle } from "@/components/shared/tri-state-toggle";
@@ -110,6 +112,12 @@ import {
   searchPackingAgentsAction,
   createPackingAgentAction,
   renamePackingAgentAction,
+  searchInspectionCompaniesAction,
+  createInspectionCompanyAction,
+  renameInspectionCompanyAction,
+  searchInspectionLocationsAction,
+  createInspectionLocationAction,
+  renameInspectionLocationAction,
   searchCustomersAction,
   createCustomerAction,
   renameCustomerAction,
@@ -147,6 +155,11 @@ interface VehicleFormProps {
    * converted to export. Combined with existingTrack === "FL", this decides
    * whether the header shows the one-way "Convert to Export" button. */
   existingConvertedToExport?: boolean;
+  /** Mirror of existingConvertedToExport above — whether this (originally
+   * FC) vehicle has already been converted to local. Combined with
+   * existingTrack === "FC", this decides whether the header shows the
+   * "Convert to Local" button. */
+  existingConvertedToLocal?: boolean;
   /** Prefills FormState in edit mode; ignored in create mode. */
   initialValues?: Partial<FormState>;
   /** Create mode only — the next-serial preview shown before a track/legacy
@@ -222,12 +235,17 @@ export interface FormState {
   packingAgent: ComboboxOption | null;
   vanningDate: string | null;
   containerNumber: string;
-  trackingNo: string;
+  // FC only. Plain Yes/No like hasPartnership below — inspectionDate/
+  // inspectionCompany/inspectionLocation only matter when true.
+  hasInspection: boolean;
+  inspectionDate: string | null;
+  inspectionCompany: ComboboxOption | null;
+  inspectionLocation: ComboboxOption | null;
 
   transportBy: ComboboxOption | null;
   vehicleLocation: ComboboxOption | null;
   massoDate: string | null;
-  billNumber: string;
+  trackingNumber: string;
   lcNo: string;
   docsArrivedDate: string | null;
 
@@ -285,12 +303,15 @@ const INITIAL_STATE: FormState = {
   packingAgent: null,
   vanningDate: null,
   containerNumber: "",
-  trackingNo: "",
+  hasInspection: false,
+  inspectionDate: null,
+  inspectionCompany: null,
+  inspectionLocation: null,
 
   transportBy: null,
   vehicleLocation: null,
   massoDate: null,
-  billNumber: "",
+  trackingNumber: "",
   lcNo: "",
   docsArrivedDate: null,
 
@@ -360,12 +381,15 @@ function buildPayload(state: FormState) {
     packingAgentId: state.packingAgent?.id ?? null,
     vanningDate: state.vanningDate,
     containerNumber: state.containerNumber,
-    trackingNo: state.trackingNo,
+    hasInspection: state.hasInspection,
+    inspectionDate: state.inspectionDate,
+    inspectionCompanyId: state.inspectionCompany?.id ?? null,
+    inspectionLocationId: state.inspectionLocation?.id ?? null,
 
     transportById: state.transportBy?.id ?? null,
     vehicleLocationId: state.vehicleLocation?.id ?? null,
     massoDate: state.massoDate,
-    billNumber: state.billNumber,
+    trackingNumber: state.trackingNumber,
     lcNo: state.lcNo,
     docsArrivedDate: state.docsArrivedDate,
 
@@ -517,6 +541,7 @@ export function VehicleForm({
   existingTrack,
   existingShipmentStatus,
   existingConvertedToExport,
+  existingConvertedToLocal,
   initialValues,
   nextFcSerial,
   nextFlSerial,
@@ -747,11 +772,23 @@ export function VehicleForm({
             </p>
           </div>
         </div>
-        {mode === "edit" && existingTrack === "FL" && !existingConvertedToExport && canEditFields && (
-          <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
-        )}
+        {mode === "edit" &&
+          existingTrack === "FL" &&
+          !existingConvertedToExport &&
+          !existingConvertedToLocal &&
+          canEditFields && (
+            <ConvertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} countries={countries} />
+          )}
         {mode === "edit" && existingConvertedToExport && canEditFields && (
           <RevertToLocalDialog vehicleId={vehicleId!} serial={existingSerial!} />
+        )}
+        {mode === "edit" &&
+          existingTrack === "FC" &&
+          !existingConvertedToLocal &&
+          !existingConvertedToExport &&
+          canEditFields && <ConvertToLocalDialog vehicleId={vehicleId!} serial={existingSerial!} />}
+        {mode === "edit" && existingConvertedToLocal && canEditFields && (
+          <RevertToExportDialog vehicleId={vehicleId!} serial={existingSerial!} />
         )}
       </div>
 
@@ -1164,16 +1201,6 @@ export function VehicleForm({
               onRename={(option, name) => renameVehicleLocationAction(option.id, name)}
               error={fieldErrors.vehicleLocationId}
             />
-            {isFC && (
-              <TextField
-                id="trackingNo"
-                label="Tracking No"
-                value={state.trackingNo}
-                onChange={(value) => setField("trackingNo", value)}
-                maxLength={100}
-                error={fieldErrors.trackingNo}
-              />
-            )}
             <DateField
               id="docsArrivedDate"
               label="Docs Arrived Date"
@@ -1213,12 +1240,12 @@ export function VehicleForm({
               error={fieldErrors.docSentDate}
             />
             <TextField
-              id="billNumber"
-              label="Bill Number"
-              value={state.billNumber}
-              onChange={(value) => setField("billNumber", value)}
+              id="trackingNumber"
+              label="Tracking Number"
+              value={state.trackingNumber}
+              onChange={(value) => setField("trackingNumber", value)}
               maxLength={100}
-              error={fieldErrors.billNumber}
+              error={fieldErrors.trackingNumber}
             />
             <div className="sm:col-span-2">
               <Label htmlFor="docSentComment" className="mb-1.5">
@@ -1361,6 +1388,54 @@ export function VehicleForm({
                   onChange={(value) => setField("lcNo", value)}
                   maxLength={100}
                   error={fieldErrors.lcNo}
+                />
+              )}
+              <YesNoToggle
+                label="Inspection"
+                value={state.hasInspection}
+                onChange={(value) =>
+                  setState((previous) => ({
+                    ...previous,
+                    hasInspection: value,
+                    inspectionDate: value ? previous.inspectionDate : null,
+                    inspectionCompany: value ? previous.inspectionCompany : null,
+                    inspectionLocation: value ? previous.inspectionLocation : null,
+                  }))
+                }
+              />
+              {state.hasInspection && (
+                <DateField
+                  id="inspectionDate"
+                  label="Inspection Date"
+                  value={state.inspectionDate}
+                  onChange={(value) => setField("inspectionDate", value)}
+                  error={fieldErrors.inspectionDate}
+                />
+              )}
+              {state.hasInspection && (
+                <ComboboxCreate
+                  id="inspectionCompany"
+                  label="Inspection Company"
+                  createLabel="inspection company"
+                  value={state.inspectionCompany}
+                  onChange={(value) => setField("inspectionCompany", value)}
+                  search={searchInspectionCompaniesAction}
+                  onCreate={createInspectionCompanyAction}
+                  onRename={(option, name) => renameInspectionCompanyAction(option.id, name)}
+                  error={fieldErrors.inspectionCompanyId}
+                />
+              )}
+              {state.hasInspection && (
+                <ComboboxCreate
+                  id="inspectionLocation"
+                  label="Inspection Location"
+                  createLabel="inspection location"
+                  value={state.inspectionLocation}
+                  onChange={(value) => setField("inspectionLocation", value)}
+                  search={searchInspectionLocationsAction}
+                  onCreate={createInspectionLocationAction}
+                  onRename={(option, name) => renameInspectionLocationAction(option.id, name)}
+                  error={fieldErrors.inspectionLocationId}
                 />
               )}
             </SectionCard>
@@ -1579,10 +1654,14 @@ export function VehicleForm({
           {mode === "create" && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field above. */}
+               * shipments — same gating as the LC No field above. Inspection
+               * Report only applies once Inspection = Yes — same gating as
+               * the Inspection fields above. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)) &&
+                    (documentType !== "INSPECTION_REPORT" || state.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>
@@ -1609,10 +1688,14 @@ export function VehicleForm({
           {mode === "edit" && files && (
             <SectionCard icon={Folder} title="Documents" contentClassName="space-y-4">
               {/* LC (Letter of Credit) only applies to Sri Lanka/Bangladesh
-               * shipments — same gating as the LC No field above. */}
+               * shipments — same gating as the LC No field above. Inspection
+               * Report only applies once Inspection = Yes — same gating as
+               * the Inspection fields above. */}
               {(isFC ? NAMED_DOCUMENT_TYPES : FL_NAMED_DOCUMENT_TYPES)
                 .filter(
-                  (documentType) => documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)
+                  (documentType) =>
+                    (documentType !== "LC" || LC_OPEN_DESTINATIONS.has(state.destination)) &&
+                    (documentType !== "INSPECTION_REPORT" || state.hasInspection)
                 )
                 .map((documentType) => (
                 <DocumentTypeSection key={documentType} label={DOCUMENT_TYPE_META[documentType].label}>

@@ -28,9 +28,11 @@ import {
 } from "@/components/ui/sheet";
 import { SectionCard } from "@/components/shared/section-card";
 import { FilterCombobox, type FilterOption } from "@/components/shared/filter-combobox";
+import { DateField } from "@/components/shared/date-field";
 import { TriStateFilterSelect } from "@/components/vehicles/tri-state-filter-select";
 import { TwoStateFilterSelect } from "@/components/vehicles/two-state-filter-select";
-import { buildVehiclesHref, SOLD_CURRENCIES, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
+import { buildVehiclesHref, parseDateParam, SOLD_CURRENCIES, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
+import { toDateInputValue } from "@/lib/utils";
 import type { VehicleListParams } from "@/lib/services/vehicle.service";
 import {
   searchBrandsAction,
@@ -65,6 +67,11 @@ const PANEL_FILTER_KEYS = [
   "paidByCustomer",
   "sellingPriceCurrency",
   "convertedToExport",
+  "convertedToLocal",
+  "etdFrom",
+  "etdTo",
+  "etaFrom",
+  "etaTo",
 ] as const satisfies readonly (keyof VehicleListParams)[];
 
 export interface VehicleFilterSelections {
@@ -232,6 +239,42 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label className="mb-1.5">ETD</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <DateField
+                      id="etdFrom"
+                      label="From"
+                      value={toDateInputValue(params.etdFrom)}
+                      onChange={(value) => push({ etdFrom: parseDateParam(value ?? undefined) })}
+                    />
+                    <DateField
+                      id="etdTo"
+                      label="To"
+                      value={toDateInputValue(params.etdTo)}
+                      onChange={(value) => push({ etdTo: parseDateParam(value ?? undefined) })}
+                      min={toDateInputValue(params.etdFrom) ?? undefined}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="mb-1.5">ETA</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <DateField
+                      id="etaFrom"
+                      label="From"
+                      value={toDateInputValue(params.etaFrom)}
+                      onChange={(value) => push({ etaFrom: parseDateParam(value ?? undefined) })}
+                    />
+                    <DateField
+                      id="etaTo"
+                      label="To"
+                      value={toDateInputValue(params.etaTo)}
+                      onChange={(value) => push({ etaTo: parseDateParam(value ?? undefined) })}
+                      min={toDateInputValue(params.etaFrom) ?? undefined}
+                    />
+                  </div>
+                </div>
               </>
             )}
             <div>
@@ -277,6 +320,13 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 label="Converted from Local"
                 value={params.convertedToExport}
                 onChange={(value) => push({ convertedToExport: value })}
+              />
+            )}
+            {params.track === "FL" && (
+              <TwoStateFilterSelect
+                label="Converted from Export"
+                value={params.convertedToLocal}
+                onChange={(value) => push({ convertedToLocal: value })}
               />
             )}
           </SectionCard>

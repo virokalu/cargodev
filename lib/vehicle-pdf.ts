@@ -242,7 +242,7 @@ export function buildVehicleDetailPdf(
     [
       field("Transport By", vehicle.transportBy?.name),
       field("Vehicle Location", vehicle.vehicleLocation?.name),
-      ...(isFC ? ([field("Tracking No", vehicle.trackingNo)] as [string, string][]) : []),
+      field("Tracking Number", vehicle.trackingNumber),
       field("Docs Arrived Date", formatDate(vehicle.docsArrivedDate)),
       field("Name Change Deadline", formatDate(vehicle.nameChangeDeadline)),
       field("Extra Key", triState(vehicle.extraKey)),
