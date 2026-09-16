@@ -9,6 +9,7 @@ import type { Prisma, SerialPrefix, ShipmentStatus, ShippingMethod, Vehicle } fr
 // wider app-level type instead.
 import type { ShipmentStatus as EffectiveShipmentStatus } from "@/lib/constants/shipment-status";
 import { SHIPMENT_STATUS_ORDER, SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
+import { DOCUMENT_TYPE_META } from "@/lib/constants/document-type";
 // Value imports (not just types) from lib/vehicle-list-url.ts — safe despite
 // that module importing types back from here, since its import of this file
 // is `import type` only (erased at compile time, so there's no real runtime
@@ -336,13 +337,21 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
     }
 
     // One combined notification for the whole creation, not one per file —
-    // a 5-photo staged upload shouldn't burst 5 separate bell entries.
+    // a 5-photo staged upload shouldn't burst 5 separate bell entries. Names
+    // each document's type (same DOCUMENT_TYPE_META labels file.service.ts's
+    // addVehicleDocument notification uses) instead of just a bare file
+    // count, so "what got uploaded" is visible without opening the vehicle.
     if (attachedFileCount > 0) {
+      const parts: string[] = [];
+      if (input.photoUrls.length > 0) {
+        parts.push(`${input.photoUrls.length} ${input.photoUrls.length === 1 ? "photo" : "photos"}`);
+      }
+      parts.push(...input.documents.map((document) => DOCUMENT_TYPE_META[document.documentType].label));
       documentUploadedNotification = {
         orgId: user.orgId,
         event: "DOCUMENT_UPLOADED",
         title: "Files attached",
-        body: `${user.name} attached ${attachedFileCount} file${attachedFileCount === 1 ? "" : "s"} to ${serial}.`,
+        body: `${user.name} attached ${parts.join(", ")} to ${serial}.`,
         vehicleId: created.id,
         recipientUserIds,
       };
