@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireMobileUser } from "@/lib/services/mobile-auth-guard";
-import { getInspectionLocationById } from "@/lib/services/lookup.service";
+import { getInspectionByById } from "@/lib/services/lookup.service";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { ServiceError } from "@/lib/errors";
 
@@ -13,11 +13,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   try {
-    const location = await getInspectionLocationById(auth.user.orgId, id);
-    if (!location) {
-      return apiError(new ServiceError("NOT_FOUND", "Inspection location not found."));
+    const inspectionBy = await getInspectionByById(auth.user.orgId, id);
+    if (!inspectionBy) {
+      return apiError(new ServiceError("NOT_FOUND", "Inspection by not found."));
     }
-    return apiSuccess(location);
+    return apiSuccess(inspectionBy);
   } catch (error) {
     return apiError(error);
   }

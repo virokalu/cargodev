@@ -115,9 +115,9 @@ import {
   searchInspectionCompaniesAction,
   createInspectionCompanyAction,
   renameInspectionCompanyAction,
-  searchInspectionLocationsAction,
-  createInspectionLocationAction,
-  renameInspectionLocationAction,
+  searchInspectionByAction,
+  createInspectionByAction,
+  renameInspectionByAction,
   searchCustomersAction,
   createCustomerAction,
   renameCustomerAction,
@@ -236,11 +236,11 @@ export interface FormState {
   vanningDate: string | null;
   containerNumber: string;
   // FC only. Plain Yes/No like hasPartnership below — inspectionDate/
-  // inspectionCompany/inspectionLocation only matter when true.
+  // inspectionCompany/inspectionBy only matter when true.
   hasInspection: boolean;
   inspectionDate: string | null;
   inspectionCompany: ComboboxOption | null;
-  inspectionLocation: ComboboxOption | null;
+  inspectionBy: ComboboxOption | null;
 
   transportBy: ComboboxOption | null;
   vehicleLocation: ComboboxOption | null;
@@ -306,7 +306,7 @@ const INITIAL_STATE: FormState = {
   hasInspection: false,
   inspectionDate: null,
   inspectionCompany: null,
-  inspectionLocation: null,
+  inspectionBy: null,
 
   transportBy: null,
   vehicleLocation: null,
@@ -384,7 +384,7 @@ function buildPayload(state: FormState) {
     hasInspection: state.hasInspection,
     inspectionDate: state.inspectionDate,
     inspectionCompanyId: state.inspectionCompany?.id ?? null,
-    inspectionLocationId: state.inspectionLocation?.id ?? null,
+    inspectionById: state.inspectionBy?.id ?? null,
 
     transportById: state.transportBy?.id ?? null,
     vehicleLocationId: state.vehicleLocation?.id ?? null,
@@ -1400,7 +1400,7 @@ export function VehicleForm({
                       hasInspection: value,
                       inspectionDate: value ? previous.inspectionDate : null,
                       inspectionCompany: value ? previous.inspectionCompany : null,
-                      inspectionLocation: value ? previous.inspectionLocation : null,
+                      inspectionBy: value ? previous.inspectionBy : null,
                     }))
                   }
                 />
@@ -1429,15 +1429,15 @@ export function VehicleForm({
               )}
               {state.hasInspection && (
                 <ComboboxCreate
-                  id="inspectionLocation"
-                  label="Inspection Location"
-                  createLabel="inspection location"
-                  value={state.inspectionLocation}
-                  onChange={(value) => setField("inspectionLocation", value)}
-                  search={searchInspectionLocationsAction}
-                  onCreate={createInspectionLocationAction}
-                  onRename={(option, name) => renameInspectionLocationAction(option.id, name)}
-                  error={fieldErrors.inspectionLocationId}
+                  id="inspectionBy"
+                  label="Inspection By"
+                  createLabel="inspection by"
+                  value={state.inspectionBy}
+                  onChange={(value) => setField("inspectionBy", value)}
+                  search={searchInspectionByAction}
+                  onCreate={createInspectionByAction}
+                  onRename={(option, name) => renameInspectionByAction(option.id, name)}
+                  error={fieldErrors.inspectionById}
                 />
               )}
             </SectionCard>

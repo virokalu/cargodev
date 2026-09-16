@@ -336,7 +336,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
                     <Field label="Inspection Company" value={vehicle.inspectionCompany?.name} />
                   )}
                   {vehicle.hasInspection && (
-                    <Field label="Inspection Location" value={vehicle.inspectionLocation?.name} />
+                    <Field label="Inspection By" value={vehicle.inspectionBy?.name} />
                   )}
                 </FieldGroup>
               )}

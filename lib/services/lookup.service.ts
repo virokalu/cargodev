@@ -431,10 +431,10 @@ export async function renameInspectionCompany(
   });
 }
 
-// ── Inspection Location (FC only) ───────────────────────────────────────
+// ── Inspection By (FC only) ──────────────────────────────────────────────
 
-export async function searchInspectionLocations(orgId: string, query: string): Promise<LookupOption[]> {
-  return prisma.inspectionLocation.findMany({
+export async function searchInspectionBy(orgId: string, query: string): Promise<LookupOption[]> {
+  return prisma.inspectionBy.findMany({
     where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
@@ -442,46 +442,42 @@ export async function searchInspectionLocations(orgId: string, query: string): P
   });
 }
 
-/** Resolves a single inspection location's label for the vehicle filter panel. */
-export async function getInspectionLocationById(orgId: string, id: string): Promise<LookupOption | null> {
-  const location = await prisma.inspectionLocation.findFirst({
+/** Resolves a single "inspection by" label for the vehicle filter panel. */
+export async function getInspectionByById(orgId: string, id: string): Promise<LookupOption | null> {
+  const inspectionBy = await prisma.inspectionBy.findFirst({
     where: { id, org_id: orgId },
     select: { id: true, name: true },
   });
-  return location ?? null;
+  return inspectionBy ?? null;
 }
 
-export async function findOrCreateInspectionLocation(orgId: string, name: string): Promise<LookupOption> {
+export async function findOrCreateInspectionBy(orgId: string, name: string): Promise<LookupOption> {
   const trimmed = name.trim();
-  const existing = await prisma.inspectionLocation.findFirst({
+  const existing = await prisma.inspectionBy.findFirst({
     where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" } },
     select: { id: true, name: true },
   });
   if (existing) return existing;
-  return prisma.inspectionLocation.create({
+  return prisma.inspectionBy.create({
     data: { org_id: orgId, name: trimmed },
     select: { id: true, name: true },
   });
 }
 
-export async function renameInspectionLocation(
-  orgId: string,
-  id: string,
-  newName: string
-): Promise<LookupOption> {
+export async function renameInspectionBy(orgId: string, id: string, newName: string): Promise<LookupOption> {
   const trimmed = newName.trim();
-  const current = await prisma.inspectionLocation.findUnique({ where: { id } });
-  assertBelongsToOrg(orgId, current, "Inspection location not found.");
+  const current = await prisma.inspectionBy.findUnique({ where: { id } });
+  assertBelongsToOrg(orgId, current, "Inspection by not found.");
 
-  const duplicate = await prisma.inspectionLocation.findFirst({
+  const duplicate = await prisma.inspectionBy.findFirst({
     where: { org_id: orgId, name: { equals: trimmed, mode: "insensitive" }, id: { not: id } },
     select: { id: true },
   });
   if (duplicate) {
-    throw new ServiceError("CONFLICT", `An inspection location named "${trimmed}" already exists.`);
+    throw new ServiceError("CONFLICT", `An "inspection by" named "${trimmed}" already exists.`);
   }
 
-  return prisma.inspectionLocation.update({
+  return prisma.inspectionBy.update({
     where: { id },
     data: { name: trimmed },
     select: { id: true, name: true },
