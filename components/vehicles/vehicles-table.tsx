@@ -311,10 +311,10 @@ const SCROLL_COLUMNS: {
     render: (row) => row.inspectionCompanyName ?? "—",
   },
   {
-    key: "inspectionLocation",
-    header: "Inspection Location",
+    key: "inspectionBy",
+    header: "Inspection By",
     tracks: ["FC"],
-    render: (row) => row.inspectionLocationName ?? "—",
+    render: (row) => row.inspectionByName ?? "—",
   },
   {
     key: "docSentComment",

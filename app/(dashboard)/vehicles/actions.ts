@@ -329,19 +329,19 @@ export async function renameInspectionCompanyAction(id: string, name: string) {
   return renamed;
 }
 
-export async function searchInspectionLocationsAction(query: string) {
+export async function searchInspectionByAction(query: string) {
   const user = await requireUser();
-  return lookupService.searchInspectionLocations(user.orgId, query);
+  return lookupService.searchInspectionBy(user.orgId, query);
 }
 
-export async function createInspectionLocationAction(name: string) {
+export async function createInspectionByAction(name: string) {
   const user = await requireUser([...STAFF_CAN_WRITE]);
-  return lookupService.findOrCreateInspectionLocation(user.orgId, name);
+  return lookupService.findOrCreateInspectionBy(user.orgId, name);
 }
 
-export async function renameInspectionLocationAction(id: string, name: string) {
+export async function renameInspectionByAction(id: string, name: string) {
   const user = await requireUser([...STAFF_CAN_WRITE]);
-  const renamed = await lookupService.renameInspectionLocation(user.orgId, id, name);
+  const renamed = await lookupService.renameInspectionBy(user.orgId, id, name);
   revalidatePath("/vehicles");
   return renamed;
 }

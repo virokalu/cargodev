@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireMobileUser } from "@/lib/services/mobile-auth-guard";
-import { searchInspectionLocations } from "@/lib/services/lookup.service";
+import { searchInspectionBy } from "@/lib/services/lookup.service";
 import { lookupSearchQuerySchema, flattenFieldErrors } from "@/lib/validation/lookup.schema";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { ServiceError } from "@/lib/errors";
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const locations = await searchInspectionLocations(auth.user.orgId, parsed.data.q);
-    return apiSuccess(locations);
+    const inspectionBy = await searchInspectionBy(auth.user.orgId, parsed.data.q);
+    return apiSuccess(inspectionBy);
   } catch (error) {
     return apiError(error);
   }

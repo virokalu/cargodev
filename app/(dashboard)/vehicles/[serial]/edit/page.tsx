@@ -40,7 +40,7 @@ function toFormValues(vehicle: VehicleDetailData): Partial<FormState> {
     hasInspection: vehicle.hasInspection,
     inspectionDate: toDateInputValue(vehicle.inspectionDate),
     inspectionCompany: vehicle.inspectionCompany,
-    inspectionLocation: vehicle.inspectionLocation,
+    inspectionBy: vehicle.inspectionBy,
 
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
