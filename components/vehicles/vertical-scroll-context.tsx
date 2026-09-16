@@ -10,7 +10,7 @@
 // page-level scroll like they used to be. This mirrors scrollTop between
 // them so a vehicle's row stays aligned across both panes.
 
-import { createContext, useCallback, useContext, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef } from "react";
 import { Table } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,44 @@ import { cn } from "@/lib/utils";
 export const PANE_SCROLL_CLASS = "max-h-[65vh] overflow-y-auto overscroll-none";
 
 type Pane = "identity" | "detail";
+
+// Remembers each pane's scroll position (vertical + that pane's own
+// horizontal) across an in-app navigation away from /vehicles and back —
+// e.g. opening a vehicle's detail page, or switching to a different sidebar
+// section, then coming back — and across switching the FC/FL track toggle
+// and back, since that's a real URL change too (?track=). sessionStorage
+// rather than a plain module variable so it also survives a full page
+// reload within the same browser tab, and clears itself once the tab
+// actually closes rather than leaking forever. Keyed by the full URL
+// (path + query string) so different filters/sort/page/track combinations
+// each remember their own scroll position instead of colliding.
+function scrollStorageKey(pane: Pane): string {
+  return `vehicles-table-scroll:${pane}:${window.location.pathname}${window.location.search}`;
+}
+
+interface StoredScroll {
+  top: number;
+  left: number;
+}
+
+function readStoredScroll(pane: Pane): StoredScroll | null {
+  try {
+    const raw = sessionStorage.getItem(scrollStorageKey(pane));
+    return raw ? (JSON.parse(raw) as StoredScroll) : null;
+  } catch {
+    // Private-browsing / storage disabled — restoring is a nicety, never
+    // block rendering over it.
+    return null;
+  }
+}
+
+function writeStoredScroll(pane: Pane, value: StoredScroll): void {
+  try {
+    sessionStorage.setItem(scrollStorageKey(pane), JSON.stringify(value));
+  } catch {
+    // Same as above — silently skip if storage isn't available.
+  }
+}
 
 interface VerticalScrollSync {
   identityRef: React.RefObject<HTMLDivElement | null>;
@@ -69,6 +107,27 @@ export function useVerticalScrollSync(pane: Pane) {
   const { identityRef, detailRef, isSyncingRef, scrollTimeoutRef } = ctx;
   const ownRef = pane === "identity" ? identityRef : detailRef;
   const otherRef = pane === "identity" ? detailRef : identityRef;
+  // Separate from scrollTimeoutRef above (shared across both panes, for the
+  // CSS class) — this one is per-pane, so persisting pane A's position
+  // can't get cancelled by pane B's sync-triggered scroll event resetting
+  // a shared timer before pane A's debounce fires.
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore this pane's scroll position once, on mount — the rows are
+  // already in the DOM by the time this runs (passed in as children, not
+  // fetched client-side), so there's already enough scroll range to
+  // restore into. Keeps the table where you left it after navigating away
+  // (a vehicle's detail page, a different sidebar section) and back, or
+  // switching the FC/FL track toggle and back.
+  useEffect(() => {
+    const el = ownRef.current;
+    if (!el) return;
+    const stored = readStoredScroll(pane);
+    if (!stored) return;
+    el.scrollTop = stored.top;
+    el.scrollLeft = stored.left;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onScroll = useCallback<React.UIEventHandler<HTMLDivElement>>(
     (event) => {
@@ -84,6 +143,17 @@ export function useVerticalScrollSync(pane: Pane) {
       scrollTimeoutRef.current = setTimeout(() => {
         identityRef.current?.classList.remove("table-is-scrolling");
         detailRef.current?.classList.remove("table-is-scrolling");
+      }, 150);
+
+      // Remembers where this pane is scrolled to, debounced so a fast
+      // scroll gesture doesn't hit sessionStorage on every frame. Reads
+      // back off the ref (not event.currentTarget) once the debounce
+      // fires, so it captures wherever the scroll actually settled.
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+      persistTimeoutRef.current = setTimeout(() => {
+        const el = ownRef.current;
+        if (!el) return;
+        writeStoredScroll(pane, { top: el.scrollTop, left: el.scrollLeft });
       }, 150);
 
       if (isSyncingRef.current) return;

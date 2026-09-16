@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
     paidByCustomer: q("paidByCustomer"),
     currency: q("currency"),
     converted: q("converted"),
+    convertedLocal: q("convertedLocal"),
     etdFrom: q("etdFrom"),
     etdTo: q("etdTo"),
     etaFrom: q("etaFrom"),

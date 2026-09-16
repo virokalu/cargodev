@@ -10,6 +10,7 @@ import type { SessionUser } from "@/lib/services/auth-guard";
 import * as activityLog from "@/lib/services/activity-log.service";
 import * as notificationService from "@/lib/services/notification.service";
 import { deleteObject, keyFromPublicUrl } from "@/lib/r2";
+import { DOCUMENT_TYPE_META } from "@/lib/constants/document-type";
 
 /** Same shape as the deleted remark.service.ts's helper — exported because
  * the presign route needs the same ownership check before issuing a URL. */
@@ -274,7 +275,7 @@ export async function addVehicleDocument(
       orgId: actor.orgId,
       event: "DOCUMENT_UPLOADED",
       title: "Document added",
-      body: `${actor.name} added "${name}" to ${vehicle.serial}.`,
+      body: `${actor.name} added ${DOCUMENT_TYPE_META[documentType].label} to ${vehicle.serial}.`,
       vehicleId,
       recipientUserIds,
     };
