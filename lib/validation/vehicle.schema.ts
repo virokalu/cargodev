@@ -124,12 +124,12 @@ const vehicleSharedFields = {
   containerNumber: optionalText(100),
 
   // FC only — plain boolean like hasPartnership below (not tri-state).
-  // inspectionDate/inspectionCompanyId/inspectionLocationId only mean
-  // something when true; vehicle.service nulls them out otherwise.
+  // inspectionDate/inspectionCompanyId/inspectionById only mean something
+  // when true; vehicle.service nulls them out otherwise.
   hasInspection: z.boolean().optional().default(false),
   inspectionDate: optionalDate,
   inspectionCompanyId: optionalId,
-  inspectionLocationId: optionalId,
+  inspectionById: optionalId,
 
   transportById: optionalId,
   vehicleLocationId: optionalId,

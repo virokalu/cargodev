@@ -87,7 +87,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
   const hasInspection = isFC ? input.hasInspection : false;
   const inspectionDate = isFC ? input.inspectionDate : null;
   const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
-  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
+  const inspectionById = isFC ? input.inspectionById : null;
 
   // Freight agent capability re-check — server never trusts the client alone
   // to have filtered the RORO/Container options (CLAUDE.md rule 4).
@@ -202,7 +202,7 @@ export async function createVehicle(user: SessionUser, rawInput: unknown): Promi
         hasInspection,
         inspectionDate,
         inspectionCompanyId,
-        inspectionLocationId,
+        inspectionById,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
@@ -478,7 +478,7 @@ export interface VehicleDetailData {
   hasInspection: boolean;
   inspectionDate: Date | null;
   inspectionCompany: LookupRef | null;
-  inspectionLocation: LookupRef | null;
+  inspectionBy: LookupRef | null;
 
   transportBy: LookupRef | null;
   vehicleLocation: LookupRef | null;
@@ -573,7 +573,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
       vehicleLocation: { select: { id: true, name: true } },
       rowColourStatus: { select: { id: true, name: true, colour: true } },
       inspectionCompany: { select: { id: true, name: true } },
-      inspectionLocation: { select: { id: true, name: true } },
+      inspectionBy: { select: { id: true, name: true } },
     },
   });
 
@@ -652,7 +652,7 @@ export async function getVehicleDetail(orgId: string, serial: string): Promise<V
     hasInspection: vehicle.hasInspection,
     inspectionDate: vehicle.inspectionDate,
     inspectionCompany: vehicle.inspectionCompany,
-    inspectionLocation: vehicle.inspectionLocation,
+    inspectionBy: vehicle.inspectionBy,
     transportBy: vehicle.transportBy,
     vehicleLocation: vehicle.vehicleLocation,
     massoDate: vehicle.massoDate,
@@ -791,7 +791,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
   const hasInspection = isFC ? input.hasInspection : false;
   const inspectionDate = isFC ? input.inspectionDate : null;
   const inspectionCompanyId = isFC ? input.inspectionCompanyId : null;
-  const inspectionLocationId = isFC ? input.inspectionLocationId : null;
+  const inspectionById = isFC ? input.inspectionById : null;
 
   if (shippingMethod && freightAgentId) {
     const agent = await prisma.freightAgent.findUnique({ where: { id: freightAgentId } });
@@ -890,7 +890,7 @@ export async function updateVehicle(user: SessionUser, id: string, rawInput: unk
         hasInspection,
         inspectionDate,
         inspectionCompanyId,
-        inspectionLocationId,
+        inspectionById,
 
         transportById: input.transportById,
         vehicleLocationId: input.vehicleLocationId,
@@ -1578,7 +1578,7 @@ export interface VehicleListRow {
   hasInspection: boolean;
   inspectionDate: Date | null;
   inspectionCompanyName: string | null;
-  inspectionLocationName: string | null;
+  inspectionByName: string | null;
   transportByName: string | null;
   vehicleLocationName: string | null;
   auctionBillPaid: boolean | null;
@@ -1825,7 +1825,7 @@ const VEHICLE_LIST_SELECT = {
   vehicleLocation: { select: { name: true } },
   rowColourStatus: { select: { id: true, name: true, colour: true, transportCellOnly: true } },
   inspectionCompany: { select: { name: true } },
-  inspectionLocation: { select: { name: true } },
+  inspectionBy: { select: { name: true } },
 } satisfies Prisma.VehicleSelect;
 
 type VehicleListRawRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_LIST_SELECT }>;
@@ -1864,7 +1864,7 @@ function toVehicleListRow(v: VehicleListRawRow): VehicleListRow {
     hasInspection: v.hasInspection,
     inspectionDate: v.inspectionDate,
     inspectionCompanyName: v.inspectionCompany?.name ?? null,
-    inspectionLocationName: v.inspectionLocation?.name ?? null,
+    inspectionByName: v.inspectionBy?.name ?? null,
     transportByName: v.transportBy?.name ?? null,
     vehicleLocationName: v.vehicleLocation?.name ?? null,
     auctionBillPaid: v.auctionBillPaid,

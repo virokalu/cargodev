@@ -93,7 +93,7 @@ model Organization {
   refreshTokens       RefreshToken[]
   deviceTokens        DeviceToken[]
   inspectionCompanies InspectionCompany[]
-  inspectionLocations InspectionLocation[]
+  inspectionBy        InspectionBy[]
 }
 
 // ─────────────────────────────────────────────
@@ -242,7 +242,7 @@ model InspectionCompany {
   @@unique([org_id, name])
 }
 
-model InspectionLocation {
+model InspectionBy {
   id       String       @id @default(cuid())
   org_id   String
   name     String
@@ -378,10 +378,10 @@ model Vehicle {
   // deliberately doesn't affect the separate, pre-existing "Inspection
   // Completed" shipment-timeline milestone, which keeps inferring itself
   // from the document upload alone (lib/shipment-milestones.ts).
-  hasInspection        Boolean   @default(false)
-  inspectionDate       DateTime?
-  inspectionCompanyId  String?
-  inspectionLocationId String?
+  hasInspection       Boolean   @default(false)
+  inspectionDate      DateTime?
+  inspectionCompanyId String?
+  inspectionById      String?
 
   // FL only — was this purchase made with a partner. Unlike the tri-state
   // flags below, this is a plain Yes/No: whoever enters the vehicle always
@@ -450,19 +450,19 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   // ── Relations ──────────────────────────────
-  org                Organization        @relation(fields: [org_id], references: [id])
-  model              VehicleModelRef?    @relation(fields: [modelId], references: [id])
-  grade              Grade?              @relation(fields: [gradeId], references: [id])
-  auctionHall        AuctionHall?        @relation(fields: [auctionHallId], references: [id])
-  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
-  customer           User?               @relation("CustomerVehicles", fields: [customerId], references: [id])
-  transportBy        TransportCompany?   @relation(fields: [transportById], references: [id])
-  vehicleLocation    VehicleLocation?    @relation(fields: [vehicleLocationId], references: [id])
-  freightAgent       FreightAgent?       @relation(fields: [freightAgentId], references: [id])
-  packingAgent       PackingAgent?       @relation(fields: [packingAgentId], references: [id])
-  rowColourStatus    RowColourStatus?    @relation(fields: [rowColourStatusId], references: [id])
-  inspectionCompany  InspectionCompany?  @relation(fields: [inspectionCompanyId], references: [id])
-  inspectionLocation InspectionLocation? @relation(fields: [inspectionLocationId], references: [id])
+  org               Organization       @relation(fields: [org_id], references: [id])
+  model             VehicleModelRef?   @relation(fields: [modelId], references: [id])
+  grade             Grade?             @relation(fields: [gradeId], references: [id])
+  auctionHall       AuctionHall?       @relation(fields: [auctionHallId], references: [id])
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id])
+  customer          User?              @relation("CustomerVehicles", fields: [customerId], references: [id])
+  transportBy       TransportCompany?  @relation(fields: [transportById], references: [id])
+  vehicleLocation   VehicleLocation?   @relation(fields: [vehicleLocationId], references: [id])
+  freightAgent      FreightAgent?      @relation(fields: [freightAgentId], references: [id])
+  packingAgent      PackingAgent?      @relation(fields: [packingAgentId], references: [id])
+  rowColourStatus   RowColourStatus?   @relation(fields: [rowColourStatusId], references: [id])
+  inspectionCompany InspectionCompany? @relation(fields: [inspectionCompanyId], references: [id])
+  inspectionBy      InspectionBy?      @relation(fields: [inspectionById], references: [id])
 
   photos        VehiclePhoto[]
   documents     VehicleDocument[]
@@ -482,7 +482,7 @@ model Vehicle {
   @@index([org_id, packingAgentId])
   @@index([org_id, vehicleLocationId])
   @@index([org_id, inspectionCompanyId])
-  @@index([org_id, inspectionLocationId])
+  @@index([org_id, inspectionById])
   @@index([org_id, modelId])
   @@index([org_id, gradeId])
   @@index([org_id, destination])

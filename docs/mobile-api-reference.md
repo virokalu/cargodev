@@ -223,7 +223,7 @@ optional `?q=` and returns up to 20 matches; every `:id` endpoint returns
 | Packing Agent | `GET /lookups/packing-agents?q=` | `GET /lookups/packing-agents/:id` |
 | Vehicle Location | `GET /lookups/vehicle-locations?q=` | `GET /lookups/vehicle-locations/:id` |
 | Inspection Company — FC only | `GET /lookups/inspection-companies?q=` | `GET /lookups/inspection-companies/:id` |
-| Inspection Location — FC only | `GET /lookups/inspection-locations?q=` | `GET /lookups/inspection-locations/:id` |
+| Inspection By — FC only | `GET /lookups/inspection-by?q=` | `GET /lookups/inspection-by/:id` |
 | Freight Agent | `GET /lookups/freight-agents` (full list, with `offersRoro`/`offersContainer`) and `GET /lookups/freight-agents/search?q=&method=RORO\|CONTAINER` | `GET /lookups/freight-agents/:id` |
 | Row Colour Status | `GET /lookups/row-colour-statuses` (full list only, no search) | — |
 
