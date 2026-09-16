@@ -1390,19 +1390,21 @@ export function VehicleForm({
                   error={fieldErrors.lcNo}
                 />
               )}
-              <YesNoToggle
-                label="Inspection"
-                value={state.hasInspection}
-                onChange={(value) =>
-                  setState((previous) => ({
-                    ...previous,
-                    hasInspection: value,
-                    inspectionDate: value ? previous.inspectionDate : null,
-                    inspectionCompany: value ? previous.inspectionCompany : null,
-                    inspectionLocation: value ? previous.inspectionLocation : null,
-                  }))
-                }
-              />
+              <div className="sm:col-span-2">
+                <YesNoToggle
+                  label="Inspection"
+                  value={state.hasInspection}
+                  onChange={(value) =>
+                    setState((previous) => ({
+                      ...previous,
+                      hasInspection: value,
+                      inspectionDate: value ? previous.inspectionDate : null,
+                      inspectionCompany: value ? previous.inspectionCompany : null,
+                      inspectionLocation: value ? previous.inspectionLocation : null,
+                    }))
+                  }
+                />
+              </div>
               {state.hasInspection && (
                 <DateField
                   id="inspectionDate"
