@@ -67,26 +67,37 @@ interface VehiclesTableProps {
 
 // Serial No / Chassis No / Model & Grade / Actions are the fields staff use
 // to spot a vehicle at a glance, so they need to stay visible at all times —
-// but at their full desktop widths (116/150/220/148px, 634px combined) they
-// alone are wider than a phone screen. Rather than shrink their font/content
-// to fit (tried first — cells got too cramped to read), this renders them as
-// their own separate <table> in a fixed-width pane that scrolls
-// *independently* of the ~28 detail columns' pane next to it: two side-by-side
-// scroll regions instead of one table with squeezed sticky columns. Content
-// keeps its original size everywhere; on a narrow screen you scroll the left
-// pane to see all four columns, and scroll the right pane separately to see
-// the rest — they don't move together, by design (that's what makes this
-// different from a single table with `position: sticky` columns, which was
-// the previous, rejected approach). The pane's sm:w-[634px] below (116 + 150
-// + 220 + 148) has to be a literal class string, not built from a shared
-// constant — Tailwind only picks up arbitrary-value classes it can find as
-// static text. Actions is 148px (not 84px) to fit four icon buttons (View/
-// Vehicle Remark/Edit/Delete, the latter always shown even for an empty
-// remark — see vehicle-remark-cell.tsx) instead of two — size-7 (28px) each
-// + gaps + the status dot. Sized for the max case since a shared <table>
-// column can't vary its width per row — a narrower column would've forced
-// the whole pane to scroll horizontally, the exact bug the "Converted"
-// badge caused earlier.
+// but at their full desktop widths they alone are wider than a phone screen.
+// Rather than shrink their font/content to fit (tried first — cells got too
+// cramped to read), this renders them as their own separate <table> in a
+// fixed-width pane that scrolls *independently* of the ~28 detail columns'
+// pane next to it: two side-by-side scroll regions instead of one table with
+// squeezed sticky columns. Content keeps its original size everywhere; on a
+// narrow screen you scroll the left pane to see all four columns, and scroll
+// the right pane separately to see the rest — they don't move together, by
+// design (that's what makes this different from a single table with
+// `position: sticky` columns, which was the previous, rejected approach).
+//
+// Serial/Chassis/Model widths are fixed at 116/150/220px. Actions and the
+// pane's total width are the one pair that varies — by `params.track`, not
+// by row, so a shared <table> column can still have one width per page load:
+//   - FC: Actions 148px, pane 634px (116+150+220+148). The status dot
+//     (StatusScrollDot, surfaces the Shipment Status badge's colour once it
+//     scrolls out of view in the detail pane) only ever renders for FC rows
+//     — FL vehicles don't track shipment status (CLAUDE.md) — so FC needs
+//     room for the dot plus 4 icon buttons (View/Vehicle Remark/Edit/Delete,
+//     the latter always shown even for an empty remark — see
+//     vehicle-remark-cell.tsx), each size-7 (28px), plus gaps.
+//   - FL: Actions 132px, pane 618px (16px narrower each — exactly the
+//     dot's size-2.5 plus its wrapping gap-1.5, since FL never renders it).
+//     Same 4 icon buttons, no dot to make room for.
+// Both widths per branch must stay literal class strings (a ternary between
+// two full strings, not one built from a shared/interpolated constant) —
+// Tailwind only picks up arbitrary-value classes it can find as static text.
+// This assumes `params.track` is always "FC" or "FL" for a real page load
+// (the FC/FL toggle never produces the theoretical "ALL" value) — if that
+// ever changes, rows could mix tracks within one render and this per-page
+// width logic would need revisiting.
 
 // Two independent <table> elements can't share row heights automatically —
 // each sizes its own rows from its own content. The detail columns are all
@@ -428,7 +439,13 @@ export function VehiclesTable({
           <div className="flex overflow-hidden rounded-lg border">
             {/* Identity pane — Serial No / Chassis No / Model & Grade / Actions,
                 full desktop size always, its own independent horizontal scroll. */}
-            <div className="w-[50vw] shrink-0 border-r sm:w-[634px]">
+            <div
+              className={
+                params.track === "FC"
+                  ? "w-[50vw] shrink-0 border-r sm:w-[634px]"
+                  : "w-[50vw] shrink-0 border-r sm:w-[618px]"
+              }
+            >
               <IdentityPaneTable>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
@@ -441,7 +458,15 @@ export function VehiclesTable({
                     <TableHead className="sticky top-0 z-10 w-[220px] min-w-[220px] bg-muted font-semibold">
                       <SortableHeader label="Model / Grade" sortKey="model" params={params} />
                     </TableHead>
-                    <TableHead className="sticky top-0 z-10 w-[148px] min-w-[148px] bg-muted text-center font-semibold">Actions</TableHead>
+                    <TableHead
+                      className={
+                        params.track === "FC"
+                          ? "sticky top-0 z-10 w-[148px] min-w-[148px] bg-muted text-center font-semibold"
+                          : "sticky top-0 z-10 w-[132px] min-w-[132px] bg-muted text-center font-semibold"
+                      }
+                    >
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -489,7 +514,7 @@ export function VehiclesTable({
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            <StatusScrollDot status={row.effectiveShipmentStatus} />
+                            {row.track === "FC" && <StatusScrollDot status={row.effectiveShipmentStatus} />}
                             <div className="flex items-center gap-1">
                               {/* Always shown, every role — viewing a vehicle's
                                   detail page isn't gated, unlike Edit/Delete
