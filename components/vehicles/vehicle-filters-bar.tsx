@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FilterCombobox } from "@/components/shared/filter-combobox";
 import { cn } from "@/lib/utils";
-import { buildVehiclesHref } from "@/lib/vehicle-list-url";
+import { buildVehiclesHref, VEHICLE_LIST_DEFAULTS } from "@/lib/vehicle-list-url";
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants/shipment-status";
 import type { VehicleListParams } from "@/lib/services/vehicle.service";
 import { VehicleFiltersPanel, type VehicleFilterSelections } from "@/components/vehicles/vehicle-filters-panel";
@@ -114,6 +114,9 @@ export function VehicleFiltersBar({
           />
         </div>
 
+        {/* Shipment status isn't tracked for Local (FL) vehicles, so this
+            filter could only ever return nothing there. */}
+        {params.track === "FC" && (
         <DropdownMenu onOpenChange={statusMenuOpenChange}>
           <DropdownMenuTrigger
             render={
@@ -169,6 +172,7 @@ export function VehicleFiltersBar({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
 
         <div className="w-full sm:w-[170px]">
           <FilterCombobox
@@ -176,12 +180,15 @@ export function VehicleFiltersBar({
             onChange={(option) =>
               router.push(buildVehiclesHref(params, { customerId: option?.id ?? "ALL", page: 1 }))
             }
-            search={searchCustomersAction}
+            search={(query) => searchCustomersAction(query, params.track)}
             placeholder="All customers"
             allLabel="All customers"
           />
         </div>
 
+        {/* Destination / Row Colour only list values the active tab has
+            vehicles for, and are hidden entirely when there are none. */}
+        {(destinations.length > 0 || params.destination !== "ALL") && (
         <Select
           value={params.destination}
           onValueChange={(value) =>
@@ -204,7 +211,9 @@ export function VehicleFiltersBar({
             ))}
           </SelectContent>
         </Select>
+        )}
 
+        {(rowColourStatuses.length > 0 || params.rowColourStatusId !== "ALL") && (
         <Select
           value={params.rowColourStatusId}
           onValueChange={(value) =>
@@ -252,6 +261,7 @@ export function VehicleFiltersBar({
             ))}
           </SelectContent>
         </Select>
+        )}
 
         <VehicleFiltersPanel params={params} selected={selected} />
       </div>
@@ -270,10 +280,14 @@ export function VehicleFiltersBar({
               type="button"
               onClick={() =>
                 router.push(
-                  buildVehiclesHref(params, {
-                    track: track.value as VehicleListParams["track"],
-                    page: 1,
-                  })
+                  // Each tab offers different filter values (and some filters
+                  // only exist on one tab), so carrying the old tab's picks
+                  // over could land on an empty table. Start clean; keep
+                  // only the search text and sort.
+                  buildVehiclesHref(
+                    { ...VEHICLE_LIST_DEFAULTS, search: params.search, sortBy: params.sortBy, sortDir: params.sortDir },
+                    { track: track.value as VehicleListParams["track"] }
+                  )
                 )
               }
               className={cn(
