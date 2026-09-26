@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 // TODO: replace with the real support address before submitting to App Store.
-const CONTACT_EMAIL = "support@ftjexports.com";
+const CONTACT_EMAIL = "operations@ftjexports.com";
 const LAST_UPDATED = "26 September 2026";
 
 export default function PrivacyPage() {
