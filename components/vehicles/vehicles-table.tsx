@@ -489,7 +489,12 @@ export function VehiclesTable({
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            <StatusScrollDot status={row.effectiveShipmentStatus} />
+                            {/* The dot stands in for the Shipment Status badge once it
+                                scrolls away. The Local (FL) tab has no such column —
+                                shipment status isn't tracked for FL — so no dot there. */}
+                            {params.track !== "FL" && (
+                              <StatusScrollDot status={row.effectiveShipmentStatus} />
+                            )}
                             <div className="flex items-center gap-1">
                               {/* Always shown, every role — viewing a vehicle's
                                   detail page isn't gated, unlike Edit/Delete
