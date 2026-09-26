@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
       <p className="mt-6">
         CargoDev is an internal vehicle import management system used by staff
-        of Global Motors to track vehicles from overseas auction to customer
+        of FTJ Exports to track vehicles from overseas auction to customer
         handover. This policy explains what information the CargoDev web and
         mobile apps collect and how it is used.
       </p>
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
         <li>
           <strong>Business records you or your colleagues enter</strong> — such
           as vehicle details, shipment status and remarks. This is operational
-          data for the brokerage, not personal data collected from app users.
+          data for FTJ Exports, not personal data collected from app users.
         </li>
       </ul>
       <p className="mt-2">
