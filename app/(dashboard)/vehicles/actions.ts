@@ -6,6 +6,7 @@
 // "the thin-wrapper rule").
 
 import type { VehicleDocumentType } from "@prisma/client";
+import type { TrackFilter } from "@/lib/vehicle-track";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/services/auth-guard";
 import { ServiceError, type ServiceErrorCode } from "@/lib/errors";
@@ -206,9 +207,9 @@ export async function previewNextSerialAction(prefix: "FC" | "FL"): Promise<stri
 
 // ── Brand / Model / Grade ────────────────────────────────────────────────
 
-export async function searchBrandsAction(query: string) {
+export async function searchBrandsAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchBrands(user.orgId, query);
+  return lookupService.searchBrands(user.orgId, query, track);
 }
 
 export async function createBrandAction(name: string) {
@@ -223,9 +224,9 @@ export async function renameBrandAction(id: string, name: string) {
   return renamed;
 }
 
-export async function searchModelsAction(brandId: string, query: string) {
+export async function searchModelsAction(brandId: string, query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchModels(user.orgId, brandId, query);
+  return lookupService.searchModels(user.orgId, brandId, query, track);
 }
 
 export async function createModelAction(brandId: string, name: string) {
@@ -240,9 +241,9 @@ export async function renameModelAction(id: string, name: string) {
   return renamed;
 }
 
-export async function searchGradesAction(modelId: string, query: string) {
+export async function searchGradesAction(modelId: string, query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchGrades(user.orgId, modelId, query);
+  return lookupService.searchGrades(user.orgId, modelId, query, track);
 }
 
 export async function createGradeAction(modelId: string, name: string) {
@@ -259,9 +260,9 @@ export async function renameGradeAction(id: string, name: string) {
 
 // ── Auction Hall / Transport Company / Vehicle Location ───────────────────
 
-export async function searchAuctionHallsAction(query: string) {
+export async function searchAuctionHallsAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchAuctionHalls(user.orgId, query);
+  return lookupService.searchAuctionHalls(user.orgId, query, track);
 }
 
 export async function createAuctionHallAction(name: string) {
@@ -278,9 +279,9 @@ export async function renameAuctionHallAction(id: string, name: string) {
 
 // ── Supplier (FL only) ─────────────────────────────────────────────────
 
-export async function searchSuppliersAction(query: string) {
+export async function searchSuppliersAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchSuppliers(user.orgId, query);
+  return lookupService.searchSuppliers(user.orgId, query, track);
 }
 
 export async function createSupplierAction(name: string) {
@@ -295,9 +296,9 @@ export async function renameSupplierAction(id: string, name: string) {
   return renamed;
 }
 
-export async function searchTransportCompaniesAction(query: string) {
+export async function searchTransportCompaniesAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchTransportCompanies(user.orgId, query);
+  return lookupService.searchTransportCompanies(user.orgId, query, track);
 }
 
 export async function createTransportCompanyAction(name: string) {
@@ -346,9 +347,9 @@ export async function renameInspectionByAction(id: string, name: string) {
   return renamed;
 }
 
-export async function searchVehicleLocationsAction(query: string) {
+export async function searchVehicleLocationsAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchVehicleLocations(user.orgId, query);
+  return lookupService.searchVehicleLocations(user.orgId, query, track);
 }
 
 export async function createVehicleLocationAction(name: string) {
@@ -365,9 +366,9 @@ export async function renameVehicleLocationAction(id: string, name: string) {
 
 // ── Freight Agent ─────────────────────────────────────────────────────────
 
-export async function searchFreightAgentsAction(query: string, method?: "RORO" | "CONTAINER") {
+export async function searchFreightAgentsAction(query: string, method?: "RORO" | "CONTAINER", track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchFreightAgents(user.orgId, query, method);
+  return lookupService.searchFreightAgents(user.orgId, query, method, track);
 }
 
 export async function createFreightAgentAction(
@@ -393,9 +394,9 @@ export async function updateFreightAgentAction(
 
 // ── Packing Agent (only relevant when shippingMethod = CONTAINER) ─────────
 
-export async function searchPackingAgentsAction(query: string) {
+export async function searchPackingAgentsAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return lookupService.searchPackingAgents(user.orgId, query);
+  return lookupService.searchPackingAgents(user.orgId, query, track);
 }
 
 export async function createPackingAgentAction(name: string) {
@@ -412,9 +413,9 @@ export async function renamePackingAgentAction(id: string, name: string) {
 
 // ── Customer ──────────────────────────────────────────────────────────────
 
-export async function searchCustomersAction(query: string) {
+export async function searchCustomersAction(query: string, track?: TrackFilter) {
   const user = await requireUser();
-  return customerService.searchCustomers(user.orgId, query);
+  return customerService.searchCustomers(user.orgId, query, track);
 }
 
 export async function createCustomerAction(name: string) {
