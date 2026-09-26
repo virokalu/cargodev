@@ -11,6 +11,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
+import { buildTrackWhere, type TrackFilter } from "@/lib/vehicle-track";
 import type { SessionUser } from "@/lib/services/auth-guard";
 import {
   customerCreateSchema,
@@ -35,12 +36,21 @@ export async function getCustomerById(orgId: string, id: string): Promise<Custom
   return customer ?? null;
 }
 
-export async function searchCustomers(orgId: string, query: string): Promise<CustomerOption[]> {
+export async function searchCustomers(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<CustomerOption[]> {
   return prisma.user.findMany({
     where: {
       org_id: orgId,
       userType: "CUSTOMER",
       name: { contains: query, mode: "insensitive" },
+      // Vehicle list filter only: offer customers who own a vehicle in the
+      // active tab. The Add Vehicle combobox passes no track.
+      ...(track && {
+        vehicles: { some: { org_id: orgId, deletedAt: null, ...buildTrackWhere(track) } },
+      }),
     },
     select: { id: true, name: true },
     orderBy: { name: "asc" },

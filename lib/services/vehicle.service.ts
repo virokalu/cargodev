@@ -25,7 +25,7 @@ import {
   flattenFieldErrors,
 } from "@/lib/validation/vehicle.schema";
 import { assignNextSerial, assignLegacySerial, correctSerialNumber } from "@/lib/services/serial.service";
-import { computeEffectiveTrack } from "@/lib/vehicle-track";
+import { buildTrackWhere, computeEffectiveTrack, type TrackFilter } from "@/lib/vehicle-track";
 import * as activityLog from "@/lib/services/activity-log.service";
 import * as notificationService from "@/lib/services/notification.service";
 import {
@@ -1636,16 +1636,8 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   // (or to local, the mirror direction) belongs in that track's list from
   // that point on, even though its serialPrefix (and serial string) never
   // changes.
-  if (params.track === "FC") {
-    andConditions.push({ OR: [{ serialPrefix: "FC" }, { convertedToExport: true }] });
-    andConditions.push({ convertedToLocal: false });
-  } else if (params.track === "FL") {
-    andConditions.push({
-      OR: [
-        { serialPrefix: "FL", convertedToExport: false },
-        { serialPrefix: "FC", convertedToLocal: true },
-      ],
-    });
+  if (params.track !== "ALL") {
+    andConditions.push(buildTrackWhere(params.track));
   }
   if (params.shipmentStatus.length > 0) {
     // Multiple selected statuses are OR'd together (matches "PENDING or
@@ -1962,9 +1954,20 @@ export async function listVehicles(
 
 /** Distinct, non-null destinations actually in use — powers the Destination
  * filter dropdown so it only ever lists values that exist. */
-export async function listDistinctDestinations(orgId: string): Promise<string[]> {
+export async function listDistinctDestinations(
+  orgId: string,
+  track?: TrackFilter
+): Promise<string[]> {
   const rows = await prisma.vehicle.findMany({
-    where: { org_id: orgId, deletedAt: null, destination: { not: null } },
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      destination: { not: null },
+      // Optional so the mobile endpoint keeps returning every destination;
+      // the web filter bar passes the active tab so it only offers
+      // destinations that tab actually has vehicles for.
+      ...(track && { AND: [buildTrackWhere(track)] }),
+    },
     select: { destination: true },
     distinct: ["destination"],
     orderBy: { destination: "asc" },
