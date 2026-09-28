@@ -137,7 +137,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               <FilterCombobox
                 value={selected.brand}
                 onChange={(option) => push({ brandId: option?.id ?? "ALL", modelId: "ALL", gradeId: "ALL" })}
-                search={(query) => searchBrandsAction(query)}
+                search={(query) => searchBrandsAction(query, params.track)}
                 placeholder="All brands"
                 allLabel="All brands"
               />
@@ -148,7 +148,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 value={selected.model}
                 onChange={(option) => push({ modelId: option?.id ?? "ALL", gradeId: "ALL" })}
                 search={(query) =>
-                  params.brandId !== "ALL" ? searchModelsAction(params.brandId, query) : Promise.resolve([])
+                  params.brandId !== "ALL" ? searchModelsAction(params.brandId, query, params.track) : Promise.resolve([])
                 }
                 placeholder="All models"
                 allLabel="All models"
@@ -162,7 +162,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 value={selected.grade}
                 onChange={(option) => push({ gradeId: option?.id ?? "ALL" })}
                 search={(query) =>
-                  params.modelId !== "ALL" ? searchGradesAction(params.modelId, query) : Promise.resolve([])
+                  params.modelId !== "ALL" ? searchGradesAction(params.modelId, query, params.track) : Promise.resolve([])
                 }
                 placeholder="All grades"
                 allLabel="All grades"
@@ -178,7 +178,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               <FilterCombobox
                 value={selected.auctionHall}
                 onChange={(option) => push({ auctionHallId: option?.id ?? "ALL" })}
-                search={searchAuctionHallsAction}
+                search={(query) => searchAuctionHallsAction(query, params.track)}
                 placeholder="All auction halls"
                 allLabel="All auction halls"
               />
@@ -189,7 +189,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                 <FilterCombobox
                   value={selected.supplier}
                   onChange={(option) => push({ supplierId: option?.id ?? "ALL" })}
-                  search={searchSuppliersAction}
+                  search={(query) => searchSuppliersAction(query, params.track)}
                   placeholder="All suppliers"
                   allLabel="All suppliers"
                 />
@@ -202,7 +202,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                   <FilterCombobox
                     value={selected.freightAgent}
                     onChange={(option) => push({ freightAgentId: option?.id ?? "ALL" })}
-                    search={(query) => searchFreightAgentsAction(query)}
+                    search={(query) => searchFreightAgentsAction(query, undefined, params.track)}
                     placeholder="All forwarding agents"
                     allLabel="All forwarding agents"
                   />
@@ -212,7 +212,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
                   <FilterCombobox
                     value={selected.packingAgent}
                     onChange={(option) => push({ packingAgentId: option?.id ?? "ALL" })}
-                    search={(query) => searchPackingAgentsAction(query)}
+                    search={(query) => searchPackingAgentsAction(query, params.track)}
                     placeholder="All packing agents"
                     allLabel="All packing agents"
                   />
@@ -282,7 +282,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               <FilterCombobox
                 value={selected.vehicleLocation}
                 onChange={(option) => push({ vehicleLocationId: option?.id ?? "ALL" })}
-                search={searchVehicleLocationsAction}
+                search={(query) => searchVehicleLocationsAction(query, params.track)}
                 placeholder="All vehicle locations"
                 allLabel="All vehicle locations"
               />
@@ -292,7 +292,7 @@ export function VehicleFiltersPanel({ params, selected }: VehicleFiltersPanelPro
               <FilterCombobox
                 value={selected.transportCompany}
                 onChange={(option) => push({ transportById: option?.id ?? "ALL" })}
-                search={searchTransportCompaniesAction}
+                search={(query) => searchTransportCompaniesAction(query, params.track)}
                 placeholder="All transport companies"
                 allLabel="All transport companies"
               />

@@ -5,6 +5,7 @@ import { listVehicles, listDistinctDestinations } from "@/lib/services/vehicle.s
 import { getCustomerById } from "@/lib/services/customer.service";
 import {
   listRowColourStatuses,
+  listRowColourStatusesInUse,
   getBrandById,
   getModelById,
   getGradeById,
@@ -33,6 +34,7 @@ export default async function VehiclesPage({
     { rows, total },
     destinations,
     rowColourStatuses,
+    filterRowColourStatuses,
     customer,
     brand,
     model,
@@ -45,8 +47,11 @@ export default async function VehiclesPage({
     transportCompany,
   ] = await Promise.all([
     listVehicles(user.orgId, params),
-    listDistinctDestinations(user.orgId),
+    listDistinctDestinations(user.orgId, params.track),
+    // Full list — the table's inline Row Colour editor must offer every colour.
     listRowColourStatuses(user.orgId),
+    // Filter dropdown only offers colours the active tab actually uses.
+    listRowColourStatusesInUse(user.orgId, params.track),
     params.customerId !== "ALL" ? getCustomerById(user.orgId, params.customerId) : null,
     params.brandId !== "ALL" ? getBrandById(user.orgId, params.brandId) : null,
     params.modelId !== "ALL" ? getModelById(user.orgId, params.modelId) : null,
@@ -104,7 +109,7 @@ export default async function VehiclesPage({
       <VehicleFiltersBar
         params={params}
         destinations={destinations}
-        rowColourStatuses={rowColourStatuses}
+        rowColourStatuses={filterRowColourStatuses}
         selected={selected}
       />
 

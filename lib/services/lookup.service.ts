@@ -10,6 +10,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { ServiceError } from "@/lib/errors";
+import { buildTrackWhere, type TrackFilter } from "@/lib/vehicle-track";
+import type { Prisma } from "@prisma/client";
 
 export interface LookupOption {
   id: string;
@@ -17,6 +19,15 @@ export interface LookupOption {
 }
 
 const SEARCH_LIMIT = 20;
+
+/** Relation filter "at least one live vehicle in this track uses this row".
+ * Used by the vehicle list's filter dropdowns so each tab only offers values
+ * that exist in that tab's data — picking one can never land on an empty
+ * table. Optional everywhere: the vehicle form's searches pass no track and
+ * still see every lookup row. */
+function usedByVehiclesIn(orgId: string, track: TrackFilter): Prisma.VehicleListRelationFilter {
+  return { some: { org_id: orgId, deletedAt: null, ...buildTrackWhere(track) } };
+}
 
 /** Every rename below fetches the row first and checks this — `update({where:{id}})`
  * alone can't filter by org_id (id is already the unique key), so ownership
@@ -33,9 +44,18 @@ function assertBelongsToOrg<T extends { org_id: string }>(
 
 // ── Brand ──────────────────────────────────────────────────────────────────
 
-export async function searchBrands(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchBrands(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.brand.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      // A brand has no direct vehicles relation — it's reached through its models.
+      ...(track && { models: { some: { vehicles: usedByVehiclesIn(orgId, track) } } }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -91,10 +111,16 @@ export async function renameBrand(orgId: string, id: string, newName: string): P
 export async function searchModels(
   orgId: string,
   brandId: string,
-  query: string
+  query: string,
+  track?: TrackFilter
 ): Promise<LookupOption[]> {
   return prisma.vehicleModelRef.findMany({
-    where: { org_id: orgId, brand_id: brandId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      brand_id: brandId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -157,10 +183,16 @@ export async function renameModel(orgId: string, id: string, newName: string): P
 export async function searchGrades(
   orgId: string,
   modelId: string,
-  query: string
+  query: string,
+  track?: TrackFilter
 ): Promise<LookupOption[]> {
   return prisma.grade.findMany({
-    where: { org_id: orgId, model_id: modelId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      model_id: modelId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -217,9 +249,17 @@ export async function renameGrade(orgId: string, id: string, newName: string): P
 
 // ── Auction Hall ──────────────────────────────────────────────────────────
 
-export async function searchAuctionHalls(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchAuctionHalls(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.auctionHall.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -267,9 +307,17 @@ export async function renameAuctionHall(orgId: string, id: string, newName: stri
 
 // ── Supplier (FL only — alternative to Auction Hall) ────────────────────
 
-export async function searchSuppliers(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchSuppliers(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.supplier.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -316,9 +364,17 @@ export async function renameSupplier(orgId: string, id: string, newName: string)
 
 // ── Transport Company ────────────────────────────────────────────────────
 
-export async function searchTransportCompanies(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchTransportCompanies(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.transportCompany.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -486,9 +542,17 @@ export async function renameInspectionBy(orgId: string, id: string, newName: str
 
 // ── Packing Agent (only relevant when shippingMethod = CONTAINER) ─────────
 
-export async function searchPackingAgents(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchPackingAgents(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.packingAgent.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -543,9 +607,17 @@ export async function renamePackingAgent(
 
 // ── Vehicle Location ──────────────────────────────────────────────────────
 
-export async function searchVehicleLocations(orgId: string, query: string): Promise<LookupOption[]> {
+export async function searchVehicleLocations(
+  orgId: string,
+  query: string,
+  track?: TrackFilter
+): Promise<LookupOption[]> {
   return prisma.vehicleLocation.findMany({
-    where: { org_id: orgId, name: { contains: query, mode: "insensitive" } },
+    where: {
+      org_id: orgId,
+      name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
     take: SEARCH_LIMIT,
@@ -632,12 +704,14 @@ export async function getFreightAgentById(orgId: string, id: string): Promise<Lo
 export async function searchFreightAgents(
   orgId: string,
   query: string,
-  method?: "RORO" | "CONTAINER"
+  method?: "RORO" | "CONTAINER",
+  track?: TrackFilter
 ): Promise<FreightAgentOption[]> {
   return prisma.freightAgent.findMany({
     where: {
       org_id: orgId,
       name: { contains: query, mode: "insensitive" },
+      ...(track && { vehicles: usedByVehiclesIn(orgId, track) }),
       ...(method === "RORO" && { offersRoro: true }),
       ...(method === "CONTAINER" && { offersContainer: true }),
     },
@@ -707,6 +781,20 @@ export async function updateFreightAgent(
 
 // ── Read-only lists (Row Colour Status — plain select, admin-managed in
 // Settings, not inline-create from the vehicle form) ───────────────────────
+
+/** Row colour statuses at least one vehicle in the given track currently
+ * has — for the vehicle list's Row Colour filter, so it doesn't offer
+ * colours that would filter the tab down to nothing. */
+export async function listRowColourStatusesInUse(
+  orgId: string,
+  track: TrackFilter
+): Promise<(LookupOption & { colour: string; transportCellOnly: boolean })[]> {
+  return prisma.rowColourStatus.findMany({
+    where: { org_id: orgId, vehicles: usedByVehiclesIn(orgId, track) },
+    select: { id: true, name: true, colour: true, transportCellOnly: true },
+    orderBy: { name: "asc" },
+  });
+}
 
 export async function listRowColourStatuses(orgId: string): Promise<
   (LookupOption & { colour: string; transportCellOnly: boolean })[]
