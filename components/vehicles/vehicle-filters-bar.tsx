@@ -43,6 +43,7 @@ interface RowColourStatusOption {
 interface VehicleFiltersBarProps {
   params: VehicleListParams;
   destinations: string[];
+  partnerNames: string[];
   rowColourStatuses: RowColourStatusOption[];
   selected: VehicleFilterSelections;
 }
@@ -62,6 +63,7 @@ function statusTriggerLabel(selected: ShipmentStatus[]): string {
 export function VehicleFiltersBar({
   params,
   destinations,
+  partnerNames,
   rowColourStatuses,
   selected,
 }: VehicleFiltersBarProps) {
@@ -186,9 +188,11 @@ export function VehicleFiltersBar({
           />
         </div>
 
-        {/* Destination / Row Colour only list values the active tab has
-            vehicles for, and are hidden entirely when there are none. */}
-        {(destinations.length > 0 || params.destination !== "ALL") && (
+        {/* Destination only matters for export (FC) vehicles — FL is sold
+            locally, so this slot shows the Partner Name filter instead on
+            that tab (below). Row Colour still only lists values the active
+            tab has vehicles for, and is hidden entirely when there are none. */}
+        {params.track === "FC" && (destinations.length > 0 || params.destination !== "ALL") && (
         <Select
           value={params.destination}
           onValueChange={(value) =>
@@ -207,6 +211,36 @@ export function VehicleFiltersBar({
             {destinations.map((destination) => (
               <SelectItem key={destination} value={destination} label={destination}>
                 {destination}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        )}
+
+        {/* FL only — picking a partner name implies Partnership = Yes (a
+            vehicle only ever has one when hasPartnership is true), so no
+            separate "Partnership: Yes" clause is needed alongside it. The
+            standalone Yes/No Partnership filter in the side panel still
+            covers "No partnership" and "any partner," which this can't. */}
+        {params.track === "FL" && (partnerNames.length > 0 || params.partnerName !== "ALL") && (
+        <Select
+          value={params.partnerName}
+          onValueChange={(value) =>
+            router.push(buildVehiclesHref(params, { partnerName: value ?? "ALL", page: 1 }))
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[170px]">
+            <SelectValue placeholder="All partners">
+              {(itemValue: string) => (itemValue === "ALL" ? "All partners" : itemValue)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL" label="All partners">
+              All partners
+            </SelectItem>
+            {partnerNames.map((partnerName) => (
+              <SelectItem key={partnerName} value={partnerName} label={partnerName}>
+                {partnerName}
               </SelectItem>
             ))}
           </SelectContent>

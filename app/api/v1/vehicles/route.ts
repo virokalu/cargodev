@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     q: q("q"),
     status: searchParams.getAll("status"),
     destination: q("destination"),
+    partner: q("partner"),
     customer: q("customer"),
     rowColour: q("rowColour"),
     rowColourNot: q("rowColourNot"),
