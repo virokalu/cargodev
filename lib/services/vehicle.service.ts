@@ -1496,6 +1496,10 @@ export interface VehicleListParams {
    * matching how every other "ALL" filter here behaves. */
   shipmentStatus: EffectiveShipmentStatus[];
   destination: string | "ALL";
+  /** FL only — filters to vehicles with this exact partner name. Implies
+   * hasPartnership = true, since partnerName is only ever written alongside
+   * it (see createVehicle/updateVehicle), so no separate clause is needed. */
+  partnerName: string | "ALL";
   customerId: string | "ALL";
   rowColourStatusId: string | "ALL";
   /** Excludes one specific row colour status rather than filtering to it —
@@ -1668,6 +1672,7 @@ function buildVehicleListWhere(orgId: string, params: VehicleListParams): Prisma
   applyTriStateFilter(where, "logBook", params.logBook);
   applyTriStateFilter(where, "extraKey", params.extraKey);
   if (params.hasPartnership !== "ALL") where.hasPartnership = params.hasPartnership === "YES";
+  if (params.partnerName !== "ALL") where.partnerName = params.partnerName;
   applyTriStateFilter(where, "paidByCustomer", params.paidByCustomer);
   if (params.sellingPriceCurrency !== "ALL") where.sellingPriceCurrency = params.sellingPriceCurrency;
   if (params.convertedToExport !== "ALL") where.convertedToExport = params.convertedToExport === "YES";
@@ -1973,6 +1978,29 @@ export async function listDistinctDestinations(
     orderBy: { destination: "asc" },
   });
   return rows.map((row) => row.destination).filter((d): d is string => d !== null);
+}
+
+/** Distinct, non-null partner names actually in use — powers the FL tab's
+ * Partner Name filter dropdown, same pattern as listDistinctDestinations
+ * above. A vehicle only ever has a partnerName when hasPartnership is true
+ * (see createVehicle/updateVehicle), so this list is implicitly already
+ * scoped to partnered vehicles. */
+export async function listDistinctPartnerNames(
+  orgId: string,
+  track?: TrackFilter
+): Promise<string[]> {
+  const rows = await prisma.vehicle.findMany({
+    where: {
+      org_id: orgId,
+      deletedAt: null,
+      partnerName: { not: null },
+      ...(track && { AND: [buildTrackWhere(track)] }),
+    },
+    select: { partnerName: true },
+    distinct: ["partnerName"],
+    orderBy: { partnerName: "asc" },
+  });
+  return rows.map((row) => row.partnerName).filter((p): p is string => p !== null);
 }
 
 export interface VehicleFilterOptions {

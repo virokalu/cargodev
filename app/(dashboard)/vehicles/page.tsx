@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/services/auth-guard";
-import { listVehicles, listDistinctDestinations } from "@/lib/services/vehicle.service";
+import { listVehicles, listDistinctDestinations, listDistinctPartnerNames } from "@/lib/services/vehicle.service";
 import { getCustomerById } from "@/lib/services/customer.service";
 import {
   listRowColourStatuses,
@@ -33,6 +33,7 @@ export default async function VehiclesPage({
   const [
     { rows, total },
     destinations,
+    partnerNames,
     rowColourStatuses,
     filterRowColourStatuses,
     customer,
@@ -48,6 +49,7 @@ export default async function VehiclesPage({
   ] = await Promise.all([
     listVehicles(user.orgId, params),
     listDistinctDestinations(user.orgId, params.track),
+    listDistinctPartnerNames(user.orgId, params.track),
     // Full list — the table's inline Row Colour editor must offer every colour.
     listRowColourStatuses(user.orgId),
     // Filter dropdown only offers colours the active tab actually uses.
@@ -109,6 +111,7 @@ export default async function VehiclesPage({
       <VehicleFiltersBar
         params={params}
         destinations={destinations}
+        partnerNames={partnerNames}
         rowColourStatuses={filterRowColourStatuses}
         selected={selected}
       />
