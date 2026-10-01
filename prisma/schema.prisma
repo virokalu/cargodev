@@ -48,7 +48,7 @@ enum VehicleDocumentType {
   FREIGHT_INVOICE
   PURCHASE_INVOICE // FL only — invoice from whoever the vehicle was bought from. Accepts image or PDF (lib/validation/upload.schema.ts)
   SALES_INVOICE // FL only — invoice issued when the vehicle is sold locally
-  CUSTOMER_SHAKEN_SHO // FL only — the customer's own shaken-sho, distinct from the vehicle's SHAKEN_SHO above
+  MEGI_HENKO // FL only — the customer's own shaken-sho, distinct from the vehicle's SHAKEN_SHO above. Was CUSTOMER_SHAKEN_SHO; renamed in 20261001_rename_customer_shaken_sho_to_megi_henko.
   CASH_RECEIPT // FL only — accepts image or PDF, same as PURCHASE_INVOICE
   OTHER
 }

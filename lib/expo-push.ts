@@ -28,6 +28,15 @@ export interface PushNotificationInput {
   data?: Record<string, unknown>;
 }
 
+export interface PushNotificationTarget {
+  expoPushToken: string;
+  // Merged on top of PushNotificationInput.data below — lets the caller
+  // attach a field that differs per recipient (e.g. each user's own
+  // Notification id) while title/body/data stay shared across the whole
+  // send.
+  data?: Record<string, unknown>;
+}
+
 /**
  * Fire-and-forget, best-effort — same treatment as pusher-server.ts's
  * triggerUserEvent: never let a push failure block the mutation that
@@ -41,22 +50,22 @@ export interface PushNotificationInput {
  * must never shift which token a later chunk's tickets get attributed to.
  */
 export async function sendExpoPushNotifications(
-  expoPushTokens: string[],
+  targets: PushNotificationTarget[],
   notification: PushNotificationInput
 ): Promise<void> {
   // Tokens are already validated at registration time (device-
   // token.service.ts's Expo.isExpoPushToken check), but a defensive filter
   // here costs nothing and guards against a token going stale in some
   // future Expo SDK format change.
-  const validTokens = expoPushTokens.filter((token) => Expo.isExpoPushToken(token));
-  if (validTokens.length === 0) return;
+  const validTargets = targets.filter((target) => Expo.isExpoPushToken(target.expoPushToken));
+  if (validTargets.length === 0) return;
 
   const expo = getClient();
-  const messages: ExpoPushMessage[] = validTokens.map((to) => ({
-    to,
+  const messages: ExpoPushMessage[] = validTargets.map((target) => ({
+    to: target.expoPushToken,
     title: notification.title,
     body: notification.body,
-    data: notification.data,
+    data: { ...notification.data, ...target.data },
     sound: "default",
   }));
 
@@ -65,14 +74,14 @@ export async function sendExpoPushNotifications(
   let cursor = 0;
 
   for (const chunk of chunks) {
-    const chunkTokens = validTokens.slice(cursor, cursor + chunk.length);
+    const chunkTargets = validTargets.slice(cursor, cursor + chunk.length);
     cursor += chunk.length;
 
     try {
       const tickets = await expo.sendPushNotificationsAsync(chunk);
       tickets.forEach((ticket, i) => {
         if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
-          deadTokens.push(chunkTokens[i]);
+          deadTokens.push(chunkTargets[i].expoPushToken);
         }
       });
     } catch (error) {

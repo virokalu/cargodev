@@ -92,15 +92,23 @@ export async function unregisterDeviceToken(
   });
 }
 
-/** Every registered token for the given recipients, across every device
- * each is logged into — used by lib/expo-push.ts to build a send list. */
-export async function listDeviceTokensForUsers(orgId: string, userIds: string[]): Promise<string[]> {
+export interface UserDeviceToken {
+  userId: string;
+  expoPushToken: string;
+}
+
+/** Every registered token for the given recipients, across every device each
+ * is logged into — used by notification.service.ts's sendMobilePush to build
+ * a send list. Keeps userId alongside each token (not just a flat token
+ * list) so that send can attach each recipient's own Notification id to
+ * their device's push payload — a shared tablet or a user with two phones
+ * still only gets its own row's id, never someone else's. */
+export async function listDeviceTokensForUsers(orgId: string, userIds: string[]): Promise<UserDeviceToken[]> {
   if (userIds.length === 0) return [];
-  const rows = await prisma.deviceToken.findMany({
+  return prisma.deviceToken.findMany({
     where: { org_id: orgId, userId: { in: userIds } },
-    select: { expoPushToken: true },
+    select: { userId: true, expoPushToken: true },
   });
-  return rows.map((r) => r.expoPushToken);
 }
 
 /** Called after a send attempt when Expo's ticket/receipt marks a token
