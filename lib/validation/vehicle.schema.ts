@@ -251,7 +251,7 @@ export const vehicleCreateSchema = z
             "FREIGHT_INVOICE",
             "PURCHASE_INVOICE",
             "SALES_INVOICE",
-            "CUSTOMER_SHAKEN_SHO",
+            "MEGI_HENKO",
             "CASH_RECEIPT",
             "OTHER",
           ]),
