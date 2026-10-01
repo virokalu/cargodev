@@ -23,6 +23,7 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   search: "",
   shipmentStatus: [],
   destination: "ALL",
+  partnerName: "ALL",
   customerId: "ALL",
   rowColourStatusId: "ALL",
   rowColourStatusIdNot: "ALL",
@@ -48,7 +49,9 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   etdTo: null,
   etaFrom: null,
   etaTo: null,
-  sortBy: "serial",
+  // Default sort for both FC and FL tabs — most recently purchased vehicle
+  // first. (Was "serial" desc.)
+  sortBy: "purchaseDate",
   sortDir: "desc",
 };
 
@@ -137,6 +140,7 @@ export function parseVehicleListParams(
       SHIPMENT_STATUSES.includes(s as ShipmentStatus)
     ),
     destination: firstValue(searchParams.destination) || "ALL",
+    partnerName: firstValue(searchParams.partner) || "ALL",
     customerId: firstValue(searchParams.customer) || "ALL",
     rowColourStatusId: firstValue(searchParams.rowColour) || "ALL",
     rowColourStatusIdNot: firstValue(searchParams.rowColourNot) || "ALL",
@@ -186,6 +190,7 @@ export function buildVehiclesHref(
   if (merged.track !== VEHICLE_LIST_DEFAULTS.track) query.set("track", merged.track);
   for (const status of merged.shipmentStatus) query.append("status", status);
   if (merged.destination !== "ALL") query.set("destination", merged.destination);
+  if (merged.partnerName !== "ALL") query.set("partner", merged.partnerName);
   if (merged.customerId !== "ALL") query.set("customer", merged.customerId);
   if (merged.rowColourStatusId !== "ALL") query.set("rowColour", merged.rowColourStatusId);
   if (merged.rowColourStatusIdNot !== "ALL") query.set("rowColourNot", merged.rowColourStatusIdNot);

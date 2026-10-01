@@ -47,6 +47,14 @@ export interface EmitParams {
   body: string;
   vehicleId?: string;
   recipientUserIds: string[];
+  // Populated by emit() itself (userId -> that recipient's own Notification
+  // row id) — never set by callers. Every call site builds one EmitParams
+  // object and passes that *same reference* to both emit(tx, params) and,
+  // once the transaction commits, notifyRealtime(params); stashing the
+  // created ids back onto it here is how notifyRealtime's mobile-push branch
+  // later learns the id it needs without every call site having to thread it
+  // through separately.
+  recipientNotificationIds?: Record<string, string>;
 }
 
 /** Admin/Manager staff in the org, minus whoever caused the event (no point
@@ -75,7 +83,10 @@ export async function listNotifiableStaffIds(
  * the same params once the transaction has actually committed. */
 export async function emit(tx: TxClient, params: EmitParams): Promise<void> {
   if (params.recipientUserIds.length === 0) return;
-  await tx.notification.createMany({
+  // createManyAndReturn (not plain createMany) so each row's own id is known
+  // here — notifyRealtime's mobile-push branch needs it per recipient, see
+  // EmitParams.recipientNotificationIds above.
+  const created = await tx.notification.createManyAndReturn({
     data: params.recipientUserIds.map((userId) => ({
       org_id: params.orgId,
       userId,
@@ -84,7 +95,9 @@ export async function emit(tx: TxClient, params: EmitParams): Promise<void> {
       body: params.body,
       vehicleId: params.vehicleId ?? null,
     })),
+    select: { id: true, userId: true },
   });
+  params.recipientNotificationIds = Object.fromEntries(created.map((row) => [row.userId, row.id]));
 }
 
 /** Post-commit, best-effort real-time push — never awaited by callers, never
@@ -110,11 +123,35 @@ export function notifyRealtime(params: EmitParams): void {
 async function sendMobilePush(params: EmitParams): Promise<void> {
   const tokens = await listDeviceTokensForUsers(params.orgId, params.recipientUserIds);
   if (tokens.length === 0) return;
-  await sendExpoPushNotifications(tokens, {
-    title: params.title,
-    body: params.body,
-    data: { event: params.event, vehicleId: params.vehicleId ?? null },
-  });
+
+  // Same vehicleSerial the REST GET /notifications response resolves
+  // (attachVehicleSerials below, off the same vehicleId) — resolved fresh
+  // here since EmitParams only carries the vehicleId. One lookup covers
+  // every recipient: a single emit() call always targets at most one
+  // vehicle, never a different one per recipient.
+  const vehicleSerial = params.vehicleId
+    ? ((await prisma.vehicle.findUnique({ where: { id: params.vehicleId }, select: { serial: true } }))?.serial ??
+      null)
+    : null;
+
+  await sendExpoPushNotifications(
+    tokens.map((token) => ({
+      expoPushToken: token.expoPushToken,
+      // notificationId is this recipient's own Notification row (set by
+      // emit() above) — the mobile app marks it read on tap. Falls back to
+      // null only if this device's user somehow isn't in
+      // recipientNotificationIds (emit() never ran, or ran with zero
+      // recipients) — shouldn't happen since sendMobilePush is only ever
+      // called after emit() for the same recipient list, but a push must
+      // never throw into its fire-and-forget caller over a missing id.
+      data: { vehicleSerial, notificationId: params.recipientNotificationIds?.[token.userId] ?? null },
+    })),
+    {
+      title: params.title,
+      body: params.body,
+      data: { event: params.event, vehicleId: params.vehicleId ?? null },
+    }
+  );
 }
 
 export interface NotificationListItem {

@@ -28,7 +28,7 @@ export const DOCUMENT_TYPE_META: Record<VehicleDocumentType, { label: string; ac
   FREIGHT_INVOICE: { label: "Freight Invoice", accept: PDF_ONLY },
   PURCHASE_INVOICE: { label: "Purchase Invoice", accept: PDF_OR_IMAGE },
   SALES_INVOICE: { label: "Sales Invoice", accept: PDF_ONLY },
-  CUSTOMER_SHAKEN_SHO: { label: "Customer Shaken-sho", accept: PDF_ONLY },
+  MEGI_HENKO: { label: "Megi Henko", accept: PDF_ONLY },
   CASH_RECEIPT: { label: "Cash Receipt", accept: PDF_OR_IMAGE },
   OTHER: { label: "Other Documents", accept: PDF_ONLY },
 };
@@ -52,6 +52,6 @@ export const FL_NAMED_DOCUMENT_TYPES: VehicleDocumentType[] = [
   "PURCHASE_INVOICE",
   "SALES_INVOICE",
   "SHAKEN_SHO",
-  "CUSTOMER_SHAKEN_SHO",
+  "MEGI_HENKO",
   "CASH_RECEIPT",
 ];

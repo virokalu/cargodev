@@ -286,6 +286,26 @@ push does not work inside Expo Go — you need a development build
 (`expo-dev-client`) to test it at all, on either platform. Push also isn't
 reliable in the iOS Simulator; test on a physical iPhone.
 
+**Push payload `data` field** — every push carries, alongside `title`/`body`:
+
+```json
+{
+  "event": "BOOKING_RECEIVED",
+  "vehicleId": "clxyz...",
+  "vehicleSerial": "FC-00123",
+  "notificationId": "clabc..."
+}
+```
+
+`vehicleSerial` and `notificationId` are the exact same values the matching
+row has in `GET /notifications`'s `NotificationListItem` (`vehicleSerial`,
+`id`). Both are `null` when the notification has no linked vehicle (or, for
+`notificationId`, in the unexpected case the id couldn't be resolved) — treat
+`null` the same way you would a `NotificationListItem` with no vehicle. On
+tap, use `notificationId` to call `POST /notifications/:id/read` and
+`vehicleSerial` to navigate to `GET /vehicles/:serial`, the same
+click-through behaviour described under Notifications above.
+
 ## Profile
 
 - `GET /api/v1/profile` — the calling user's own profile. Any authenticated staff role.

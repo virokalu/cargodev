@@ -238,7 +238,10 @@ async function runEtdApproachingReminders(
 /** Same 3-days-before-ETD trigger as the check above, but always
  * per-vehicle — a container-mate's document status can differ from its
  * neighbours', so this one is never grouped. Checks EC (all FC), LC
- * (Sri Lanka/Bangladesh only), and Inspection Report (all FC). */
+ * (Sri Lanka/Bangladesh only), and Inspection Report (only when the
+ * vehicle's own Inspection flag is Yes — a vehicle marked "No" never gets
+ * an Inspection Report upload slot in the form at all, so it can never
+ * satisfy this check and shouldn't be nagged about it). */
 async function runMissingDocumentReminders(
   orgId: string,
   recipientUserIds: string[],
@@ -258,6 +261,7 @@ async function runMissingDocumentReminders(
       id: true,
       serial: true,
       destination: true,
+      hasInspection: true,
       documents: { select: { documentType: true } },
     },
   });
@@ -270,7 +274,7 @@ async function runMissingDocumentReminders(
     if (vehicle.destination && LC_OPEN_DESTINATIONS.has(vehicle.destination) && !uploadedTypes.has("LC")) {
       missing.push("LC document");
     }
-    if (!uploadedTypes.has("INSPECTION_REPORT")) missing.push("Inspection report");
+    if (vehicle.hasInspection && !uploadedTypes.has("INSPECTION_REPORT")) missing.push("Inspection report");
     if (missing.length === 0) continue;
 
     const body = `${vehicle.serial}'s ETD is in 3 days — still missing: ${missing.join(", ")}.`;
