@@ -49,7 +49,9 @@ export const VEHICLE_LIST_DEFAULTS: VehicleListParams = {
   etdTo: null,
   etaFrom: null,
   etaTo: null,
-  sortBy: "serial",
+  // Default sort for both FC and FL tabs — most recently purchased vehicle
+  // first. (Was "serial" desc.)
+  sortBy: "purchaseDate",
   sortDir: "desc",
 };
 
