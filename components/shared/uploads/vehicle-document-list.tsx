@@ -18,12 +18,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Loader2, Trash2, Upload } from "lucide-react";
+import { FileText, Trash2, Upload } from "lucide-react";
 import type { VehicleDocumentType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { FileDropZone } from "@/components/shared/uploads/file-drop-zone";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
+import { DeleteFileButton } from "@/components/shared/uploads/delete-file-button";
 import { addVehicleDocumentAction, deleteVehicleDocumentAction } from "@/app/(dashboard)/vehicles/actions";
 import type { VehicleDocumentListItem } from "@/lib/services/file.service";
 
@@ -117,7 +118,6 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [inFlight, setInFlight] = useState<InFlightFile[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Mirrors props.documents, but readable synchronously inside handleStaged —
   // see the comment there for why an onChange callback can't read
@@ -168,10 +168,11 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
     props.onChange(next);
   }
 
+  // Confirmation now lives in DeleteFileButton, which manages its own
+  // pending/error state while this runs inside its dialog — no local
+  // deletingId bookkeeping needed here anymore.
   async function handleDelete(vehicleId: string, documentId: string) {
-    setDeletingId(documentId);
     await deleteVehicleDocumentAction(vehicleId, documentId);
-    setDeletingId(null);
     router.refresh();
   }
 
@@ -180,8 +181,17 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
 
   // Normalized so the list below has one render path regardless of mode —
   // "stage" documents have no id/uploader/date until they're actually
-  // persisted on save.
-  const items: { key: string; url: string; name: string; meta: string | null; onDelete: (() => void) | null }[] =
+  // persisted on save. confirmDelete distinguishes a real server delete
+  // (persist — needs the confirmation dialog) from a harmless "remove from
+  // what I haven't saved yet" local filter (stage — doesn't).
+  const items: {
+    key: string;
+    url: string;
+    name: string;
+    meta: string | null;
+    onDelete: (() => void | Promise<void>) | null;
+    confirmDelete: boolean;
+  }[] =
     props.mode === "persist"
       ? props.documents.map((doc) => ({
           key: doc.id,
@@ -189,6 +199,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
           name: doc.name,
           meta: `${doc.uploaderName} · ${formatDate(doc.createdAt)}`,
           onDelete: canDelete ? () => handleDelete(props.vehicleId, doc.id) : null,
+          confirmDelete: true,
         }))
       : props.documents.map((doc) => ({
           key: doc.url,
@@ -199,6 +210,7 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
           // AuctionSheetUpload's stage mode when a staged file is replaced
           // before submit.
           onDelete: () => props.onChange(props.documents.filter((d) => d.url !== doc.url)),
+          confirmDelete: false,
         }));
 
   return (
@@ -249,21 +261,26 @@ export function VehicleDocumentList(props: VehicleDocumentListProps) {
                   {item.name}
                 </a>
                 {item.meta && <span className="shrink-0 text-xs text-muted-foreground">{item.meta}</span>}
-                {item.onDelete && (
-                  <button
-                    type="button"
-                    aria-label="Delete document"
-                    disabled={deletingId === item.key}
-                    onClick={item.onDelete}
-                    className="shrink-0 text-destructive"
-                  >
-                    {deletingId === item.key ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
+                {item.onDelete &&
+                  (item.confirmDelete ? (
+                    <DeleteFileButton
+                      title={`Delete "${item.name}"?`}
+                      onConfirm={async () => {
+                        await item.onDelete!();
+                      }}
+                      triggerAriaLabel="Delete document"
+                      triggerClassName="shrink-0 text-destructive"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="Delete document"
+                      onClick={item.onDelete}
+                      className="shrink-0 text-destructive"
+                    >
                       <Trash2 className="size-4" />
-                    )}
-                  </button>
-                )}
+                    </button>
+                  ))}
               </div>
             ))}
           </div>
