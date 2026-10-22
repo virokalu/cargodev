@@ -11,10 +11,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Images, Loader2, Trash2, Upload } from "lucide-react";
+import { Images, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FileDropZone } from "@/components/shared/uploads/file-drop-zone";
 import { useFileUpload } from "@/components/shared/uploads/use-file-upload";
+import { DeleteFileButton } from "@/components/shared/uploads/delete-file-button";
 import {
   addVehiclePhotoAction,
   deleteVehiclePhotoAction,
@@ -114,7 +115,6 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [inFlight, setInFlight] = useState<InFlightFile[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   // Bookkeeping only — doesn't drive any render on its own (inFlight above
   // already re-renders as rows settle), so a ref instead of state. One
   // entry per handleNewFiles call (a "batch" = whatever the user selected
@@ -193,10 +193,11 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
     props.onChange(next);
   }
 
+  // Confirmation now lives in DeleteFileButton, which manages its own
+  // pending/error state while this runs inside its dialog — no local
+  // deletingId bookkeeping needed here anymore.
   async function handleDelete(vehicleId: string, photoId: string) {
-    setDeletingId(photoId);
     await deleteVehiclePhotoAction(vehicleId, photoId);
-    setDeletingId(null);
     router.refresh();
   }
 
@@ -206,12 +207,16 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
   // Normalized so the grid below has one render path regardless of mode —
   // "stage" photos are just URLs (no id/uploader/date until they're actually
   // persisted on save), "persist" photos carry the full server record.
-  const items: { key: string; url: string; onDelete: (() => void) | null }[] =
+  // confirmDelete distinguishes a real server delete (persist — needs the
+  // confirmation dialog) from a harmless "remove from what I haven't saved
+  // yet" local filter (stage — doesn't).
+  const items: { key: string; url: string; onDelete: (() => void | Promise<void>) | null; confirmDelete: boolean }[] =
     props.mode === "persist"
       ? props.photos.map((photo) => ({
           key: photo.id,
           url: photo.url,
           onDelete: canDelete ? () => handleDelete(props.vehicleId, photo.id) : null,
+          confirmDelete: true,
         }))
       : props.photos.map((url) => ({
           key: url,
@@ -220,6 +225,7 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
           // AuctionSheetUpload's stage mode when a staged file is replaced
           // before submit.
           onDelete: () => props.onChange(props.photos.filter((p) => p !== url)),
+          confirmDelete: false,
         }));
 
   return (
@@ -265,21 +271,27 @@ export function VehiclePhotoGallery(props: VehiclePhotoGalleryProps) {
                   alt=""
                   className="aspect-square w-full rounded-md border border-border object-cover"
                 />
-                {item.onDelete && (
-                  <button
-                    type="button"
-                    aria-label="Delete photo"
-                    disabled={deletingId === item.key}
-                    onClick={item.onDelete}
-                    className="absolute top-1 right-1 rounded-md bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    {deletingId === item.key ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
+                {item.onDelete &&
+                  (item.confirmDelete ? (
+                    <DeleteFileButton
+                      title="Delete this photo?"
+                      onConfirm={async () => {
+                        await item.onDelete!();
+                      }}
+                      triggerAriaLabel="Delete photo"
+                      triggerClassName="absolute top-1 right-1 rounded-md bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                      iconClassName="size-3.5"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="Delete photo"
+                      onClick={item.onDelete}
+                      className="absolute top-1 right-1 rounded-md bg-background/90 p-1 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                    >
                       <Trash2 className="size-3.5" />
-                    )}
-                  </button>
-                )}
+                    </button>
+                  ))}
               </div>
             ))}
           </div>
