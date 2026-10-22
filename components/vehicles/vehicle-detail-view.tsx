@@ -32,7 +32,7 @@ import { VehiclePhotoHero } from "@/components/vehicles/vehicle-photo-hero";
 import { VehicleDocumentList } from "@/components/shared/uploads/vehicle-document-list";
 import { DocumentTypeSection } from "@/components/shared/uploads/document-type-section";
 import { BackToVehiclesButton } from "@/components/vehicles/back-to-vehicles-button";
-import { ExportVehiclePdfButton } from "@/components/vehicles/export-vehicle-pdf-button";
+import { PdfFieldSelectionDialog } from "@/components/vehicles/pdf-field-selection-dialog";
 import { TriStateCell } from "@/components/shared/tri-state-cell";
 import { RowColourCell } from "@/components/shared/row-colour-cell";
 import { SHIPMENT_STATUS_META } from "@/lib/constants/shipment-status";
@@ -214,7 +214,7 @@ export function VehicleDetailView({ vehicle, files, canEditVehicle }: VehicleDet
               Edit
             </Button>
           )}
-          <ExportVehiclePdfButton
+          <PdfFieldSelectionDialog
             vehicle={vehicle}
             ecReceivedAt={ecReceivedAt}
             inspectionCompletedAt={inspectionCompletedAt}
